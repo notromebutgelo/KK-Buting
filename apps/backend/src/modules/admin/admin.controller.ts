@@ -11,10 +11,18 @@ import {
   bulkApproveVerifications,
   getAllRewards,
   createReward,
+  updateReward,
+  getRewardRedemptions,
+  markRewardRedemptionClaimed,
   getMerchants,
   getMerchantDetails,
   getPendingMerchants,
   approveMerchant,
+  updateMerchant,
+  updateMerchantStatus,
+  getMerchantTransactions,
+  getPointsTransactionsOverview,
+  updatePointsConversionRate,
   getYouthMembers,
   getYouthMember,
   updateYouthMemberProfile,
@@ -169,6 +177,39 @@ export async function addReward(req: AuthRequest, res: Response) {
   }
 }
 
+export async function updateRewardHandler(req: AuthRequest, res: Response) {
+  try {
+    await updateReward(req.params.rewardId, req.body);
+    return res.json({ message: "Reward updated" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function listRewardRedemptionsHandler(req: AuthRequest, res: Response) {
+  try {
+    const redemptions = await getRewardRedemptions({
+      rewardId: req.query.rewardId as string | undefined,
+      search: req.query.search as string | undefined,
+      status: req.query.status as string | undefined,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+    });
+    return res.json({ redemptions });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function markRewardRedemptionClaimedHandler(req: AuthRequest, res: Response) {
+  try {
+    await markRewardRedemptionClaimed(req.params.transactionId, req.user?.email || "admin");
+    return res.json({ message: "Redemption marked as claimed" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 export async function listMerchants(req: AuthRequest, res: Response) {
   try {
     const merchants = await getMerchants(req.query.status as string | undefined);
@@ -201,6 +242,70 @@ export async function approveMerchantHandler(req: AuthRequest, res: Response) {
   try {
     await approveMerchant(req.params.merchantId);
     return res.json({ message: "Merchant approved" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function updateMerchantHandler(req: AuthRequest, res: Response) {
+  try {
+    await updateMerchant(req.params.merchantId, req.body, req.user?.email || "admin");
+    return res.json({ message: "Merchant updated" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function updateMerchantStatusHandler(req: AuthRequest, res: Response) {
+  const status = String(req.body?.status || "");
+  if (!["approved", "rejected", "suspended"].includes(status)) {
+    return res.status(400).json({ error: "status must be approved, rejected, or suspended" });
+  }
+
+  try {
+    await updateMerchantStatus(req.params.merchantId, status as "approved" | "rejected" | "suspended", req.user?.email || "superadmin");
+    return res.json({ message: "Merchant status updated" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function listMerchantTransactionsHandler(req: AuthRequest, res: Response) {
+  try {
+    const transactions = await getMerchantTransactions(req.params.merchantId);
+    return res.json({ transactions });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function getPointsTransactionsOverviewHandler(req: AuthRequest, res: Response) {
+  try {
+    const data = await getPointsTransactionsOverview({
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+      merchantId: req.query.merchantId as string | undefined,
+      userId: req.query.userId as string | undefined,
+      status: req.query.status as string | undefined,
+      minPoints: req.query.minPoints ? Number(req.query.minPoints) : undefined,
+      maxPoints: req.query.maxPoints ? Number(req.query.maxPoints) : undefined,
+      search: req.query.search as string | undefined,
+    });
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function updatePointsConversionRateHandler(req: AuthRequest, res: Response) {
+  const pesosPerPoint = Number(req.body?.pesosPerPoint);
+  if (!Number.isFinite(pesosPerPoint) || pesosPerPoint <= 0) {
+    return res.status(400).json({ error: "pesosPerPoint must be a positive number" });
+  }
+
+  try {
+    await updatePointsConversionRate(pesosPerPoint, req.user?.email || "superadmin");
+    return res.json({ message: "Conversion rate updated" });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

@@ -780,9 +780,17 @@ export async function getAllRewards() {
   return rewardsSnap.docs.map((doc) => {
     const reward: AnyRecord = serializeRecord({ id: doc.id, ...doc.data() });
     const merchant = merchantMap.get(String(reward.merchantId || ""));
+    const stock = reward.unlimitedStock ? null : Number(reward.stock ?? reward.remainingStock ?? 0);
+    const expiryDate = reward.expiryDate || reward.expiresAt || null;
+    const isExpired = expiryDate ? new Date(String(expiryDate)).getTime() < Date.now() : false;
+    const isActive = reward.isActive !== false;
     return {
       ...reward,
       merchantName: merchant?.name || "Unknown Merchant",
+      status: !isActive ? "inactive" : isExpired ? "expired" : "active",
+      stock,
+      unlimitedStock: Boolean(reward.unlimitedStock),
+      expiryDate,
     };
   });
 }
@@ -790,9 +798,126 @@ export async function getAllRewards() {
 export async function createReward(data: Record<string, unknown>) {
   const ref = await db.collection("rewards").add({
     ...data,
+    isActive: data.isActive !== false,
+    stock: data.unlimitedStock ? null : Number(data.stock ?? 0),
+    unlimitedStock: Boolean(data.unlimitedStock),
+    expiryDate: data.expiryDate || null,
     createdAt: FieldValue.serverTimestamp(),
   });
   return ref.id;
+}
+
+export async function updateReward(rewardId: string, data: Record<string, unknown>) {
+  const payload: AnyRecord = {
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+
+  const allowedKeys = [
+    "title",
+    "description",
+    "imageUrl",
+    "points",
+    "stock",
+    "unlimitedStock",
+    "expiryDate",
+    "isActive",
+    "category",
+    "merchantId",
+    "validDays",
+  ];
+
+  for (const [key, value] of Object.entries(data)) {
+    if (allowedKeys.includes(key)) {
+      payload[key] = key === "stock" && data.unlimitedStock ? null : value;
+    }
+  }
+
+  await db.collection("rewards").doc(rewardId).set(payload, { merge: true });
+}
+
+export async function getRewardRedemptions(filters: {
+  rewardId?: string;
+  search?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+} = {}) {
+  const [transactionsSnap, rewardsSnap, usersSnap] = await Promise.all([
+    db.collection("transactions").where("type", "==", "redeem").get(),
+    db.collection("rewards").get(),
+    db.collection("users").get(),
+  ]);
+
+  const rewardsMap = new Map<string, AnyRecord>(
+    rewardsSnap.docs.map((doc) => [doc.id, serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord])
+  );
+  const usersMap = new Map<string, AnyRecord>(
+    usersSnap.docs.map((doc) => [doc.id, serializeRecord({ uid: doc.id, ...doc.data() }) as AnyRecord])
+  );
+
+  const search = normalizeString(filters.search);
+  const rewardId = String(filters.rewardId || "").trim();
+  const status = normalizeString(filters.status);
+  const dateFrom = filters.dateFrom ? new Date(filters.dateFrom) : null;
+  const dateTo = filters.dateTo ? new Date(`${filters.dateTo}T23:59:59`) : null;
+
+  return transactionsSnap.docs
+    .map((doc) => {
+      const transaction = serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord;
+      const reward = rewardsMap.get(String(transaction.rewardId || ""));
+      const user = usersMap.get(String(transaction.userId || ""));
+      const redemptionStatus = String(transaction.redemptionStatus || "active");
+      const redeemedAt = transaction.createdAt ? new Date(String(transaction.createdAt)) : null;
+      const rewardExpiryDate = reward?.expiryDate ? new Date(String(reward.expiryDate)) : null;
+      const computedStatus =
+        redemptionStatus === "claimed"
+          ? "claimed"
+          : rewardExpiryDate && !Number.isNaN(rewardExpiryDate.getTime()) && rewardExpiryDate.getTime() < Date.now()
+            ? "expired"
+            : redemptionStatus;
+
+      return {
+        id: transaction.id,
+        rewardId: transaction.rewardId || null,
+        rewardName: reward?.title || transaction.rewardTitle || "Reward",
+        userId: transaction.userId || null,
+        userName: user?.UserName || user?.email || "Unknown user",
+        userEmail: user?.email || null,
+        memberId: transaction.memberId || null,
+        pointsCost: Math.abs(Number(transaction.points || 0)),
+        status: computedStatus,
+        redeemedAt: transaction.createdAt,
+        claimedAt: transaction.claimedAt || null,
+      };
+    })
+    .filter((redemption) => {
+      const redeemedAt = redemption.redeemedAt ? new Date(String(redemption.redeemedAt)) : null;
+      const matchesReward = !rewardId || redemption.rewardId === rewardId;
+      const matchesSearch =
+        !search ||
+        normalizeString(redemption.rewardName).includes(search) ||
+        normalizeString(redemption.userName).includes(search) ||
+        normalizeString(redemption.memberId).includes(search);
+      const matchesStatus = !status || status === "all" ? true : normalizeString(redemption.status) === status;
+      const matchesDateFrom =
+        !dateFrom || (redeemedAt && !Number.isNaN(redeemedAt.getTime()) && redeemedAt >= dateFrom);
+      const matchesDateTo =
+        !dateTo || (redeemedAt && !Number.isNaN(redeemedAt.getTime()) && redeemedAt <= dateTo);
+      return matchesReward && matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
+    })
+    .sort((a, b) => String(b.redeemedAt || "").localeCompare(String(a.redeemedAt || "")));
+}
+
+export async function markRewardRedemptionClaimed(transactionId: string, adminEmail: string) {
+  await db.collection("transactions").doc(transactionId).set(
+    {
+      redemptionStatus: "claimed",
+      claimedAt: FieldValue.serverTimestamp(),
+      claimedBy: adminEmail,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
 }
 
 export async function getMerchants(status?: string) {
@@ -818,6 +943,8 @@ export async function getMerchants(status?: string) {
       ...merchant,
       ownerEmail: owner?.email,
       ownerName: owner?.UserName,
+      pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 50),
+      dateJoined: merchant.createdAt || merchant.updatedAt || null,
     };
   });
 
@@ -838,6 +965,251 @@ export async function approveMerchant(merchantId: string) {
     status: "approved",
     approvedAt: FieldValue.serverTimestamp(),
   });
+}
+
+export async function updateMerchant(
+  merchantId: string,
+  data: Record<string, unknown>,
+  adminEmail: string
+) {
+  const allowedKeys = [
+    "name",
+    "description",
+    "category",
+    "address",
+    "imageUrl",
+    "logoUrl",
+    "ownerName",
+    "discountInfo",
+    "termsAndConditions",
+    "pointsRate",
+    "businessInfo",
+  ];
+
+  const payload: AnyRecord = {
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: adminEmail,
+  };
+
+  for (const [key, value] of Object.entries(data)) {
+    if (allowedKeys.includes(key)) {
+      payload[key] = value;
+    }
+  }
+
+  if (payload.pointsRate != null) {
+    payload.pointsRate = Number(payload.pointsRate || 50);
+  }
+
+  await db.collection("merchants").doc(merchantId).set(payload, { merge: true });
+}
+
+export async function updateMerchantStatus(
+  merchantId: string,
+  status: "approved" | "rejected" | "suspended",
+  adminEmail: string
+) {
+  const payload: AnyRecord = {
+    status,
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: adminEmail,
+  };
+
+  if (status === "approved") {
+    payload.approvedAt = FieldValue.serverTimestamp();
+    payload.suspendedAt = null;
+    payload.suspendedBy = null;
+  }
+
+  if (status === "suspended") {
+    payload.suspendedAt = FieldValue.serverTimestamp();
+    payload.suspendedBy = adminEmail;
+  }
+
+  await db.collection("merchants").doc(merchantId).set(payload, { merge: true });
+}
+
+export async function getMerchantTransactions(merchantId: string) {
+  const [transactionsSnap, usersSnap] = await Promise.all([
+    db.collection("transactions").where("merchantId", "==", merchantId).get(),
+    db.collection("users").get(),
+  ]);
+
+  const usersMap = new Map<string, AnyRecord>(
+    usersSnap.docs.map((doc) => [doc.id, serializeRecord({ uid: doc.id, ...doc.data() }) as AnyRecord])
+  );
+
+  return transactionsSnap.docs
+    .map((doc) => {
+      const transaction = serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord;
+      const user = usersMap.get(String(transaction.userId || ""));
+      return {
+        id: transaction.id,
+        userId: transaction.userId || null,
+        userName: user?.UserName || user?.email || "Unknown user",
+        userEmail: user?.email || null,
+        amountSpent: transaction.amountSpent ?? null,
+        pointsGiven: Math.abs(Number(transaction.points || 0)),
+        type: transaction.type || "earn",
+        createdAt: transaction.createdAt,
+      };
+    })
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+}
+
+export async function getPointsTransactionsOverview(filters: {
+  dateFrom?: string;
+  dateTo?: string;
+  merchantId?: string;
+  userId?: string;
+  status?: string;
+  minPoints?: number;
+  maxPoints?: number;
+  search?: string;
+} = {}) {
+  const [transactionsSnap, usersSnap, merchantsSnap, pointsSnap, settingsSnap] = await Promise.all([
+    db.collection("transactions").get(),
+    db.collection("users").get(),
+    db.collection("merchants").get(),
+    db.collection("points").get(),
+    db.collection("settings").doc("system").get(),
+  ]);
+
+  const usersMap = new Map<string, AnyRecord>(
+    usersSnap.docs.map((doc) => [doc.id, serializeRecord({ uid: doc.id, ...doc.data() }) as AnyRecord])
+  );
+  const merchantsMap = new Map<string, AnyRecord>(
+    merchantsSnap.docs.map((doc) => [doc.id, serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord])
+  );
+
+  const search = normalizeString(filters.search);
+  const dateFrom = filters.dateFrom ? new Date(filters.dateFrom) : null;
+  const dateTo = filters.dateTo ? new Date(`${filters.dateTo}T23:59:59`) : null;
+  const status = normalizeString(filters.status);
+  const merchantId = String(filters.merchantId || "").trim();
+  const userId = String(filters.userId || "").trim();
+  const minPoints = Number.isFinite(filters.minPoints) ? Number(filters.minPoints) : null;
+  const maxPoints = Number.isFinite(filters.maxPoints) ? Number(filters.maxPoints) : null;
+
+  const allTransactions = transactionsSnap.docs
+    .map((doc) => {
+      const transaction = serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord;
+      const user = usersMap.get(String(transaction.userId || ""));
+      const merchant = merchantsMap.get(String(transaction.merchantId || ""));
+      const rawPoints = Number(transaction.points || 0);
+      const pointsValue = Math.abs(rawPoints);
+      return {
+        id: transaction.id,
+        userId: transaction.userId || null,
+        userName: user?.UserName || user?.email || "Unknown user",
+        userEmail: user?.email || null,
+        merchantId: transaction.merchantId || null,
+        merchantName: merchant?.name || (transaction.merchantId ? "Unknown merchant" : "System"),
+        amountSpent: transaction.amountSpent ?? null,
+        pointsAwarded: pointsValue,
+        timestamp: transaction.createdAt || transaction.updatedAt || null,
+        status: String(transaction.status || (transaction.failedAt ? "failed" : "success")),
+        type: String(transaction.type || "earn"),
+        reason: transaction.reason || null,
+        adminName: transaction.adjustedBy || null,
+        rawPoints,
+      };
+    })
+    .sort((a, b) => String(b.timestamp || "").localeCompare(String(a.timestamp || "")));
+
+  const transactionLog = allTransactions.filter((transaction) => {
+    if (!["earn", "redeem", "adjustment"].includes(transaction.type)) return false;
+    const timestamp = transaction.timestamp ? new Date(String(transaction.timestamp)) : null;
+    const matchesSearch =
+      !search ||
+      normalizeString(transaction.userName).includes(search) ||
+      normalizeString(transaction.merchantName).includes(search) ||
+      normalizeString(transaction.userEmail).includes(search);
+    const matchesMerchant = !merchantId || transaction.merchantId === merchantId;
+    const matchesUser = !userId || transaction.userId === userId;
+    const matchesStatus = !status || status === "all" ? true : normalizeString(transaction.status) === status;
+    const matchesDateFrom =
+      !dateFrom || (timestamp && !Number.isNaN(timestamp.getTime()) && timestamp >= dateFrom);
+    const matchesDateTo =
+      !dateTo || (timestamp && !Number.isNaN(timestamp.getTime()) && timestamp <= dateTo);
+    const matchesMin = minPoints == null || transaction.pointsAwarded >= minPoints;
+    const matchesMax = maxPoints == null || transaction.pointsAwarded <= maxPoints;
+
+    return (
+      matchesSearch &&
+      matchesMerchant &&
+      matchesUser &&
+      matchesStatus &&
+      matchesDateFrom &&
+      matchesDateTo &&
+      matchesMin &&
+      matchesMax
+    );
+  });
+
+  const manualAdjustments = allTransactions
+    .filter((transaction) => transaction.type === "adjustment")
+    .map((transaction) => ({
+      ...transaction,
+      direction: Number(transaction.rawPoints || 0) >= 0 ? "add" : "deduct",
+    }));
+
+  const leaderboard = pointsSnap.docs
+    .map((doc) => {
+      const pointsRecord = serializeRecord({ userId: doc.id, ...doc.data() }) as AnyRecord;
+      const user = usersMap.get(doc.id);
+      return {
+        userId: doc.id,
+        userName: user?.UserName || user?.email || "Unknown user",
+        userEmail: user?.email || null,
+        totalPoints: Number(pointsRecord.balance || 0),
+        earnedPoints: Number(pointsRecord.earnedPoints || pointsRecord.balance || 0),
+        redeemedPoints: Number(pointsRecord.redeemedPoints || 0),
+      };
+    })
+    .sort((a, b) => b.totalPoints - a.totalPoints)
+    .slice(0, 10);
+
+  const totalIssued = allTransactions
+    .filter((transaction) => transaction.type === "earn" && transaction.status !== "failed")
+    .reduce((sum, transaction) => sum + Number(transaction.pointsAwarded || 0), 0);
+  const totalRedeemed = allTransactions
+    .filter((transaction) => transaction.type === "redeem")
+    .reduce((sum, transaction) => sum + Number(transaction.pointsAwarded || 0), 0);
+  const outstandingBalance = pointsSnap.docs.reduce(
+    (sum, doc) => sum + Number(doc.data().balance || 0),
+    0
+  );
+
+  return {
+    transactionLog,
+    manualAdjustments,
+    leaderboard,
+    summary: {
+      totalIssued,
+      totalRedeemed,
+      outstandingBalance,
+    },
+    conversionRate: {
+      pesosPerPoint: Number(settingsSnap.data()?.pesosPerPoint || 50),
+      updatedAt: toIso(settingsSnap.data()?.updatedAt),
+      updatedBy: settingsSnap.data()?.updatedBy || null,
+    },
+    merchantOptions: Array.from(merchantsMap.values())
+      .map((merchant) => ({ id: merchant.id, name: merchant.name || "Merchant" }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+export async function updatePointsConversionRate(pesosPerPoint: number, adminEmail: string) {
+  await db.collection("settings").doc("system").set(
+    {
+      pesosPerPoint,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: adminEmail,
+    },
+    { merge: true }
+  );
 }
 
 export async function getYouthMembers(filters: YouthMemberFilters = {}) {

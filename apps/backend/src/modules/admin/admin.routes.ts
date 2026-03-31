@@ -10,10 +10,18 @@ import {
   bulkApproveVerificationHandler,
   listRewards,
   addReward,
+  updateRewardHandler,
+  listRewardRedemptionsHandler,
+  markRewardRedemptionClaimedHandler,
   listMerchants,
   getMerchantHandler,
   listPendingMerchants,
   approveMerchantHandler,
+  updateMerchantHandler,
+  updateMerchantStatusHandler,
+  listMerchantTransactionsHandler,
+  getPointsTransactionsOverviewHandler,
+  updatePointsConversionRateHandler,
   listYouth,
   getYouthHandler,
   updateYouthProfileHandler,
@@ -55,10 +63,18 @@ router.patch(
 );
 router.get("/rewards", ...adminOrSuperadmin, listRewards);
 router.post("/rewards", ...adminOrSuperadmin, addReward);
+router.patch("/rewards/:rewardId", ...adminOrSuperadmin, updateRewardHandler);
+router.get("/rewards/redemptions", ...adminOrSuperadmin, listRewardRedemptionsHandler);
+router.patch("/rewards/redemptions/:transactionId/claim", ...adminOrSuperadmin, markRewardRedemptionClaimedHandler);
 router.get("/merchants", ...adminOrSuperadmin, listMerchants);
 router.get("/merchants/:merchantId", ...adminOrSuperadmin, getMerchantHandler);
 router.get("/merchants/pending", ...adminOrSuperadmin, listPendingMerchants);
 router.patch("/merchants/:merchantId/approve", ...adminOrSuperadmin, approveMerchantHandler);
+router.patch("/merchants/:merchantId", ...adminOrSuperadmin, updateMerchantHandler);
+router.patch("/merchants/:merchantId/status", ...superadminOnly, updateMerchantStatusHandler);
+router.get("/merchants/:merchantId/transactions", ...adminOrSuperadmin, listMerchantTransactionsHandler);
+router.get("/points-transactions", ...adminOrSuperadmin, getPointsTransactionsOverviewHandler);
+router.patch("/points-transactions/conversion-rate", ...superadminOnly, updatePointsConversionRateHandler);
 router.get("/youth", ...adminOrSuperadmin, listYouth);
 router.get("/youth/:userId", ...adminOrSuperadmin, getYouthHandler);
 router.patch("/youth/:userId/status", ...adminOrSuperadmin, updateYouthStatusHandler);

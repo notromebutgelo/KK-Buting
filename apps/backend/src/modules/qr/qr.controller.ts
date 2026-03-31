@@ -12,7 +12,7 @@ export async function generateQr(req: AuthRequest, res: Response) {
 }
 
 export async function scanQr(req: AuthRequest, res: Response) {
-  const { token } = req.body;
+  const token = req.body?.token || req.body?.qrData;
   if (!token) return res.status(400).json({ error: "token is required" });
   try {
     const result = await processQrScan(token, req.user!.uid);

@@ -1,7 +1,24 @@
 import { db } from "../../config/firebase";
+import { POINTS_PER_TRANSACTION } from "../../config/points";
 import { generateQrToken, verifyQrToken } from "../../../utils/renerateQrToken";
 import { addPoints } from "../points/points.service";
-import { POINTS_PER_TRANSACTION } from "@kk-system/shared";
+
+function extractScanToken(rawValue: string) {
+  const trimmed = String(rawValue || "").trim();
+  if (!trimmed) return "";
+
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      token?: string;
+      qrToken?: string;
+      signedToken?: string;
+    };
+
+    return String(parsed.token || parsed.qrToken || parsed.signedToken || "").trim();
+  } catch {
+    return trimmed;
+  }
+}
 
 export async function generateUserQr(uid: string): Promise<string> {
   const profileSnap = await db.collection("kkProfiling").doc(uid).get();
@@ -14,7 +31,8 @@ export async function generateUserQr(uid: string): Promise<string> {
   return token;
 }
 
-export async function processQrScan(token: string, merchantId: string) {
+export async function processQrScan(rawValue: string, merchantId: string) {
+  const token = extractScanToken(rawValue);
   const result = verifyQrToken(token);
   if (!result) throw new Error("Invalid or expired QR code");
   const { userId, revision } = result;

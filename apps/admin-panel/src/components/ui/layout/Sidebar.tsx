@@ -56,6 +56,16 @@ const navItems = [
     ),
   },
   {
+    href: '/points-transactions',
+    label: 'Points & Txns',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M12 8c-2.761 0-5 .895-5 2s2.239 2 5 2 5-.895 5-2-2.239-2-5-2zm0 0V5m0 7v7m-7-5c0 1.105 3.134 2 7 2s7-.895 7-2m-14 4c0 1.105 3.134 2 7 2s7-.895 7-2" />
+      </svg>
+    ),
+  },
+  {
     href: '/reports',
     label: 'Reports',
     icon: (

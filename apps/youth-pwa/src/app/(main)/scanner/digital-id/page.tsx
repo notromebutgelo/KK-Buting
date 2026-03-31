@@ -27,6 +27,7 @@ export default function DigitalIDPage() {
     if (!profile) {
       return (user?.UserName || 'YOUTH MEMBER').toUpperCase()
     }
+
     return [profile.firstName, profile.middleName, profile.lastName]
       .filter(Boolean)
       .join(' ')
@@ -282,7 +283,6 @@ export default function DigitalIDPage() {
           </div>
         )}
       </section>
-
     </div>
   )
 }

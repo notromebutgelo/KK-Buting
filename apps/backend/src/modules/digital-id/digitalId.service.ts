@@ -72,11 +72,17 @@ export async function getDigitalId(uid: string) {
   const idNumber = data.idNumber || generateIdNumber(uid);
   const revision = Number(data.digitalIdRevision || 1);
   const qrToken = generateQrToken(uid, revision);
+  const qrPayload = JSON.stringify({
+    digitalIdNumber: idNumber,
+    uid,
+    token: qrToken,
+  });
   return {
     status: "verified",
     idNumber,
     memberId: idNumber,
-    qrCode: qrToken,
+    qrCode: qrPayload,
+    qrPayload,
     qrToken,
     firstName: data.firstName,
     lastName: data.lastName,

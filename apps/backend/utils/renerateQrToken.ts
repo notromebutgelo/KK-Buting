@@ -23,8 +23,8 @@ export function verifyQrToken(token: string): { userId: string; revision: number
     const expected = crypto.createHmac("sha256", process.env.QR_SECRET || "kk-secret").update(payload).digest("hex");
     if (hmac !== expected) return null;
     if (Number.isNaN(revision)) return null;
-    // Expire after 5 minutes
-    if (Date.now() - timestamp > 5 * 60 * 1000) return null;
+    // Expire after 10 minutes
+    if (Date.now() - timestamp > 10 * 60 * 1000) return null;
     return { userId, revision, timestamp };
   } catch {
     return null;

@@ -166,7 +166,7 @@ export default function BottomNav() {
         <Link
           href="/scanner"
           className="absolute left-1/2 top-0 flex h-[74px] w-[74px] -translate-x-1/2 -translate-y-[34px] items-center justify-center rounded-full border-[8px] border-white bg-[#014384] shadow-[0_10px_24px_rgba(1,67,132,0.25)]"
-          aria-label="Open scanner"
+          aria-label="Open my QR code"
         >
           <QrIcon active={isScannerActive} />
         </Link>
