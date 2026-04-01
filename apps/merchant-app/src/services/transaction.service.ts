@@ -42,10 +42,19 @@ function mapTransaction(item: Record<string, unknown>): MerchantTransaction {
 
 export async function scanMemberQr({ token, amountSpent }: ScanInput) {
   try {
-    const response = await api.post('/qr/redeem', {
-      token,
-      amountSpent: Number(amountSpent || 0),
-    })
+    const normalizedAmount = Number(amountSpent || 0)
+    const useRedeemFlow = Number.isFinite(normalizedAmount) && normalizedAmount > 0
+    const response = await api.post(
+      useRedeemFlow ? '/qr/redeem' : '/qr/scan',
+      useRedeemFlow
+        ? {
+            token,
+            amountSpent: normalizedAmount,
+          }
+        : {
+            token,
+          }
+    )
 
     const memberId = String(response.data?.memberId ?? response.data?.userId ?? 'unknown-member')
     const transaction: MerchantTransaction = {
@@ -53,7 +62,7 @@ export async function scanMemberQr({ token, amountSpent }: ScanInput) {
       memberId,
       memberIdMasked: maskMemberId(memberId),
       memberLabel: String(response.data?.userName || 'Verified Member'),
-      amountSpent: Number(response.data?.amountSpent || amountSpent || 0),
+      amountSpent: Number(response.data?.amountSpent || normalizedAmount || 0),
       pointsAwarded: Number(response.data?.pointsAwarded || 0),
       status: 'success',
       createdAt: new Date().toISOString(),

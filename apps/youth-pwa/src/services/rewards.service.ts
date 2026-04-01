@@ -1,7 +1,16 @@
 import api from '@/lib/api'
 
-export async function getRewards(category?: string) {
-  const params = category && category !== 'all' ? { category } : {}
+type RewardFilters = {
+  category?: string
+  search?: string
+  merchantId?: string
+  status?: string
+}
+
+export async function getRewards(filters: RewardFilters = {}) {
+  const params = Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  )
   const res = await api.get('/rewards', { params })
   return res.data.rewards || res.data
 }
@@ -13,10 +22,11 @@ export async function getReward(rewardId: string) {
 
 export async function redeemReward(rewardId: string) {
   const res = await api.post(`/rewards/${rewardId}/redeem`)
-  return res.data
+  return res.data.redemption || res.data
 }
 
-export async function getMyRedemptions() {
-  const res = await api.get('/rewards/my-redemptions')
+export async function getMyRedemptions(status?: string) {
+  const params = status && status !== 'all' ? { status } : {}
+  const res = await api.get('/rewards/my-redemptions', { params })
   return res.data.redemptions || res.data
 }

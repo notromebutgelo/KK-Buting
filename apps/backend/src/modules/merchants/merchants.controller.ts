@@ -6,6 +6,7 @@ import {
   createMerchant,
   getMerchantByOwnerId,
   updateMerchantProfileByOwner,
+  uploadMerchantAssetByOwner,
   getMerchantTransactionsByOwner,
   getMerchantPromotionsByOwner,
   createMerchantPromotionByOwner,
@@ -59,6 +60,20 @@ export async function updateMyMerchant(req: AuthRequest, res: Response) {
   try {
     const merchant = await updateMerchantProfileByOwner(req.user!.uid, req.body || {});
     return res.json({ merchant, message: "Merchant profile updated" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function uploadMyMerchantAsset(req: AuthRequest, res: Response) {
+  const { assetType, fileData } = req.body || {};
+  if (!assetType || !fileData) {
+    return res.status(400).json({ error: "assetType and fileData are required" });
+  }
+
+  try {
+    const asset = await uploadMerchantAssetByOwner(req.user!.uid, assetType, fileData);
+    return res.status(201).json(asset);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

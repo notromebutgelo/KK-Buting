@@ -21,6 +21,12 @@ const config: ExpoConfig = {
         cameraPermission: 'Allow KK Merchant to scan member QR codes.',
       },
     ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Allow KK Merchant to access your photo library for shop logos and banners.',
+      },
+    ],
   ],
   experiments: {
     autolinkingModuleResolution: true,

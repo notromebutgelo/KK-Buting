@@ -1,21 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
 import api from '@/lib/api'
+import type { Reward } from '@/types/rewards'
 
-export interface Reward {
-  id: string
-  title: string
-  description: string
-  points: number
-  category: 'food' | 'services' | 'others'
-  merchantId: string
-  merchantName: string
-  imageUrl: string
-  validDays: number
-  createdAt: string
-}
-
-export function useRewards(category?: string) {
+export function useRewards(category?: string, search?: string, merchantId?: string) {
   const [rewards, setRewards] = useState<Reward[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +12,13 @@ export function useRewards(category?: string) {
     async function fetchRewards() {
       setIsLoading(true)
       try {
-        const params = category && category !== 'all' ? { category } : {}
+        const params = Object.fromEntries(
+          Object.entries({
+            category: category && category !== 'all' ? category : undefined,
+            search: search?.trim() || undefined,
+            merchantId: merchantId?.trim() || undefined,
+          }).filter(([, value]) => value !== undefined)
+        )
         const res = await api.get('/rewards', { params })
         setRewards(res.data.rewards || res.data)
       } catch (err: unknown) {
@@ -35,7 +29,7 @@ export function useRewards(category?: string) {
       }
     }
     fetchRewards()
-  }, [category])
+  }, [category, search, merchantId])
 
   return { rewards, isLoading, error }
 }

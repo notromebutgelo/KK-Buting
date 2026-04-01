@@ -1,5 +1,6 @@
 import React from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import DashboardScreen from '../screens/dashboards/DashboardScreen'
 import NotificationsScreen from '../screens/notifications/NotificationsScreen'
@@ -18,6 +19,9 @@ export type MerchantTabParamList = {
 const Tab = createBottomTabNavigator<MerchantTabParamList>()
 
 export default function BottomTabNavigator() {
+  const insets = useSafeAreaInsets()
+  const bottomPadding = Math.max(insets.bottom, 10)
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -25,9 +29,9 @@ export default function BottomTabNavigator() {
         tabBarActiveTintColor: '#0f766e',
         tabBarInactiveTintColor: '#6b7280',
         tabBarStyle: {
-          height: 68,
+          height: 58 + bottomPadding,
           paddingTop: 8,
-          paddingBottom: 10,
+          paddingBottom: bottomPadding,
         },
       }}
     >

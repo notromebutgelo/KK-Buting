@@ -1,6 +1,8 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { db } from "../../config/firebase";
+import { storage } from "../../config/firebase";
 import { setUserRole } from "../auth/user.service";
+import { randomUUID } from "crypto";
 
 type AnyRecord = Record<string, any>;
 
@@ -38,7 +40,7 @@ function normalizeMerchant(record: AnyRecord): AnyRecord {
     businessName: merchant.businessName || merchant.name || "Merchant",
     description: merchant.description || merchant.shortDescription || "",
     shortDescription: merchant.shortDescription || merchant.description || "",
-    imageUrl: merchant.imageUrl || merchant.bannerUrl || "",
+    imageUrl: merchant.imageUrl || merchant.bannerUrl || merchant.logoUrl || "",
     bannerUrl: merchant.bannerUrl || merchant.imageUrl || "",
     pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 50),
   };
@@ -130,7 +132,7 @@ function buildMerchantPayload(data: Record<string, unknown>) {
   ];
 
   for (const [key, value] of Object.entries(data)) {
-    if (allowedKeys.includes(key)) {
+    if (allowedKeys.includes(key) && value !== undefined) {
       payload[key] = value;
     }
   }
@@ -205,6 +207,79 @@ function buildProductPayload(data: Record<string, unknown>) {
   return payload;
 }
 
+function normalizeMerchantAssetType(assetType: string) {
+  return assetType === "banner" ? "banner" : "logo";
+}
+
+function getMerchantAssetBucketCandidates() {
+  const primaryBucketName = storage.bucket().name;
+  const candidates = [primaryBucketName];
+
+  if (primaryBucketName.endsWith(".appspot.com")) {
+    candidates.push(primaryBucketName.replace(/\.appspot\.com$/, ".firebasestorage.app"));
+  } else if (primaryBucketName.endsWith(".firebasestorage.app")) {
+    candidates.push(primaryBucketName.replace(/\.firebasestorage\.app$/, ".appspot.com"));
+  }
+
+  return Array.from(new Set(candidates.filter(Boolean)));
+}
+
+function getInlineAssetLimit(assetType: "logo" | "banner") {
+  return assetType === "logo" ? 400_000 : 550_000;
+}
+
+async function uploadMerchantAssetFromBase64(
+  ownerId: string,
+  assetType: "logo" | "banner",
+  fileData: string
+) {
+  const match = fileData.match(/^data:(.+);base64,(.+)$/);
+  if (!match) {
+    throw new Error("Invalid file data format");
+  }
+
+  const mimeType = match[1];
+  const base64Payload = match[2];
+  const extension = mimeType.split("/")[1] || "jpg";
+  const filePath = `merchant-assets/${ownerId}/${assetType}-${Date.now()}.${extension}`;
+  const downloadToken = randomUUID();
+  let lastError: Error | null = null;
+
+  for (const bucketName of getMerchantAssetBucketCandidates()) {
+    try {
+      const bucket = storage.bucket(bucketName);
+      const file = bucket.file(filePath);
+
+      await file.save(Buffer.from(base64Payload, "base64"), {
+        metadata: {
+          contentType: mimeType,
+          metadata: {
+            firebaseStorageDownloadTokens: downloadToken,
+          },
+        },
+        resumable: false,
+      });
+
+      return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
+        filePath
+      )}?alt=media&token=${downloadToken}`;
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error || "Upload failed"));
+      if (!String(error?.message || "").includes("bucket does not exist")) {
+        throw error;
+      }
+    }
+  }
+
+  if (fileData.length <= getInlineAssetLimit(assetType)) {
+    return fileData;
+  }
+
+  throw new Error(
+    "Firebase Storage bucket is not available, and this image is too large for the inline fallback. Enable Firebase Storage for this project or choose a smaller image."
+  );
+}
+
 export async function getAllMerchants() {
   const snap = await db.collection("merchants").where("status", "==", "approved").get();
   return snap.docs.map((doc) => normalizeMerchant({ id: doc.id, ...doc.data() }));
@@ -264,10 +339,42 @@ export async function updateMerchantProfileByOwner(ownerId: string, data: Record
   }
 
   const payload = buildMerchantPayload(data);
+  if (!Object.prototype.hasOwnProperty.call(payload, "imageUrl")) {
+    payload.imageUrl = String(payload.bannerUrl || payload.logoUrl || "");
+  } else {
+    payload.imageUrl = String(payload.imageUrl || payload.bannerUrl || payload.logoUrl || "");
+  }
   payload.updatedAt = FieldValue.serverTimestamp();
 
   await db.collection("merchants").doc(merchantDoc.id).set(payload, { merge: true });
   return getMerchantById(merchantDoc.id, { includePrivate: true });
+}
+
+export async function uploadMerchantAssetByOwner(ownerId: string, assetType: string, fileData: string) {
+  const merchantDoc = await getOwnedMerchantSnapshot(ownerId);
+  if (!merchantDoc) {
+    throw new Error("Merchant profile not found");
+  }
+
+  const normalizedAssetType = normalizeMerchantAssetType(String(assetType || ""));
+  const fileUrl = await uploadMerchantAssetFromBase64(ownerId, normalizedAssetType, fileData);
+  const current = merchantDoc.data() || {};
+  const fieldName = normalizedAssetType === "banner" ? "bannerUrl" : "logoUrl";
+  const updatePayload: AnyRecord = {
+    [fieldName]: fileUrl,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+
+  if (normalizedAssetType === "banner" || !current.imageUrl) {
+    updatePayload.imageUrl = fileUrl;
+  }
+
+  await merchantDoc.ref.set(updatePayload, { merge: true });
+
+  return {
+    assetType: normalizedAssetType,
+    fileUrl,
+  };
 }
 
 export async function getMerchantPromotionsByOwner(ownerId: string) {

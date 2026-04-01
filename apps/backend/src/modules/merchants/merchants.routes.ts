@@ -5,6 +5,7 @@ import {
   registerMerchant,
   getMyMerchant,
   updateMyMerchant,
+  uploadMyMerchantAsset,
   listMyMerchantTransactions,
   listMyMerchantPromotions,
   createMyMerchantPromotion,
@@ -22,6 +23,7 @@ const router = Router();
 
 router.get("/me", verifyToken, requireRole("merchant"), getMyMerchant);
 router.patch("/me", verifyToken, requireRole("merchant"), updateMyMerchant);
+router.post("/me/assets", verifyToken, requireRole("merchant"), uploadMyMerchantAsset);
 router.get("/me/transactions", verifyToken, requireRole("merchant"), listMyMerchantTransactions);
 router.get("/me/promotions", verifyToken, requireRole("merchant"), listMyMerchantPromotions);
 router.post("/me/promotions", verifyToken, requireRole("merchant"), createMyMerchantPromotion);

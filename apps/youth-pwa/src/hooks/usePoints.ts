@@ -19,6 +19,7 @@ export function usePoints() {
   const [data, setData] = useState<PointsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     async function fetchPoints() {
@@ -34,7 +35,7 @@ export function usePoints() {
       }
     }
     fetchPoints()
-  }, [])
+  }, [reloadKey])
 
-  return { data, isLoading, error }
+  return { data, isLoading, error, refresh: () => setReloadKey((current) => current + 1) }
 }

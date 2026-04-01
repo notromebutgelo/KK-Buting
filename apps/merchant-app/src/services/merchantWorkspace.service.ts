@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import axios from 'axios'
 
 import api from '../lib/api'
 import type { MerchantUser } from '../store/authStore'
@@ -155,6 +156,14 @@ function mapBackendTransaction(item: Record<string, unknown>): MerchantTransacti
   }
 }
 
+function rethrowApiError(error: unknown): never {
+  if (axios.isAxiosError(error)) {
+    throw new Error(String(error.response?.data?.error || error.message || 'Request failed'))
+  }
+
+  throw error
+}
+
 export async function getMerchantProfile(user: MerchantUser | null | undefined) {
   const response = await api.get('/merchants/me')
   return mapBackendProfile(response.data?.merchant ?? response.data, user)
@@ -164,19 +173,41 @@ export async function updateMerchantProfile(
   user: MerchantUser | null | undefined,
   patch: Partial<MerchantProfile>
 ) {
-  const response = await api.patch('/merchants/me', {
-    businessName: patch.businessName,
-    category: patch.category,
-    contactNumber: patch.contactNumber,
-    address: patch.address,
-    shortDescription: patch.shortDescription,
-    businessInfo: patch.businessInfo,
-    discountInfo: patch.discountInfo,
-    termsAndConditions: patch.termsAndConditions,
-    logoUrl: patch.logoUrl,
-    bannerUrl: patch.bannerUrl,
-  })
-  return mapBackendProfile(response.data?.merchant ?? response.data, user)
+  try {
+    const response = await api.patch('/merchants/me', {
+      businessName: patch.businessName,
+      category: patch.category,
+      contactNumber: patch.contactNumber,
+      address: patch.address,
+      shortDescription: patch.shortDescription,
+      businessInfo: patch.businessInfo,
+      discountInfo: patch.discountInfo,
+      termsAndConditions: patch.termsAndConditions,
+      logoUrl: patch.logoUrl,
+      bannerUrl: patch.bannerUrl,
+      imageUrl: patch.bannerUrl || patch.logoUrl,
+    })
+    return mapBackendProfile(response.data?.merchant ?? response.data, user)
+  } catch (error) {
+    rethrowApiError(error)
+  }
+}
+
+export async function uploadMerchantAsset(
+  _user: MerchantUser | null | undefined,
+  assetType: 'logo' | 'banner',
+  fileData: string
+) {
+  try {
+    const response = await api.post('/merchants/me/assets', {
+      assetType,
+      fileData,
+    })
+
+    return String(response.data?.fileUrl || '')
+  } catch (error) {
+    rethrowApiError(error)
+  }
 }
 
 export async function getMerchantPromotions(_user: MerchantUser | null | undefined) {

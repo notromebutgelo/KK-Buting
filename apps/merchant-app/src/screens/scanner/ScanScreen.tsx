@@ -44,7 +44,8 @@ export default function ScanScreen() {
 
   const pointsPreview = useMemo(() => {
     const numericAmount = Number(amountSpent || 0)
-    if (!numericAmount || !profile?.pointsRate) return 0
+    if (!numericAmount) return 10
+    if (!profile?.pointsRate) return 0
     return Math.max(1, Math.floor(numericAmount / profile.pointsRate))
   }, [amountSpent, profile?.pointsRate])
 
@@ -96,8 +97,8 @@ export default function ScanScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Scan Member QR</Text>
         <Text style={styles.subtitle}>
-          Use the live camera scanner or paste a token manually. Current backend validation is live, while amount and
-          profile tools are prepared for the next merchant modules.
+          Scan a youth QR to award points immediately. Enter a purchase amount only when you want points to follow your
+          merchant peso-to-point rate.
         </Text>
 
         {profile ? <StatusBanner status={profile.status} message={profile.adminNote} /> : null}
@@ -130,7 +131,7 @@ export default function ScanScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Purchase amount in pesos</Text>
+          <Text style={styles.label}>Purchase amount in pesos (optional)</Text>
           <TextInput
             style={styles.input}
             value={amountSpent}
@@ -141,8 +142,11 @@ export default function ScanScreen() {
           />
 
           <Text style={styles.previewText}>
-            Local preview: around {pointsPreview} point{pointsPreview === 1 ? '' : 's'} at a {profile?.pointsRate ?? 50}
-            -peso rate. Server-awarded points still follow the backend rule.
+            {Number(amountSpent || 0) > 0
+              ? `Local preview: around ${pointsPreview} point${pointsPreview === 1 ? '' : 's'} at a ${
+                  profile?.pointsRate ?? 50
+                }-peso rate.`
+              : `No amount entered: scanning awards the default ${pointsPreview} points.`}
           </Text>
 
           <Text style={styles.label}>Manual QR token entry</Text>

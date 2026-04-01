@@ -9,6 +9,7 @@ import merchantsRoutes from "./modules/merchants/merchants.routes";
 import pointsRoutes from "./modules/points/points.routes";
 import qrRoutes from "./modules/qr/qr.routes";
 import adminRoutes from "./modules/admin/admin.routes";
+import rewardsRoutes from "./modules/rewards/rewards.routes";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/profiling", profilingRoutes);
 app.use("/api/digital-id", digitalIdRoutes);
 app.use("/api/merchants", merchantsRoutes);
+app.use("/api/rewards", rewardsRoutes);
 app.use("/api/points", pointsRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/admin", adminRoutes);
