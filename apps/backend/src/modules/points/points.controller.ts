@@ -1,11 +1,20 @@
 import { Response } from "express";
 import { AuthRequest } from "../../middleware/verifyToken";
-import { getPoints, addPoints, redeemPoints } from "./points.service";
+import { getPoints, getPointsSummary, addPoints, redeemPoints } from "./points.service";
 
 export async function getPointsBalance(req: AuthRequest, res: Response) {
   try {
     const balance = await getPoints(req.user!.uid);
     return res.json({ balance });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function getMyPointsSummary(req: AuthRequest, res: Response) {
+  try {
+    const summary = await getPointsSummary(req.user!.uid);
+    return res.json(summary);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

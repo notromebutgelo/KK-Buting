@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
-import Link from 'next/link'
 import api from '@/lib/api'
 import type { Merchant } from '@/hooks/useMerchants'
 import type { Reward } from '@/hooks/useRewards'
@@ -46,8 +45,8 @@ export default function MerchantDetailPage() {
 
       {/* Hero */}
       <div className="relative h-48 bg-gradient-to-br from-green-50 to-teal-50">
-        {merchant.imageUrl ? (
-          <Image src={merchant.imageUrl} alt={merchant.name} fill className="object-cover" />
+        {merchant.bannerUrl || merchant.imageUrl ? (
+          <Image src={merchant.bannerUrl || merchant.imageUrl} alt={merchant.name} fill className="object-cover" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <svg className="w-20 h-20 text-green-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,14 +61,21 @@ export default function MerchantDetailPage() {
         {/* Merchant Info */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="flex items-start gap-3">
+              {(merchant.logoUrl || merchant.imageUrl) ? (
+                <div className="relative h-14 w-14 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+                  <Image src={merchant.logoUrl || merchant.imageUrl} alt={merchant.name} fill className="object-cover" />
+                </div>
+              ) : null}
+              <div>
               <h1 className="text-xl font-bold text-gray-900">{merchant.name}</h1>
               <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium mt-1 inline-block">
                 {merchant.category}
               </span>
+              </div>
             </div>
           </div>
-          <p className="text-gray-600 text-sm mt-3 leading-relaxed">{merchant.description}</p>
+          <p className="text-gray-600 text-sm mt-3 leading-relaxed">{merchant.shortDescription || merchant.description}</p>
           {merchant.address && (
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-50">
               <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,7 +86,76 @@ export default function MerchantDetailPage() {
               <p className="text-gray-500 text-sm">{merchant.address}</p>
             </div>
           )}
+          {merchant.businessInfo && (
+            <div className="mt-3 rounded-2xl bg-gray-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">About this shop</p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-600">{merchant.businessInfo}</p>
+            </div>
+          )}
+          {merchant.discountInfo && (
+            <div className="mt-3 rounded-2xl bg-amber-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Discount Info</p>
+              <p className="mt-1 text-sm leading-relaxed text-amber-900">{merchant.discountInfo}</p>
+            </div>
+          )}
+          {merchant.termsAndConditions && (
+            <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms & Conditions</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-700">{merchant.termsAndConditions}</p>
+            </div>
+          )}
         </div>
+
+        {merchant.promotions && merchant.promotions.length > 0 && (
+          <div>
+            <h2 className="text-gray-800 font-bold mb-3">Active Promotions</h2>
+            <div className="space-y-3">
+              {merchant.promotions.map((promotion) => (
+                <div key={promotion.id} className="rounded-2xl bg-white p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-gray-900">{promotion.title}</p>
+                      {promotion.shortTagline ? (
+                        <p className="mt-1 text-sm text-gray-500">{promotion.shortTagline}</p>
+                      ) : null}
+                    </div>
+                    {promotion.valueLabel ? (
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                        {promotion.valueLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {merchant.products && merchant.products.length > 0 && (
+          <div>
+            <h2 className="text-gray-800 font-bold mb-3">Products & Menu</h2>
+            <div className="space-y-3">
+              {merchant.products.map((product) => (
+                <div key={product.id} className="rounded-2xl bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-gray-900">{product.name}</p>
+                      {product.description ? (
+                        <p className="mt-1 text-sm text-gray-500">{product.description}</p>
+                      ) : null}
+                      {product.category ? (
+                        <p className="mt-2 text-xs font-medium uppercase tracking-wide text-gray-400">{product.category}</p>
+                      ) : null}
+                    </div>
+                    {typeof product.price === 'number' ? (
+                      <p className="text-sm font-semibold text-gray-900">PHP {product.price.toFixed(2)}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Rewards from this merchant */}
         {rewards.length > 0 && (

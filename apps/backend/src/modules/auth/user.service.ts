@@ -18,6 +18,21 @@ export async function getUserById(uid: string) {
 }
 
 export async function setUserRole(uid: string, role: string) {
-  await auth.setCustomUserClaims(uid, { role });
-  await db.collection("users").doc(uid).update({ role });
+  const userRecord = await auth.getUser(uid);
+  await auth.setCustomUserClaims(uid, {
+    ...(userRecord.customClaims || {}),
+    role,
+  });
+
+  await db.collection("users").doc(uid).set(
+    {
+      uid,
+      email: userRecord.email || "",
+      UserName: userRecord.displayName || userRecord.email?.split("@")[0] || role,
+      role,
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
 }

@@ -1,6 +1,8 @@
 import { db } from "../../config/firebase";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { generateIdNumber } from "../../../utils/generateIdNumber";
+import { setUserRole } from "../auth/user.service";
+import { getMerchantById } from "../merchants/merhcants.service";
 
 type AnyRecord = Record<string, any>;
 type YouthListSortKey = "fullName" | "createdAt" | "verificationStatus" | "ageGroup";
@@ -952,8 +954,24 @@ export async function getMerchants(status?: string) {
 }
 
 export async function getMerchantDetails(merchantId: string) {
-  const merchants = await getMerchants();
-  return merchants.find((merchant) => merchant.id === merchantId) || null;
+  const merchant = await getMerchantById(merchantId, { includePrivate: true });
+  if (!merchant) return null;
+
+  const ownerId = String(merchant.ownerId || "");
+  let owner: AnyRecord | null = null;
+
+  if (ownerId) {
+    const ownerSnap = await db.collection("users").doc(ownerId).get();
+    owner = ownerSnap.exists ? (serializeRecord({ uid: ownerSnap.id, ...ownerSnap.data() }) as AnyRecord) : null;
+  }
+
+  return {
+    ...merchant,
+    ownerEmail: owner?.email || merchant.ownerEmail || null,
+    ownerName: owner?.UserName || merchant.ownerName || null,
+    pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 50),
+    dateJoined: merchant.createdAt || merchant.updatedAt || null,
+  };
 }
 
 export async function getPendingMerchants() {
@@ -961,10 +979,18 @@ export async function getPendingMerchants() {
 }
 
 export async function approveMerchant(merchantId: string) {
-  await db.collection("merchants").doc(merchantId).update({
+  const merchantRef = db.collection("merchants").doc(merchantId);
+  const merchantSnap = await merchantRef.get();
+  const merchant = merchantSnap.data() || {};
+
+  await merchantRef.update({
     status: "approved",
     approvedAt: FieldValue.serverTimestamp(),
   });
+
+  if (merchant.ownerId) {
+    await setUserRole(String(merchant.ownerId), "merchant");
+  }
 }
 
 export async function updateMerchant(
@@ -1009,6 +1035,9 @@ export async function updateMerchantStatus(
   status: "approved" | "rejected" | "suspended",
   adminEmail: string
 ) {
+  const merchantRef = db.collection("merchants").doc(merchantId);
+  const merchantSnap = await merchantRef.get();
+  const merchant = merchantSnap.data() || {};
   const payload: AnyRecord = {
     status,
     updatedAt: FieldValue.serverTimestamp(),
@@ -1026,7 +1055,11 @@ export async function updateMerchantStatus(
     payload.suspendedBy = adminEmail;
   }
 
-  await db.collection("merchants").doc(merchantId).set(payload, { merge: true });
+  await merchantRef.set(payload, { merge: true });
+
+  if (status === "approved" && merchant.ownerId) {
+    await setUserRole(String(merchant.ownerId), "merchant");
+  }
 }
 
 export async function getMerchantTransactions(merchantId: string) {
@@ -1048,9 +1081,12 @@ export async function getMerchantTransactions(merchantId: string) {
         userId: transaction.userId || null,
         userName: user?.UserName || user?.email || "Unknown user",
         userEmail: user?.email || null,
+        memberId: transaction.memberId || null,
         amountSpent: transaction.amountSpent ?? null,
         pointsGiven: Math.abs(Number(transaction.points || 0)),
         type: transaction.type || "earn",
+        status: String(transaction.status || "success"),
+        reason: transaction.reason || null,
         createdAt: transaction.createdAt,
       };
     })

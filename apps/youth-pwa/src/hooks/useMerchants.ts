@@ -5,13 +5,37 @@ import api from '@/lib/api'
 export interface Merchant {
   id: string
   name: string
+  businessName?: string
   description: string
+  shortDescription?: string
   category: string
   address: string
   imageUrl: string
-  status: 'pending' | 'approved' | 'rejected'
+  bannerUrl?: string
+  logoUrl?: string
+  businessInfo?: string
+  discountInfo?: string
+  termsAndConditions?: string
+  pointsRate?: number
+  status: 'pending' | 'approved' | 'rejected' | 'suspended'
   ownerId: string
   createdAt: string
+  promotions?: Array<{
+    id: string
+    title: string
+    shortTagline?: string
+    bannerUrl?: string
+    valueLabel?: string
+    endDate?: string
+  }>
+  products?: Array<{
+    id: string
+    name: string
+    description?: string
+    category?: string
+    imageUrl?: string
+    price?: number
+  }>
 }
 
 export function useMerchants() {

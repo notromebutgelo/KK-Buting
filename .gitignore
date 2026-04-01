@@ -22,6 +22,8 @@ coverage/
 !**/.env.local.example
 
 .turbo/
+.expo/
+**/.expo/
 *.log
 *.tsbuildinfo
 Thumbs.db
