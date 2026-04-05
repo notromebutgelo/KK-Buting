@@ -3,6 +3,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { generateIdNumber } from "../../../utils/generateIdNumber";
 import { setUserRole } from "../auth/user.service";
 import { getMerchantById } from "../merchants/merhcants.service";
+import { createNotification } from "../notifications/notifications.service";
 
 type AnyRecord = Record<string, any>;
 type YouthListSortKey = "fullName" | "createdAt" | "verificationStatus" | "ageGroup";
@@ -628,6 +629,15 @@ export async function approveVerification(userId: string, adminEmail: string) {
     },
     { merge: true }
   );
+
+  await createNotification({
+    recipientUid: userId,
+    audience: "youth",
+    type: "success",
+    title: "Verification approved",
+    body: "Your verification has been approved. Your digital ID and rewards access are now available.",
+    link: "/scanner/digital-id",
+  });
 }
 
 export async function rejectVerification(
@@ -745,6 +755,15 @@ export async function requestVerificationResubmission(
   );
 
   await batch.commit();
+
+  await createNotification({
+    recipientUid: userId,
+    audience: "youth",
+    type: "warning",
+    title: "Resubmission requested",
+    body: message,
+    link: "/verification/upload",
+  });
 }
 
 export async function bulkApproveVerifications(userIds: string[], adminEmail: string) {
@@ -911,7 +930,11 @@ export async function getRewardRedemptions(filters: {
 }
 
 export async function markRewardRedemptionClaimed(transactionId: string, adminEmail: string) {
-  await db.collection("transactions").doc(transactionId).set(
+  const transactionRef = db.collection("transactions").doc(transactionId);
+  const transactionSnap = await transactionRef.get();
+  const transactionData = transactionSnap.data() || {};
+
+  await transactionRef.set(
     {
       redemptionStatus: "claimed",
       claimedAt: FieldValue.serverTimestamp(),
@@ -920,6 +943,18 @@ export async function markRewardRedemptionClaimed(transactionId: string, adminEm
     },
     { merge: true }
   );
+
+  const userId = String(transactionData.userId || "");
+  if (userId) {
+    await createNotification({
+      recipientUid: userId,
+      audience: "youth",
+      type: "success",
+      title: "Reward claimed",
+      body: `Your ${String(transactionData.rewardTitle || "reward")} redemption has been marked as claimed.`,
+      link: "/rewards/my-redemptions",
+    });
+  }
 }
 
 export async function getMerchants(status?: string) {
@@ -945,7 +980,7 @@ export async function getMerchants(status?: string) {
       ...merchant,
       ownerEmail: owner?.email,
       ownerName: owner?.UserName,
-      pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 50),
+      pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 10),
       dateJoined: merchant.createdAt || merchant.updatedAt || null,
     };
   });
@@ -969,7 +1004,7 @@ export async function getMerchantDetails(merchantId: string) {
     ...merchant,
     ownerEmail: owner?.email || merchant.ownerEmail || null,
     ownerName: owner?.UserName || merchant.ownerName || null,
-    pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 50),
+    pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 10),
     dateJoined: merchant.createdAt || merchant.updatedAt || null,
   };
 }
@@ -990,6 +1025,14 @@ export async function approveMerchant(merchantId: string) {
 
   if (merchant.ownerId) {
     await setUserRole(String(merchant.ownerId), "merchant");
+    await createNotification({
+      recipientUid: String(merchant.ownerId),
+      audience: "merchant",
+      type: "account",
+      title: "Merchant account approved",
+      body: "Your merchant account is now active. You can update your storefront and start awarding points.",
+      link: "/shop",
+    });
   }
 }
 
@@ -1000,14 +1043,18 @@ export async function updateMerchant(
 ) {
   const allowedKeys = [
     "name",
+    "businessName",
     "description",
+    "shortDescription",
     "category",
     "address",
     "imageUrl",
+    "bannerUrl",
     "logoUrl",
     "ownerName",
     "discountInfo",
     "termsAndConditions",
+    "pointsPolicy",
     "pointsRate",
     "businessInfo",
   ];
@@ -1024,7 +1071,7 @@ export async function updateMerchant(
   }
 
   if (payload.pointsRate != null) {
-    payload.pointsRate = Number(payload.pointsRate || 50);
+    payload.pointsRate = Number(payload.pointsRate || 10);
   }
 
   await db.collection("merchants").doc(merchantId).set(payload, { merge: true });
@@ -1059,6 +1106,26 @@ export async function updateMerchantStatus(
 
   if (status === "approved" && merchant.ownerId) {
     await setUserRole(String(merchant.ownerId), "merchant");
+  }
+
+  if (merchant.ownerId) {
+    const notificationType =
+      status === "approved" ? "success" : status === "suspended" ? "warning" : "error";
+    const notificationBody =
+      status === "approved"
+        ? "Your merchant account is active again. Storefront updates and QR scans are available."
+        : status === "suspended"
+          ? "Your merchant account has been suspended. Contact SK admin for the next steps."
+          : "Your merchant account was rejected. Review your shop details and coordinate with SK admin.";
+
+    await createNotification({
+      recipientUid: String(merchant.ownerId),
+      audience: "merchant",
+      type: notificationType,
+      title: `Merchant status updated: ${status}`,
+      body: notificationBody,
+      link: "/shop",
+    });
   }
 }
 
@@ -1227,7 +1294,7 @@ export async function getPointsTransactionsOverview(filters: {
       outstandingBalance,
     },
     conversionRate: {
-      pesosPerPoint: Number(settingsSnap.data()?.pesosPerPoint || 50),
+      pesosPerPoint: Number(settingsSnap.data()?.pesosPerPoint || 10),
       updatedAt: toIso(settingsSnap.data()?.updatedAt),
       updatedBy: settingsSnap.data()?.updatedBy || null,
     },

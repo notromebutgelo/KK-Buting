@@ -63,7 +63,7 @@ export default function MerchantsPage() {
   const [editor, setEditor] = useState({
     discountInfo: '',
     termsAndConditions: '',
-    pointsRate: '50',
+    pointsRate: '10',
   })
 
   const isSuperadmin = adminRole === 'superadmin'
@@ -146,7 +146,7 @@ export default function MerchantsPage() {
     setEditor({
       discountInfo: selectedMerchant.discountInfo || '',
       termsAndConditions: selectedMerchant.termsAndConditions || '',
-      pointsRate: String(selectedMerchant.pointsRate || 50),
+      pointsRate: String(selectedMerchant.pointsRate || 10),
     })
 
     let mounted = true
@@ -223,7 +223,7 @@ export default function MerchantsPage() {
       await api.patch(`/admin/merchants/${selectedMerchant.id}`, {
         discountInfo: editor.discountInfo,
         termsAndConditions: editor.termsAndConditions,
-        pointsRate: Number(editor.pointsRate || 50),
+        pointsRate: Number(editor.pointsRate || 10),
       })
       setMessage('Merchant profile updated successfully.')
       await refreshMerchants(selectedMerchant.id)
@@ -375,7 +375,7 @@ export default function MerchantsPage() {
                             {merchant.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-PH') : '—'}
                           </td>
                           <td className="px-5 py-4 text-right text-sm font-semibold text-blue-700">
-                            ₱{Number(merchant.pointsRate || 50).toLocaleString()} = 1 pt
+                            ₱{Number(merchant.pointsRate || 10).toLocaleString()} = 1 pt
                           </td>
                         </tr>
                       )
@@ -474,7 +474,7 @@ export default function MerchantsPage() {
                     Save Details
                   </button>
                 </div>
-                <p className="text-xs text-gray-500">Default conversion is ₱50 = 1 point.</p>
+                <p className="text-xs text-gray-500">Default conversion is ₱100 = 10 points.</p>
               </div>
 
               <div className="space-y-3 rounded-2xl border border-gray-100 p-4">

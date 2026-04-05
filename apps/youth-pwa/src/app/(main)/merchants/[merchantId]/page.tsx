@@ -30,12 +30,6 @@ function getMerchantTags(merchant: Merchant) {
     .slice(0, 2)
     .forEach((value) => tags.add(value))
 
-  merchant.products
-    ?.map((product) => String(product.category || '').trim())
-    .filter(Boolean)
-    .slice(0, 2)
-    .forEach((value) => tags.add(value))
-
   return Array.from(tags).slice(0, 2)
 }
 
@@ -43,7 +37,7 @@ function toBulletLines(content?: string) {
   if (!content) return []
 
   return content
-    .split(/\r?\n|•|-/)
+    .split(/\r?\n|\u2022/)
     .map((line) => line.trim())
     .filter(Boolean)
 }
@@ -103,12 +97,13 @@ export default function MerchantDetailPage() {
     if (!merchant) return []
 
     const manualLines = toBulletLines(merchant.discountInfo)
-    const promotionLines =
+    const promoLines =
       merchant.promotions?.map((promotion) =>
-        [promotion.title, promotion.valueLabel].filter(Boolean).join(' - ')
+        [promotion.title, promotion.shortTagline || promotion.valueLabel].filter(Boolean).join(' - ')
       ) || []
+    const pointsPolicyLines = toBulletLines(merchant.pointsPolicy)
 
-    return [...manualLines, ...promotionLines].filter(Boolean)
+    return [...manualLines, ...promoLines, ...pointsPolicyLines]
   }, [merchant])
 
   const termLines = useMemo(() => toBulletLines(merchant?.termsAndConditions), [merchant])
@@ -125,46 +120,46 @@ export default function MerchantDetailPage() {
   }
 
   return (
-    <div className="min-h-full bg-[#edf4ff] pb-28">
-      <section className="relative h-[246px] overflow-hidden bg-[#0d4f92]">
-        {getMerchantBanner(merchant) ? (
-          <Image src={getMerchantBanner(merchant)} alt={merchant.name} fill className="object-cover" />
-        ) : (
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,#0d4f92_0%,#2e86de_100%)]" />
-        )}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,53,108,0.18)_0%,rgba(5,53,108,0.7)_100%)]" />
-
-        <div className="absolute inset-x-0 top-0 rounded-b-[32px] bg-[linear-gradient(180deg,#f9fbff_0%,#ffffff_100%)] px-4 pb-4 pt-4 shadow-[0_16px_30px_rgba(4,60,121,0.18)]">
-          <div className="grid grid-cols-[40px_1fr_40px] items-center">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3f7ff] text-[#0d4f92]"
-              aria-label="Go back"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="m15 19-7-7 7-7" />
-              </svg>
-            </button>
-            <h1 className="text-center text-[18px] font-black text-[#0d4f92]">Merchant Details</h1>
-            <div />
-          </div>
+    <div className="min-h-full bg-[#edf3fb] pb-28">
+      <section className="rounded-b-[32px] bg-white px-4 pb-4 pt-4 shadow-[0_16px_30px_rgba(4,60,121,0.16)]">
+        <div className="grid grid-cols-[40px_1fr_40px] items-center">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#edf4fb] text-[#0d4f92]"
+            aria-label="Go back"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m15 19-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-center text-[18px] font-black text-[#0d4f92]">Merchant Details</h1>
+          <div />
         </div>
       </section>
 
-      <div className="-mt-12 px-4">
+      <section className="relative h-[228px] overflow-hidden bg-[#0d4f92]">
+        {getMerchantBanner(merchant) ? (
+          <Image src={getMerchantBanner(merchant)} alt={merchant.businessName || merchant.name} fill className="object-cover" />
+        ) : (
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,#0d4f92_0%,#2e86de_100%)]" />
+        )}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,53,108,0.08)_0%,rgba(5,53,108,0.32)_100%)]" />
+      </section>
+
+      <div className="-mt-14 px-4">
         <section className="rounded-[30px] bg-white px-4 pb-5 pt-4 shadow-[0_18px_36px_rgba(4,60,121,0.16)]">
           <div className="flex items-start gap-3">
-            <div className="relative -mt-10 h-[74px] w-[74px] flex-shrink-0 overflow-hidden rounded-full border-4 border-white bg-[#e7eef8] shadow-[0_10px_18px_rgba(4,60,121,0.16)]">
+            <div className="relative h-[86px] w-[86px] flex-shrink-0 overflow-hidden rounded-full border-4 border-white bg-[#edf4fb] shadow-[0_10px_18px_rgba(4,60,121,0.18)]">
               {getMerchantLogo(merchant) ? (
-                <Image src={getMerchantLogo(merchant)} alt={merchant.name} fill className="object-cover" />
+                <Image src={getMerchantLogo(merchant)} alt={merchant.businessName || merchant.name} fill className="object-cover" />
               ) : null}
             </div>
 
             <div className="min-w-0 flex-1 pt-1">
-              <h2 className="text-[28px] font-black leading-none text-[#0d4f92]">{merchant.businessName || merchant.name}</h2>
-              <div className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#6c88a7]">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#90a8c2]" fill="none" stroke="currentColor" strokeWidth="2">
+              <h2 className="text-[30px] font-black leading-none text-[#0d4f92]">{merchant.businessName || merchant.name}</h2>
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-[#7892af]">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#8fa7c1]" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 21s-6-4.35-6-10a6 6 0 1 1 12 0c0 5.65-6 10-6 10Z" />
                   <circle cx="12" cy="11" r="2" />
                 </svg>
@@ -177,25 +172,25 @@ export default function MerchantDetailPage() {
             {getMerchantTags(merchant).map((tag) => (
               <span
                 key={tag}
-                className="rounded-full border border-[#dce7f3] bg-[#f7fbff] px-3 py-1 text-[10px] font-bold text-[#0d4f92]"
+                className="rounded-full bg-[#0d4f92] px-3 py-1 text-[10px] font-bold text-white"
               >
                 {tag}
               </span>
             ))}
           </div>
 
-          <div className="mt-4 rounded-[22px] border border-[#d7e3ef] bg-[#fbfdff] px-4 py-4">
-            <p className="text-[13px] leading-6 text-[#476584]">
+          <div className="mt-4">
+            <p className="text-[16px] leading-7 text-[#4d6785]">
               {merchant.shortDescription || merchant.description || merchant.businessInfo || 'Merchant details coming soon.'}
             </p>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 border-b border-[#dbe6f2]">
+          <div className="mt-5 grid grid-cols-2 border-b border-[#dce7f2]">
             <button
               type="button"
               onClick={() => setActiveTab('discounts')}
-              className={`pb-3 text-xs font-black ${
-                activeTab === 'discounts' ? 'border-b-2 border-[#0d4f92] text-[#0d4f92]' : 'text-[#7a94b0]'
+              className={`pb-3 text-sm font-black ${
+                activeTab === 'discounts' ? 'border-b-2 border-[#0d4f92] text-[#0d4f92]' : 'text-[#7f98b3]'
               }`}
             >
               Discount Info
@@ -203,21 +198,21 @@ export default function MerchantDetailPage() {
             <button
               type="button"
               onClick={() => setActiveTab('terms')}
-              className={`pb-3 text-xs font-black ${
-                activeTab === 'terms' ? 'border-b-2 border-[#0d4f92] text-[#0d4f92]' : 'text-[#7a94b0]'
+              className={`pb-3 text-sm font-black ${
+                activeTab === 'terms' ? 'border-b-2 border-[#0d4f92] text-[#0d4f92]' : 'text-[#7f98b3]'
               }`}
             >
               Terms & Conditions
             </button>
           </div>
 
-          <div className="pt-4 text-[13px] leading-6 text-[#4a6684]">
+          <div className="pt-4 text-[15px] leading-7 text-[#496684]">
             {activeTab === 'discounts' ? (
               discountLines.length > 0 ? (
-                <ul className="space-y-2">
+                <ul className="space-y-2.5">
                   {discountLines.map((line) => (
-                    <li key={line} className="flex gap-2">
-                      <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-[#0d4f92]" />
+                    <li key={line} className="flex gap-3">
+                      <span className="mt-[11px] h-2 w-2 rounded-full bg-[#0d4f92]" />
                       <span>{line}</span>
                     </li>
                   ))}
@@ -226,10 +221,10 @@ export default function MerchantDetailPage() {
                 <p>No active discount details have been posted yet.</p>
               )
             ) : termLines.length > 0 ? (
-              <ul className="space-y-2">
+              <ul className="space-y-2.5">
                 {termLines.map((line) => (
-                  <li key={line} className="flex gap-2">
-                    <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-[#0d4f92]" />
+                  <li key={line} className="flex gap-3">
+                    <span className="mt-[11px] h-2 w-2 rounded-full bg-[#0d4f92]" />
                     <span>{line}</span>
                   </li>
                 ))}
@@ -241,8 +236,11 @@ export default function MerchantDetailPage() {
         </section>
 
         {merchant.promotions && merchant.promotions.length > 0 ? (
-          <section id="merchant-offers" className="mt-4 rounded-[28px] bg-white px-4 py-5 shadow-[0_14px_30px_rgba(4,60,121,0.12)]">
-            <h3 className="text-sm font-black text-[#0d4f92]">Current Offers</h3>
+          <section className="mt-4 rounded-[28px] bg-white px-4 py-5 shadow-[0_14px_30px_rgba(4,60,121,0.12)]">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-black text-[#0d4f92]">Current Promos</h3>
+              <span className="text-xs font-semibold text-[#839cb8]">{merchant.promotions.length} active</span>
+            </div>
             <div className="mt-3 space-y-3">
               {merchant.promotions.map((promotion) => (
                 <div key={promotion.id} className="overflow-hidden rounded-[22px] border border-[#dce7f3] bg-[#f9fbff]">
@@ -256,7 +254,7 @@ export default function MerchantDetailPage() {
                       <div>
                         <p className="text-sm font-black text-[#0d4f92]">{promotion.title}</p>
                         {promotion.shortTagline ? (
-                          <p className="mt-1 text-xs leading-5 text-[#6380a0]">{promotion.shortTagline}</p>
+                          <p className="mt-1 text-xs leading-5 text-[#6480a0]">{promotion.shortTagline}</p>
                         ) : null}
                       </div>
                       {promotion.valueLabel ? (
@@ -274,7 +272,10 @@ export default function MerchantDetailPage() {
 
         {merchant.products && merchant.products.length > 0 ? (
           <section className="mt-4 rounded-[28px] bg-white px-4 py-5 shadow-[0_14px_30px_rgba(4,60,121,0.12)]">
-            <h3 className="text-sm font-black text-[#0d4f92]">Products & Menu</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-black text-[#0d4f92]">Products & Menu</h3>
+              <span className="text-xs font-semibold text-[#839cb8]">{merchant.products.length} items</span>
+            </div>
             <div className="mt-3 space-y-3">
               {merchant.products.map((product) => (
                 <div key={product.id} className="rounded-[20px] border border-[#dce7f3] bg-[#fbfdff] px-4 py-4">
@@ -301,13 +302,10 @@ export default function MerchantDetailPage() {
               <div>
                 <h3 className="text-sm font-black text-[#0d4f92]">Rewards You Can Redeem</h3>
                 <p className="mt-1 text-xs leading-5 text-[#6a86a4]">
-                  Admin-created rewards for this merchant. Redeeming these spends your youth points.
+                  Admin-created rewards linked to this merchant.
                 </p>
               </div>
-              <Link
-                href="/rewards"
-                className="text-[11px] font-black uppercase tracking-[0.12em] text-[#f09000]"
-              >
+              <Link href="/rewards" className="text-[11px] font-black uppercase tracking-[0.12em] text-[#f09000]">
                 All Rewards
               </Link>
             </div>
@@ -339,7 +337,7 @@ export default function MerchantDetailPage() {
         ) : null}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 bg-[linear-gradient(180deg,rgba(237,244,255,0)_0%,rgba(237,244,255,0.92)_24%,#edf4ff_100%)] px-4 pb-[calc(1rem+var(--safe-area-inset-bottom))] pt-6">
+      <div className="fixed inset-x-0 bottom-0 z-20 bg-[linear-gradient(180deg,rgba(237,243,251,0)_0%,rgba(237,243,251,0.92)_24%,#edf3fb_100%)] px-4 pb-[calc(1rem+var(--safe-area-inset-bottom))] pt-6">
         <button
           type="button"
           onClick={() => {
@@ -357,11 +355,7 @@ export default function MerchantDetailPage() {
           }}
           className="mx-auto flex w-full max-w-md items-center justify-center rounded-full bg-[linear-gradient(90deg,#f8cb5b_0%,#f1b941_52%,#ffd77a_100%)] px-6 py-4 text-sm font-black text-white shadow-[0_18px_30px_rgba(241,185,65,0.34)]"
         >
-          {merchantRewards.length === 1
-            ? 'Redeem Reward'
-            : merchantRewards.length > 1
-              ? 'View Rewards'
-              : 'Show Youth QR to Earn Points'}
+          {merchantRewards.length > 0 ? 'Redeem' : 'Show Youth QR to Earn Points'}
         </button>
       </div>
     </div>

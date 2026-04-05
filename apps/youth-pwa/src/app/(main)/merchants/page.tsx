@@ -1,13 +1,22 @@
 'use client'
 
-import Link from 'next/link'
 import Image from 'next/image'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 import Spinner from '@/components/ui/Spinner'
 import { type Merchant, useMerchants } from '@/hooks/useMerchants'
 
 const FAVORITES_KEY = 'kk-favorite-merchants'
+
+function getMerchantBanner(merchant: Merchant) {
+  return merchant.bannerUrl || merchant.imageUrl || merchant.logoUrl || ''
+}
+
+function getMerchantLogo(merchant: Merchant) {
+  return merchant.logoUrl || merchant.imageUrl || merchant.bannerUrl || ''
+}
 
 function getMerchantTags(merchant: Merchant) {
   const tags = new Set<string>()
@@ -19,28 +28,15 @@ function getMerchantTags(merchant: Merchant) {
     .slice(0, 2)
     .forEach((value) => tags.add(value))
 
-  merchant.products
-    ?.map((product) => String(product.category || '').trim())
-    .filter(Boolean)
-    .slice(0, 2)
-    .forEach((value) => tags.add(value))
-
   return Array.from(tags).slice(0, 2)
 }
 
-function getMerchantCover(merchant: Merchant) {
-  return merchant.bannerUrl || merchant.imageUrl || merchant.logoUrl || ''
-}
-
-function getMerchantLogo(merchant: Merchant) {
-  return merchant.logoUrl || merchant.imageUrl || merchant.bannerUrl || ''
-}
-
 export default function MerchantsPage() {
+  const router = useRouter()
   const { merchants, isLoading, error } = useMerchants()
   const [query, setQuery] = useState('')
   const [favorites, setFavorites] = useState<string[]>([])
-  const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null)
+  const [expandedMerchantId, setExpandedMerchantId] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -53,16 +49,16 @@ export default function MerchantsPage() {
     }
   }, [])
 
-  const approved = useMemo(
+  const approvedMerchants = useMemo(
     () => merchants.filter((merchant) => merchant.status === 'approved'),
     [merchants]
   )
 
-  const filtered = useMemo(() => {
+  const filteredMerchants = useMemo(() => {
     const keyword = query.trim().toLowerCase()
-    if (!keyword) return approved
+    if (!keyword) return approvedMerchants
 
-    return approved.filter((merchant) =>
+    return approvedMerchants.filter((merchant) =>
       [
         merchant.name,
         merchant.businessName,
@@ -74,23 +70,20 @@ export default function MerchantsPage() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword))
     )
-  }, [approved, query])
+  }, [approvedMerchants, query])
 
   useEffect(() => {
-    if (filtered.length === 0) {
-      setSelectedMerchantId(null)
+    if (!filteredMerchants.length) {
+      setExpandedMerchantId(null)
       return
     }
 
-    setSelectedMerchantId((current) =>
-      current && filtered.some((merchant) => merchant.id === current) ? current : filtered[0].id
+    setExpandedMerchantId((current) =>
+      current && filteredMerchants.some((merchant) => merchant.id === current)
+        ? current
+        : filteredMerchants[0].id
     )
-  }, [filtered])
-
-  const selectedMerchant = useMemo(
-    () => filtered.find((merchant) => merchant.id === selectedMerchantId) || filtered[0] || null,
-    [filtered, selectedMerchantId]
-  )
+  }, [filteredMerchants])
 
   const toggleFavorite = (merchantId: string) => {
     setFavorites((current) => {
@@ -104,14 +97,25 @@ export default function MerchantsPage() {
   }
 
   return (
-    <div className="min-h-full bg-[#0a5ca8] pb-24">
-      <section className="rounded-b-[34px] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 pb-5 pt-4 shadow-[0_18px_34px_rgba(0,54,122,0.18)]">
-        <div className="flex items-center justify-center py-3">
-          <h1 className="text-[22px] font-black tracking-[-0.02em] text-[#0c4f93]">Merchants</h1>
+    <div className="min-h-full bg-[linear-gradient(180deg,#0b5fad_0%,#0d4f92_24%,#edf3fb_24%,#edf3fb_100%)] pb-24">
+      <section className="rounded-b-[34px] bg-white px-4 pb-5 pt-4 shadow-[0_16px_30px_rgba(4,60,121,0.2)]">
+        <div className="grid grid-cols-[40px_1fr_40px] items-center">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#edf4fb] text-[#0d4f92]"
+            aria-label="Go back"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m15 19-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-center text-[20px] font-black text-[#0d4f92]">Merchants</h1>
+          <div />
         </div>
 
-        <div className="mt-3 flex items-center gap-3 rounded-full border border-[#d7e6f8] bg-[#f7fbff] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-          <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#f0a722]" fill="none" stroke="currentColor" strokeWidth="2">
+        <div className="mt-4 flex items-center gap-3 rounded-full border border-[#d8e6f6] bg-[#f8fbff] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#f2b32a]" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="m21 21-4.35-4.35" />
             <circle cx="11" cy="11" r="6" />
           </svg>
@@ -121,17 +125,13 @@ export default function MerchantsPage() {
             placeholder="Search for a Merchant..."
             className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#35577c] outline-none placeholder:text-[#8ca6c4]"
           />
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff1cc] text-[#f0a722]"
-            aria-label="Merchant filters"
-          >
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff1cc] text-[#f2b32a]">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M4 7h16" />
               <path d="M7 12h10" />
               <path d="M10 17h4" />
             </svg>
-          </button>
+          </div>
         </div>
       </section>
 
@@ -141,158 +141,90 @@ export default function MerchantsPage() {
             <Spinner size="lg" />
           </div>
         ) : error ? (
-          <div className="rounded-[28px] bg-white/95 px-6 py-10 text-center text-sm font-semibold text-red-500 shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
+          <div className="rounded-[28px] bg-white px-6 py-10 text-center text-sm font-semibold text-red-500 shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
             {error}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="rounded-[28px] bg-white/95 px-6 py-12 text-center shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
+        ) : filteredMerchants.length === 0 ? (
+          <div className="rounded-[28px] bg-white px-6 py-12 text-center shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
             <p className="text-lg font-black text-[#0d4f92]">No merchants found</p>
             <p className="mt-2 text-sm text-[#6d87a4]">Try a different keyword or check back later.</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {selectedMerchant ? (
-              <section>
-                <div
-                  key={selectedMerchant.id}
-                  className="overflow-hidden rounded-[24px] border-[3px] border-[#ffbf2a] bg-white shadow-[0_14px_30px_rgba(4,60,121,0.26)] transition-all duration-300"
+          <div className="space-y-4">
+            {filteredMerchants.map((merchant, index) => {
+              const expanded = expandedMerchantId === merchant.id
+              const isFavorite = favorites.includes(merchant.id)
+              const frameClass =
+                index % 2 === 0
+                  ? 'bg-[linear-gradient(180deg,#ffbf2a_0%,#f1a31c_100%)]'
+                  : 'bg-[linear-gradient(180deg,#0f5da7_0%,#113f79_100%)]'
+              const accentText = index % 2 === 0 ? 'text-[#f09300]' : 'text-[#0d4f92]'
+
+              return (
+                <article
+                  key={merchant.id}
+                  className={`overflow-hidden rounded-[26px] p-[4px] shadow-[0_14px_28px_rgba(4,60,121,0.24)] transition-all duration-300 ${frameClass}`}
                 >
-                  <div className="relative h-[128px] bg-[linear-gradient(135deg,#0f5ca9_0%,#0e3769_100%)]">
-                    {getMerchantCover(selectedMerchant) ? (
-                      <Image
-                        src={getMerchantCover(selectedMerchant)}
-                        alt={selectedMerchant.name}
-                        fill
-                        className="object-cover transition-all duration-500"
-                      />
-                    ) : null}
-                    <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12)_0%,rgba(0,0,0,0.55)_100%)]" />
-                    <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
-                      <div className="flex flex-wrap gap-1.5">
-                        {getMerchantTags(selectedMerchant).map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-bold text-[#114d88]"
-                          >
-                            {tag}
-                          </span>
-                        ))}
+                  <div className="rounded-[22px] bg-white">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setExpandedMerchantId((current) => (current === merchant.id ? null : merchant.id))}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setExpandedMerchantId((current) => (current === merchant.id ? null : merchant.id))
+                        }
+                      }}
+                      className="block w-full cursor-pointer text-left"
+                    >
+                      <div className="relative h-[148px] overflow-hidden rounded-t-[22px] bg-[linear-gradient(135deg,#e6eef8_0%,#b9d3ef_100%)]">
+                        {getMerchantBanner(merchant) ? (
+                          <Image
+                            src={getMerchantBanner(merchant)}
+                            alt={merchant.businessName || merchant.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : null}
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.18)_100%)]" />
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="flex items-start gap-3 px-4 py-4">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMerchantId(selectedMerchant.id)}
-                      className="relative h-[72px] w-[72px] flex-shrink-0 overflow-hidden rounded-[18px] border-[3px] border-[#ffbf2a] bg-[#fff8de]"
-                      aria-label={`Selected merchant ${selectedMerchant.businessName || selectedMerchant.name}`}
-                    >
-                      {getMerchantLogo(selectedMerchant) ? (
-                        <Image
-                          src={getMerchantLogo(selectedMerchant)}
-                          alt={selectedMerchant.name}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : null}
-                    </button>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-1 text-[18px] font-black text-[#0d4f92]">
-                        {selectedMerchant.businessName || selectedMerchant.name}
-                      </p>
-                      <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-[#7c96b4]">
-                        {selectedMerchant.address}
-                      </p>
-                      <p className="mt-2 line-clamp-3 text-[12px] leading-5 text-[#56728f]">
-                        {selectedMerchant.shortDescription || selectedMerchant.description || selectedMerchant.businessInfo}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 border-t border-[#e5eef8] px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
-                      {getMerchantTags(selectedMerchant).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full border border-[#d6e3f0] bg-[#f8fbff] px-3 py-1 text-[10px] font-bold text-[#0d4f92]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-
-                    <Link
-                      href={`/merchants/${selectedMerchant.id}`}
-                      className="text-[11px] font-black text-[#f39100]"
-                    >
-                      View Details
-                    </Link>
-                  </div>
-                </div>
-              </section>
-            ) : null}
-
-            <section>
-              <h2 className="text-base font-black text-white">Recommended Merchants</h2>
-              <div className="mt-3 space-y-4">
-                {filtered.map((merchant, index) => {
-                  const isFavorite = favorites.includes(merchant.id)
-                  const isSelected = merchant.id === selectedMerchant?.id
-                  const cardAccent =
-                    index % 2 === 0
-                      ? 'bg-[linear-gradient(135deg,#ffbd2f_0%,#ff9f17_100%)]'
-                      : 'bg-[linear-gradient(135deg,#0d4f92_0%,#0f67bf_100%)]'
-                  const cardFrame =
-                    index % 2 === 0
-                      ? 'bg-[linear-gradient(180deg,#ffbd2f_0%,#ffb11d_100%)]'
-                      : 'bg-[linear-gradient(180deg,#0d4f92_0%,#0c5cad_100%)]'
-                  const buttonText = index % 2 === 0 ? 'text-[#f39100]' : 'text-[#0d4f92]'
-
-                  return (
-                    <article
-                      key={merchant.id}
-                      className={`overflow-hidden rounded-[24px] p-[3px] shadow-[0_14px_28px_rgba(4,60,121,0.24)] transition-transform duration-300 ${cardFrame} ${
-                        isSelected ? 'scale-[1.01]' : ''
-                      }`}
-                    >
-                      <div
-                        className={`rounded-[21px] bg-white px-3 pb-4 pt-3 transition-colors duration-300 ${
-                          isSelected ? 'ring-2 ring-[#ffd36c]' : ''
-                        }`}
-                      >
+                      <div className="px-4 pb-4 pt-3">
                         <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedMerchantId(merchant.id)}
-                            className={`relative h-[74px] w-[74px] flex-shrink-0 overflow-hidden rounded-[18px] ${cardAccent}`}
-                            aria-label={`Preview ${merchant.businessName || merchant.name}`}
-                          >
+                          <div className="relative -mt-9 h-[66px] w-[66px] flex-shrink-0 overflow-hidden rounded-[20px] border-[3px] border-white bg-[#f8fbff] shadow-[0_10px_18px_rgba(4,60,121,0.12)]">
                             {getMerchantLogo(merchant) ? (
-                              <Image src={getMerchantLogo(merchant)} alt={merchant.name} fill className="object-cover" />
+                              <Image
+                                src={getMerchantLogo(merchant)}
+                                alt={merchant.businessName || merchant.name}
+                                fill
+                                className="object-cover"
+                              />
                             ) : null}
-                          </button>
+                          </div>
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start gap-2">
-                              <div className="min-w-0 flex-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedMerchantId(merchant.id)}
-                                  className="block text-left"
-                                >
-                                  <h3 className="line-clamp-1 text-[15px] font-black text-[#0d4f92]">
-                                    {merchant.businessName || merchant.name}
-                                  </h3>
-                                </button>
-                                <p className="mt-1 line-clamp-1 text-[10px] font-semibold text-[#7c96b4]">{merchant.address}</p>
+                          <div className="min-w-0 flex-1 pt-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="line-clamp-1 text-[19px] font-black text-[#0d4f92]">
+                                  {merchant.businessName || merchant.name}
+                                </p>
+                                <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#7d95b0]">
+                                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-[#98aec7]" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 21s-6-4.35-6-10a6 6 0 1 1 12 0c0 5.65-6 10-6 10Z" />
+                                    <circle cx="12" cy="11" r="2" />
+                                  </svg>
+                                  <span className="line-clamp-1">{merchant.address}</span>
+                                </div>
                               </div>
 
                               <button
                                 type="button"
-                                onClick={() => toggleFavorite(merchant.id)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#ffd2dd] bg-white text-[#e73d6f] shadow-[0_8px_14px_rgba(231,61,111,0.16)]"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  toggleFavorite(merchant.id)
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#ffd4df] bg-white text-[#e83b6f] shadow-[0_10px_16px_rgba(232,59,111,0.18)]"
                                 aria-label={isFavorite ? 'Remove favorite merchant' : 'Add favorite merchant'}
                               >
                                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
@@ -300,44 +232,43 @@ export default function MerchantsPage() {
                                 </svg>
                               </button>
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={() => setSelectedMerchantId(merchant.id)}
-                              className="mt-2 block text-left"
-                            >
-                              <p className="line-clamp-3 text-[11px] leading-4 text-[#56728f]">
-                                {merchant.shortDescription || merchant.description || merchant.businessInfo}
-                              </p>
-                            </button>
                           </div>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                          <div className="flex flex-wrap gap-2">
-                            {getMerchantTags(merchant).map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded-full border border-[#d6e3f0] bg-[#f8fbff] px-3 py-1 text-[10px] font-bold text-[#0d4f92]"
+                        {expanded ? (
+                          <div className="pt-4">
+                            <p className="text-[13px] leading-5 text-[#58718e]">
+                              {merchant.shortDescription || merchant.description || merchant.businessInfo || 'Merchant details coming soon.'}
+                            </p>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {getMerchantTags(merchant).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="rounded-full border border-[#d7e3ef] bg-[#f8fbff] px-3 py-1 text-[10px] font-bold text-[#0d4f92]"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+
+                            <div className="mt-4 flex items-center justify-end">
+                              <Link
+                                href={`/merchants/${merchant.id}`}
+                                onClick={(event) => event.stopPropagation()}
+                                className={`rounded-full bg-white px-4 py-2 text-[11px] font-black shadow-[0_10px_18px_rgba(4,60,121,0.08)] ${accentText}`}
                               >
-                                {tag}
-                              </span>
-                            ))}
+                                View Details
+                              </Link>
+                            </div>
                           </div>
-
-                          <Link
-                            href={`/merchants/${merchant.id}`}
-                            className={`text-[11px] font-black ${buttonText}`}
-                          >
-                            View Details
-                          </Link>
-                        </div>
+                        ) : null}
                       </div>
-                    </article>
-                  )
-                })}
-              </div>
-            </section>
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         )}
       </div>

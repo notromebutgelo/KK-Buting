@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +12,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import {
   deleteMerchantProduct,
@@ -94,13 +97,23 @@ export default function ProductMenuScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()}>
+      <KeyboardAvoidingView
+        style={styles.keyboardShell}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
+      >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.hero}>
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={18} color="#014384" />
             <Text style={styles.back}>Back</Text>
           </Pressable>
           <Text style={styles.title}>Products & Menu</Text>
-          <Text style={styles.subtitle}>Manage the items that will later appear in the merchant directory and promo flows.</Text>
+          <Text style={styles.subtitle}>Manage the items that appear in the merchant directory and promo flows.</Text>
         </View>
 
         <View style={styles.grid}>
@@ -110,8 +123,13 @@ export default function ProductMenuScreen() {
               style={[styles.productCard, selectedId === product.id && styles.selectedCard]}
               onPress={() => handleSelect(product)}
             >
+              <View style={styles.cardTop}>
+                <View style={styles.productIcon}>
+                  <MaterialCommunityIcons name="food-outline" size={20} color="#014384" />
+                </View>
+                <Text style={styles.productPrice}>{formatCurrency(product.price)}</Text>
+              </View>
               <Text style={styles.productName}>{product.name}</Text>
-              <Text style={styles.productPrice}>{formatCurrency(product.price)}</Text>
               <Text style={styles.productMeta}>{product.category}</Text>
               <Text style={styles.productMeta}>{product.isActive ? 'Visible in list' : 'Hidden from list'}</Text>
             </Pressable>
@@ -160,6 +178,7 @@ export default function ProductMenuScreen() {
           </View>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
@@ -199,55 +218,83 @@ function Field({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f6f6ef',
+    backgroundColor: '#f0f0f0',
+  },
+  keyboardShell: {
+    flex: 1,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: 18,
+    gap: 14,
+    paddingBottom: 36,
   },
-  header: {
-    gap: 8,
+  hero: {
+    gap: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 26,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   back: {
-    color: '#0f766e',
+    color: '#014384',
     fontWeight: '800',
   },
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#111827',
+    color: '#014384',
   },
   subtitle: {
-    color: '#4b5563',
-    lineHeight: 22,
+    color: '#60748f',
+    lineHeight: 21,
   },
   grid: {
-    gap: 12,
+    gap: 10,
   },
   productCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    padding: 16,
+    padding: 15,
     gap: 6,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(1, 67, 132, 0.08)',
   },
   selectedCard: {
-    borderColor: '#0f766e',
-    backgroundColor: '#f0fdfa',
+    borderColor: 'rgba(1, 67, 132, 0.24)',
+    backgroundColor: '#f8fbff',
+  },
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  productIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#eef4fb',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   productName: {
-    color: '#111827',
+    color: '#014384',
     fontWeight: '800',
     fontSize: 16,
   },
   productPrice: {
-    color: '#ea580c',
-    fontSize: 22,
+    color: '#9c6500',
+    fontSize: 20,
     fontWeight: '900',
   },
   productMeta: {
-    color: '#64748b',
+    color: '#6a7f98',
     fontSize: 12,
   },
   editor: {
@@ -256,12 +303,12 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(1, 67, 132, 0.08)',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: '900',
+    color: '#014384',
   },
   field: {
     gap: 8,
@@ -270,17 +317,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fieldLabel: {
-    color: '#334155',
-    fontWeight: '700',
+    color: '#35506d',
+    fontWeight: '800',
     fontSize: 13,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#d9e4f0',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fbff',
     color: '#0f172a',
   },
   multilineInput: {
@@ -294,18 +341,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#eef4fb',
   },
   toggleRowActive: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#fff4d8',
   },
   toggleText: {
-    color: '#475569',
+    color: '#4f647e',
     fontWeight: '800',
     textAlign: 'center',
   },
   toggleTextActive: {
-    color: '#166534',
+    color: '#9c6500',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -314,7 +361,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     flex: 1,
     borderRadius: 16,
-    backgroundColor: '#ea580c',
+    backgroundColor: '#014384',
     paddingVertical: 16,
     alignItems: 'center',
   },
@@ -325,13 +372,13 @@ const styles = StyleSheet.create({
   secondaryButton: {
     paddingHorizontal: 18,
     borderRadius: 16,
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#fff1ef',
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    color: '#b91c1c',
+    color: '#b42318',
     fontWeight: '800',
   },
 })

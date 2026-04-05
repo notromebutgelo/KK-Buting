@@ -69,7 +69,7 @@ const initialSummary: Summary = {
 }
 
 const initialConversionRate: ConversionRate = {
-  pesosPerPoint: 50,
+  pesosPerPoint: 10,
   updatedAt: null,
   updatedBy: null,
 }
@@ -96,7 +96,7 @@ export default function PointsTransactionsPage() {
     minPoints: '',
     maxPoints: '',
   })
-  const [conversionRateInput, setConversionRateInput] = useState('50')
+  const [conversionRateInput, setConversionRateInput] = useState('10')
 
   const isSuperadmin = adminRole === 'superadmin'
 
@@ -115,7 +115,7 @@ export default function PointsTransactionsPage() {
 
         const nextData = overviewRes.data as PointsOverviewResponse
         setData(nextData)
-        setConversionRateInput(String(nextData.conversionRate?.pesosPerPoint || 50))
+        setConversionRateInput(String(nextData.conversionRate?.pesosPerPoint || 10))
         setAdminRole(meRes.data?.role || window.localStorage.getItem('kk-admin-role') || 'admin')
       } catch {
         if (!mounted) return
@@ -140,7 +140,7 @@ export default function PointsTransactionsPage() {
 
   useEffect(() => {
     if (!isLoading) {
-      setConversionRateInput(String(data.conversionRate?.pesosPerPoint || 50))
+      setConversionRateInput(String(data.conversionRate?.pesosPerPoint || 10))
     }
   }, [data.conversionRate, isLoading])
 
@@ -192,7 +192,7 @@ export default function PointsTransactionsPage() {
       const res = await api.get('/admin/points-transactions')
       const nextData = res.data as PointsOverviewResponse
       setData(nextData)
-      setConversionRateInput(String(nextData.conversionRate?.pesosPerPoint || 50))
+      setConversionRateInput(String(nextData.conversionRate?.pesosPerPoint || 10))
     } catch (error: any) {
       setMessage(error?.response?.data?.error || 'We could not reset the filters right now.')
     } finally {

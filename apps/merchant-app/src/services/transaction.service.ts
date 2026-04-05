@@ -43,18 +43,14 @@ function mapTransaction(item: Record<string, unknown>): MerchantTransaction {
 export async function scanMemberQr({ token, amountSpent }: ScanInput) {
   try {
     const normalizedAmount = Number(amountSpent || 0)
-    const useRedeemFlow = Number.isFinite(normalizedAmount) && normalizedAmount > 0
-    const response = await api.post(
-      useRedeemFlow ? '/qr/redeem' : '/qr/scan',
-      useRedeemFlow
-        ? {
-            token,
-            amountSpent: normalizedAmount,
-          }
-        : {
-            token,
-          }
-    )
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      throw new Error('Enter the purchase amount to calculate points for this scan.')
+    }
+
+    const response = await api.post('/qr/redeem', {
+      token,
+      amountSpent: normalizedAmount,
+    })
 
     const memberId = String(response.data?.memberId ?? response.data?.userId ?? 'unknown-member')
     const transaction: MerchantTransaction = {

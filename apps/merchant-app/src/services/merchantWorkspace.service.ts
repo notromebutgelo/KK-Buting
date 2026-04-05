@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import axios from 'axios'
 
 import api from '../lib/api'
@@ -12,34 +11,7 @@ import type {
   MerchantStatus,
   MerchantTransaction,
 } from '../types/merchant'
-import { getStatusMessage, maskMemberId, maskMemberLabel } from '../utils/merchant'
-
-const NOTIFICATIONS_KEY = 'notifications'
-
-function scopedKey(user: MerchantUser | null | undefined, key: string) {
-  return `merchant-workspace:${user?.uid ?? 'default'}:${key}`
-}
-
-async function readScoped<T>(
-  user: MerchantUser | null | undefined,
-  key: string,
-  factory: () => T
-): Promise<T> {
-  const storageKey = scopedKey(user, key)
-  const raw = await AsyncStorage.getItem(storageKey)
-
-  if (raw) {
-    return JSON.parse(raw) as T
-  }
-
-  const seeded = factory()
-  await AsyncStorage.setItem(storageKey, JSON.stringify(seeded))
-  return seeded
-}
-
-async function writeScoped<T>(user: MerchantUser | null | undefined, key: string, value: T) {
-  await AsyncStorage.setItem(scopedKey(user, key), JSON.stringify(value))
-}
+import { getStatusMessage, maskMemberId } from '../utils/merchant'
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -47,31 +19,6 @@ function createId(prefix: string) {
 
 function nowIso() {
   return new Date().toISOString()
-}
-
-function defaultStatus(): MerchantStatus {
-  return 'active'
-}
-
-function buildSeedNotifications(): MerchantNotification[] {
-  return [
-    {
-      id: createId('notif'),
-      title: 'Merchant account active',
-      body: 'Your merchant workspace is ready for QR scans and live catalog updates.',
-      type: 'account',
-      createdAt: nowIso(),
-      read: false,
-    },
-    {
-      id: createId('notif'),
-      title: 'Promo reminder',
-      body: 'Review your current promotion validity dates before posting them to youth members.',
-      type: 'promotion',
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-      read: true,
-    },
-  ]
 }
 
 function mapBackendStatus(status: string | undefined): MerchantStatus {
@@ -95,7 +42,11 @@ function mapBackendProfile(payload: Record<string, unknown>, user: MerchantUser 
     businessInfo: String(payload.businessInfo || ''),
     discountInfo: String(payload.discountInfo || ''),
     termsAndConditions: String(payload.termsAndConditions || ''),
-    pointsRate: Number(payload.pointsRate || 50),
+    pointsPolicy: String(
+      payload.pointsPolicy ||
+        'Earn 10 points for every PHP 100 spent at this shop. Present your youth QR during checkout.'
+    ),
+    pointsRate: Number(payload.pointsRate || 10),
     logoUrl: String(payload.logoUrl || ''),
     bannerUrl: String(payload.bannerUrl || payload.imageUrl || ''),
     status,
@@ -156,6 +107,17 @@ function mapBackendTransaction(item: Record<string, unknown>): MerchantTransacti
   }
 }
 
+function mapBackendNotification(item: Record<string, unknown>): MerchantNotification {
+  return {
+    id: String(item.id || createId('notif')),
+    title: String(item.title || 'Notification'),
+    body: String(item.body || ''),
+    type: (String(item.type || 'info') as MerchantNotification['type']),
+    createdAt: String(item.createdAt || nowIso()),
+    read: Boolean(item.read),
+  }
+}
+
 function rethrowApiError(error: unknown): never {
   if (axios.isAxiosError(error)) {
     throw new Error(String(error.response?.data?.error || error.message || 'Request failed'))
@@ -183,6 +145,7 @@ export async function updateMerchantProfile(
       businessInfo: patch.businessInfo,
       discountInfo: patch.discountInfo,
       termsAndConditions: patch.termsAndConditions,
+      pointsPolicy: patch.pointsPolicy,
       logoUrl: patch.logoUrl,
       bannerUrl: patch.bannerUrl,
       imageUrl: patch.bannerUrl || patch.logoUrl,
@@ -277,14 +240,14 @@ export async function deleteMerchantProduct(_user: MerchantUser | null | undefin
 }
 
 export async function getMerchantNotifications(user: MerchantUser | null | undefined) {
-  return readScoped(user, NOTIFICATIONS_KEY, buildSeedNotifications)
+  const response = await api.get('/notifications/me')
+  const notifications = (response.data?.notifications || response.data || []) as Array<Record<string, unknown>>
+  return notifications.map(mapBackendNotification)
 }
 
 export async function markAllNotificationsRead(user: MerchantUser | null | undefined) {
-  const notifications = await getMerchantNotifications(user)
-  const next = notifications.map((notification) => ({ ...notification, read: true }))
-  await writeScoped(user, NOTIFICATIONS_KEY, next)
-  return next
+  await api.post('/notifications/me/read-all')
+  return getMerchantNotifications(user)
 }
 
 export async function getMerchantTransactions(_user: MerchantUser | null | undefined) {

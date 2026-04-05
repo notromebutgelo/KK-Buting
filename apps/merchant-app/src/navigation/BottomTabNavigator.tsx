@@ -1,5 +1,6 @@
 import React from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import DashboardScreen from '../screens/dashboards/DashboardScreen'
@@ -18,22 +19,44 @@ export type MerchantTabParamList = {
 
 const Tab = createBottomTabNavigator<MerchantTabParamList>()
 
+function getTabIcon(routeName: keyof MerchantTabParamList, focused: boolean) {
+  if (routeName === 'Home') return focused ? 'view-dashboard' : 'view-dashboard-outline'
+  if (routeName === 'Scan') return focused ? 'qrcode-scan' : 'qrcode-scan'
+  if (routeName === 'Shop') return focused ? 'storefront' : 'storefront-outline'
+  if (routeName === 'Alerts') return focused ? 'bell' : 'bell-outline'
+  return focused ? 'account-circle' : 'account-circle-outline'
+}
+
 export default function BottomTabNavigator() {
   const insets = useSafeAreaInsets()
   const bottomPadding = Math.max(insets.bottom, 10)
 
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#0f766e',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarActiveTintColor: '#014384',
+        tabBarInactiveTintColor: '#6a7f98',
         tabBarStyle: {
-          height: 58 + bottomPadding,
-          paddingTop: 8,
+          height: 64 + bottomPadding,
+          paddingTop: 10,
           paddingBottom: bottomPadding,
+          backgroundColor: '#ffffff',
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(1, 67, 132, 0.08)',
         },
-      }}
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '700',
+        },
+        tabBarIcon: ({ color, focused, size }) => (
+          <MaterialCommunityIcons
+            name={getTabIcon(route.name as keyof MerchantTabParamList, focused)}
+            size={size}
+            color={color}
+          />
+        ),
+      })}
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Scan" component={ScanScreen} />

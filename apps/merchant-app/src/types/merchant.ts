@@ -4,7 +4,15 @@ export type MerchantPromotionType = 'discount' | 'fixed_amount' | 'bundle'
 
 export type MerchantAvailability = 'dine-in' | 'takeout' | 'delivery'
 
-export type MerchantNotificationType = 'system' | 'transaction' | 'promotion' | 'account'
+export type MerchantNotificationType =
+  | 'system'
+  | 'transaction'
+  | 'promotion'
+  | 'account'
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'error'
 
 export type MerchantTransactionStatus = 'success' | 'failed'
 
@@ -20,6 +28,7 @@ export interface MerchantProfile {
   businessInfo: string
   discountInfo: string
   termsAndConditions: string
+  pointsPolicy: string
   pointsRate: number
   logoUrl: string
   bannerUrl: string

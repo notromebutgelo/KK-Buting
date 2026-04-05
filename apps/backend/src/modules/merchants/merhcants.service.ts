@@ -3,6 +3,7 @@ import { db } from "../../config/firebase";
 import { storage } from "../../config/firebase";
 import { setUserRole } from "../auth/user.service";
 import { randomUUID } from "crypto";
+import { createNotification } from "../notifications/notifications.service";
 
 type AnyRecord = Record<string, any>;
 
@@ -42,7 +43,10 @@ function normalizeMerchant(record: AnyRecord): AnyRecord {
     shortDescription: merchant.shortDescription || merchant.description || "",
     imageUrl: merchant.imageUrl || merchant.bannerUrl || merchant.logoUrl || "",
     bannerUrl: merchant.bannerUrl || merchant.imageUrl || "",
-    pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 50),
+    pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 10),
+    pointsPolicy:
+      merchant.pointsPolicy ||
+      `Earn 10 points for every PHP 100 spent at this shop. Present your youth QR during checkout.`,
   };
 }
 
@@ -127,6 +131,7 @@ function buildMerchantPayload(data: Record<string, unknown>) {
     "contactNumber",
     "discountInfo",
     "termsAndConditions",
+    "pointsPolicy",
     "ownerName",
     "ownerEmail",
   ];
@@ -320,13 +325,24 @@ export async function createMerchant(data: Record<string, unknown>) {
     ...payload,
     ownerId,
     status: "pending",
-    pointsRate: Number(data.pointsRate || 50),
+    pointsRate: Number(data.pointsRate || 10),
+    pointsPolicy:
+      payload.pointsPolicy ||
+      "Earn 10 points for every PHP 100 spent at this shop. Present your youth QR during checkout.",
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
 
   if (ownerId) {
     await setUserRole(ownerId, "merchant");
+    await createNotification({
+      recipientUid: ownerId,
+      audience: "merchant",
+      type: "account",
+      title: "Merchant application submitted",
+      body: "Your merchant account was submitted and is now waiting for SK admin approval.",
+      link: "/shop",
+    });
   }
 
   return ref.id;

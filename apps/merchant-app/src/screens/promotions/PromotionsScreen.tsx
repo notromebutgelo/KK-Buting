@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +12,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import {
   deleteMerchantPromotion,
@@ -121,9 +124,19 @@ export default function PromotionsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()}>
+      <KeyboardAvoidingView
+        style={styles.keyboardShell}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
+      >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.hero}>
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={18} color="#014384" />
             <Text style={styles.back}>Back</Text>
           </Pressable>
           <Text style={styles.title}>Promotions</Text>
@@ -138,11 +151,14 @@ export default function PromotionsScreen() {
               onPress={() => handleSelect(promotion)}
             >
               <View style={styles.cardHeader}>
-                <Text style={styles.promoTitle}>{promotion.title}</Text>
+                <View style={styles.iconWrap}>
+                  <MaterialCommunityIcons name="ticket-percent-outline" size={20} color="#014384" />
+                </View>
                 <Text style={[styles.badge, !promotion.isActive && styles.inactiveBadge]}>
                   {promotion.isActive ? 'Active' : 'Paused'}
                 </Text>
               </View>
+              <Text style={styles.promoTitle}>{promotion.title}</Text>
               <Text style={styles.promoValue}>{promotion.valueLabel}</Text>
               <Text style={styles.promoCopy}>{promotion.shortTagline}</Text>
               <Text style={styles.promoMeta}>
@@ -222,6 +238,7 @@ export default function PromotionsScreen() {
           </View>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
@@ -252,56 +269,80 @@ function Field({ label, value, onChangeText, multiline = false, compact = false 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f6f6ef',
+    backgroundColor: '#f0f0f0',
+  },
+  keyboardShell: {
+    flex: 1,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: 18,
+    gap: 14,
+    paddingBottom: 36,
   },
-  header: {
-    gap: 8,
+  hero: {
+    gap: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 26,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   back: {
-    color: '#0f766e',
+    color: '#014384',
     fontWeight: '800',
   },
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#111827',
+    color: '#014384',
   },
   subtitle: {
-    color: '#4b5563',
-    lineHeight: 22,
+    color: '#60748f',
+    lineHeight: 21,
   },
   list: {
-    gap: 12,
+    gap: 10,
   },
   promoCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    padding: 16,
+    padding: 15,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(1, 67, 132, 0.08)',
   },
   selectedCard: {
-    borderColor: '#0f766e',
-    backgroundColor: '#f0fdfa',
+    borderColor: 'rgba(1, 67, 132, 0.24)',
+    backgroundColor: '#f8fbff',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#eef4fb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   promoTitle: {
     fontWeight: '800',
-    color: '#111827',
+    color: '#014384',
     flex: 1,
+    fontSize: 16,
   },
   badge: {
-    backgroundColor: '#dcfce7',
-    color: '#166534',
+    backgroundColor: '#fff4d8',
+    color: '#9c6500',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
@@ -309,20 +350,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   inactiveBadge: {
-    backgroundColor: '#e5e7eb',
-    color: '#475569',
+    backgroundColor: '#eef4fb',
+    color: '#4f647e',
   },
   promoValue: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#ea580c',
+    color: '#0572dc',
   },
   promoCopy: {
-    color: '#4b5563',
+    color: '#5e728b',
     lineHeight: 20,
   },
   promoMeta: {
-    color: '#64748b',
+    color: '#7d91aa',
     fontSize: 12,
   },
   card: {
@@ -331,12 +372,12 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(1, 67, 132, 0.08)',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: '900',
+    color: '#014384',
   },
   field: {
     gap: 8,
@@ -345,17 +386,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fieldLabel: {
-    color: '#334155',
-    fontWeight: '700',
+    color: '#35506d',
+    fontWeight: '800',
     fontSize: 13,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#d9e4f0',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fbff',
     color: '#0f172a',
   },
   multilineInput: {
@@ -374,14 +415,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#eef4fb',
   },
   activeChip: {
-    backgroundColor: '#0f766e',
+    backgroundColor: '#014384',
   },
   chipText: {
-    color: '#334155',
-    fontWeight: '700',
+    color: '#4f647e',
+    fontWeight: '800',
   },
   activeChipText: {
     color: '#ffffff',
@@ -390,18 +431,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#eef4fb',
   },
   toggleRowActive: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#fff4d8',
   },
   toggleText: {
-    color: '#475569',
+    color: '#4f647e',
     fontWeight: '800',
     textAlign: 'center',
   },
   toggleTextActive: {
-    color: '#166534',
+    color: '#9c6500',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -410,7 +451,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     flex: 1,
     borderRadius: 16,
-    backgroundColor: '#ea580c',
+    backgroundColor: '#014384',
     paddingVertical: 16,
     alignItems: 'center',
   },
@@ -421,13 +462,13 @@ const styles = StyleSheet.create({
   secondaryButton: {
     paddingHorizontal: 18,
     borderRadius: 16,
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#fff1ef',
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    color: '#b91c1c',
+    color: '#b42318',
     fontWeight: '800',
   },
 })

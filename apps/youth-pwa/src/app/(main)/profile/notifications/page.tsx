@@ -1,38 +1,89 @@
 'use client'
-import PageHeader from '@/components/layout/PageHeader'
 
-const mockNotifications = [
-  {
-    id: 1,
-    title: 'Profile Submitted',
-    message: 'Your profiling form has been submitted for review.',
-    time: '2 hours ago',
-    read: false,
-    type: 'info',
-  },
-  {
-    id: 2,
-    title: 'Welcome to KK!',
-    message: 'You have successfully registered. Complete your profile to get started.',
-    time: '1 day ago',
-    read: true,
-    type: 'success',
-  },
-]
+import { useEffect, useMemo, useState } from 'react'
+
+import PageHeader from '@/components/layout/PageHeader'
+import Spinner from '@/components/ui/Spinner'
+import { getMyNotifications, markMyNotificationsRead, type YouthNotification } from '@/services/notifications.service'
 
 const typeColors: Record<string, string> = {
   info: 'bg-blue-100 text-blue-600',
   success: 'bg-green-100 text-green-600',
   warning: 'bg-yellow-100 text-yellow-600',
   error: 'bg-red-100 text-red-600',
+  account: 'bg-emerald-100 text-emerald-700',
+  system: 'bg-slate-100 text-slate-700',
+  promotion: 'bg-fuchsia-100 text-fuchsia-700',
+  transaction: 'bg-cyan-100 text-cyan-700',
 }
 
 export default function NotificationsPage() {
+  const [notifications, setNotifications] = useState<YouthNotification[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isMarkingRead, setIsMarkingRead] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.read).length,
+    [notifications]
+  )
+
+  async function loadNotifications() {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const nextNotifications = await getMyNotifications()
+      setNotifications(nextNotifications)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load notifications.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadNotifications()
+  }, [])
+
   return (
     <div className="min-h-full bg-gray-50">
       <PageHeader title="Notifications" />
-      <div className="px-5 pt-4 space-y-3">
-        {mockNotifications.length === 0 ? (
+      <div className="px-5 pt-4 space-y-4">
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Your updates</p>
+            <p className="text-xs text-gray-500">
+              {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}` : 'Everything is up to date'}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={isMarkingRead || unreadCount === 0}
+            onClick={async () => {
+              try {
+                setIsMarkingRead(true)
+                await markMyNotificationsRead()
+                await loadNotifications()
+              } finally {
+                setIsMarkingRead(false)
+              }
+            }}
+            className="rounded-full bg-[#e7f3ff] px-4 py-2 text-xs font-bold text-[#0d4f92] disabled:opacity-50"
+          >
+            {isMarkingRead ? 'Updating...' : 'Mark all read'}
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <Spinner size="lg" />
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-5 text-sm text-red-700">
+            {error}
+          </div>
+        ) : notifications.length === 0 ? (
           <div className="text-center py-16">
             <svg className="w-16 h-16 text-gray-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -42,7 +93,7 @@ export default function NotificationsPage() {
             <p className="text-gray-300 text-sm mt-1">We&apos;ll notify you about important updates</p>
           </div>
         ) : (
-          mockNotifications.map((notif) => (
+          notifications.map((notif) => (
             <div
               key={notif.id}
               className={`bg-white rounded-2xl p-4 shadow-sm border ${!notif.read ? 'border-green-200' : 'border-gray-100'}`}
@@ -57,12 +108,12 @@ export default function NotificationsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-gray-900 text-sm">{notif.title}</p>
-                    {!notif.read && (
+                    {!notif.read ? (
                       <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
-                    )}
+                    ) : null}
                   </div>
-                  <p className="text-gray-500 text-sm mt-0.5">{notif.message}</p>
-                  <p className="text-gray-300 text-xs mt-1">{notif.time}</p>
+                  <p className="text-gray-500 text-sm mt-0.5">{notif.body}</p>
+                  <p className="text-gray-300 text-xs mt-1">{formatDateTime(notif.createdAt)}</p>
                 </div>
               </div>
             </div>
@@ -71,4 +122,17 @@ export default function NotificationsPage() {
       </div>
     </div>
   )
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown time'
+
+  return date.toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }

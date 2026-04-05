@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,16 +17,17 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import StatusBadge from '../../components/StatusBadge'
 import StatusBanner from '../../components/StatusBanner'
+import type { RootStackParamList } from '../../navigation/AppNavigator'
 import {
   getMerchantProfile,
   updateMerchantProfile,
   uploadMerchantAsset,
 } from '../../services/merchantWorkspace.service'
 import { useAuthStore } from '../../store/authStore'
-import type { RootStackParamList } from '../../navigation/AppNavigator'
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>
 
@@ -43,6 +46,7 @@ export default function ShopProfileScreen() {
     businessInfo: '',
     discountInfo: '',
     termsAndConditions: '',
+    pointsPolicy: '',
     logoUrl: '',
     bannerUrl: '',
     status: 'active' as 'pending' | 'active' | 'suspended',
@@ -64,6 +68,7 @@ export default function ShopProfileScreen() {
         businessInfo: profile.businessInfo,
         discountInfo: profile.discountInfo,
         termsAndConditions: profile.termsAndConditions,
+        pointsPolicy: profile.pointsPolicy,
         logoUrl: profile.logoUrl,
         bannerUrl: profile.bannerUrl,
         status: profile.status,
@@ -91,6 +96,7 @@ export default function ShopProfileScreen() {
         businessInfo: profile.businessInfo,
         discountInfo: profile.discountInfo,
         termsAndConditions: profile.termsAndConditions,
+        pointsPolicy: profile.pointsPolicy,
         logoUrl: profile.logoUrl,
         bannerUrl: profile.bannerUrl,
         status: profile.status,
@@ -164,6 +170,7 @@ export default function ShopProfileScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#014384" />
           <Text style={styles.loadingText}>Loading shop profile...</Text>
         </View>
       </SafeAreaView>
@@ -172,31 +179,65 @@ export default function ShopProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.keyboardShell}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
+      >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.hero}>
           <View style={styles.heroHeader}>
             <View style={styles.heroText}>
               <Text style={styles.title}>My Shop</Text>
               <Text style={styles.subtitle}>
-                Update the business profile that youth members will eventually see in the merchant directory.
+                Update the shared storefront content that youth members will see in the merchant directory.
               </Text>
             </View>
             <StatusBadge status={form.status} />
           </View>
+          <View style={styles.actionRow}>
+            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Promotions')}>
+              <MaterialCommunityIcons name="ticket-percent-outline" size={18} color="#014384" />
+              <Text style={styles.secondaryButtonText}>Promotions</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Products')}>
+              <MaterialCommunityIcons name="food-outline" size={18} color="#014384" />
+              <Text style={styles.secondaryButtonText}>Products</Text>
+            </Pressable>
+          </View>
           <StatusBanner status={form.status} message={form.adminNote} />
         </View>
 
-        <View style={styles.actionRow}>
-          <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Promotions')}>
-            <Text style={styles.secondaryButtonText}>Open Promotions</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Products')}>
-            <Text style={styles.secondaryButtonText}>Open Products</Text>
-          </Pressable>
+        <View style={styles.previewCard}>
+          {form.bannerUrl ? (
+            <Image source={{ uri: form.bannerUrl }} style={styles.previewBanner} />
+          ) : (
+            <View style={[styles.previewBanner, styles.previewBannerPlaceholder]}>
+              <MaterialCommunityIcons name="image-outline" size={24} color="#7d91aa" />
+            </View>
+          )}
+          <View style={styles.previewHeader}>
+            {form.logoUrl ? (
+              <Image source={{ uri: form.logoUrl }} style={styles.previewLogo} />
+            ) : (
+              <View style={[styles.previewLogo, styles.previewLogoPlaceholder]}>
+                <MaterialCommunityIcons name="storefront-outline" size={28} color="#014384" />
+              </View>
+            )}
+            <View style={styles.previewTitleWrap}>
+              <Text style={styles.previewName}>{form.businessName || 'Your shop name'}</Text>
+              <Text style={styles.previewCategory}>{form.category || 'Category'}</Text>
+            </View>
+          </View>
+          <Text style={styles.previewCopy}>{form.shortDescription || 'A short storefront description will appear here.'}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Business Details</Text>
+          <Text style={styles.sectionTitle}>Business details</Text>
           <Field label="Business name" value={form.businessName} onChangeText={(value) => setForm((current) => ({ ...current, businessName: value }))} />
           <Field label="Category" value={form.category} onChangeText={(value) => setForm((current) => ({ ...current, category: value }))} />
           <Field
@@ -218,6 +259,10 @@ export default function ShopProfileScreen() {
             onChangeText={(value) => setForm((current) => ({ ...current, businessInfo: value }))}
             multiline
           />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Brand assets</Text>
           <AssetField
             label="Shop logo"
             value={form.logoUrl}
@@ -237,7 +282,13 @@ export default function ShopProfileScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Youth-facing Content</Text>
+          <Text style={styles.sectionTitle}>Youth-facing content</Text>
+          <Field
+            label="Points policy"
+            value={form.pointsPolicy}
+            onChangeText={(value) => setForm((current) => ({ ...current, pointsPolicy: value }))}
+            multiline
+          />
           <Field
             label="Discount info"
             value={form.discountInfo}
@@ -252,21 +303,11 @@ export default function ShopProfileScreen() {
           />
         </View>
 
-        <View style={styles.previewCard}>
-          <Text style={styles.sectionTitle}>Preview</Text>
-          {form.bannerUrl ? <Image source={{ uri: form.bannerUrl }} style={styles.previewBanner} /> : null}
-          {form.logoUrl ? <Image source={{ uri: form.logoUrl }} style={styles.previewLogo} /> : null}
-          <Text style={styles.previewName}>{form.businessName}</Text>
-          <Text style={styles.previewCategory}>{form.category}</Text>
-          <Text style={styles.previewCopy}>{form.shortDescription}</Text>
-          <Text style={styles.previewMeta}>{form.address}</Text>
-          <Text style={styles.previewMeta}>{form.discountInfo}</Text>
-        </View>
-
         <Pressable style={styles.primaryButton} onPress={handleSave} disabled={saving}>
           <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Save Shop Profile'}</Text>
         </Pressable>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
@@ -289,6 +330,7 @@ function AssetField({ label, value, uploadLabel, isUploading, onUpload, onRemove
           <Image source={{ uri: value }} style={styles.assetPreview} />
         ) : (
           <View style={[styles.assetPreview, styles.assetPlaceholder]}>
+            <MaterialCommunityIcons name="image-outline" size={24} color="#7d91aa" />
             <Text style={styles.assetPlaceholderText}>No image uploaded yet</Text>
           </View>
         )}
@@ -338,27 +380,32 @@ function Field({ label, value, onChangeText, keyboardType = 'default', multiline
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f6f6ef',
+    backgroundColor: '#f0f0f0',
+  },
+  keyboardShell: {
+    flex: 1,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 10,
   },
   loadingText: {
-    color: '#4b5563',
+    color: '#60748f',
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: 18,
+    gap: 14,
+    paddingBottom: 36,
   },
   hero: {
     backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 26,
+    padding: 18,
     gap: 14,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(1, 67, 132, 0.08)',
   },
   heroHeader: {
     gap: 12,
@@ -369,27 +416,81 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#111827',
+    color: '#014384',
   },
   subtitle: {
-    color: '#4b5563',
-    lineHeight: 22,
+    color: '#60748f',
+    lineHeight: 21,
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   secondaryButton: {
     flex: 1,
     borderRadius: 16,
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 16,
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#eef4fb',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   secondaryButtonText: {
-    color: '#c2410c',
+    color: '#014384',
     fontWeight: '800',
+  },
+  previewCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 26,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+  },
+  previewBanner: {
+    width: '100%',
+    height: 140,
+    borderRadius: 18,
+  },
+  previewBannerPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef4fb',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  previewLogo: {
+    width: 74,
+    height: 74,
+    borderRadius: 22,
+    backgroundColor: '#ffffff',
+  },
+  previewLogoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef4fb',
+  },
+  previewTitleWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  previewName: {
+    color: '#014384',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  previewCategory: {
+    color: '#0572dc',
+    fontWeight: '800',
+  },
+  previewCopy: {
+    color: '#5e728b',
+    lineHeight: 20,
   },
   card: {
     backgroundColor: '#ffffff',
@@ -397,28 +498,28 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 14,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(1, 67, 132, 0.08)',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: '900',
+    color: '#014384',
   },
   field: {
     gap: 8,
   },
   fieldLabel: {
-    color: '#334155',
-    fontWeight: '700',
+    color: '#35506d',
+    fontWeight: '800',
     fontSize: 13,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#d9e4f0',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fbff',
     color: '#0f172a',
   },
   multilineInput: {
@@ -426,15 +527,15 @@ const styles = StyleSheet.create({
   },
   assetCard: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#d9e4f0',
     borderRadius: 18,
     padding: 12,
     gap: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f8fbff',
   },
   assetPreview: {
     width: '100%',
-    height: 168,
+    height: 158,
     borderRadius: 14,
     backgroundColor: '#e2e8f0',
   },
@@ -442,6 +543,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
+    gap: 8,
   },
   assetPlaceholderText: {
     color: '#64748b',
@@ -455,7 +557,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     borderRadius: 14,
-    backgroundColor: '#0f766e',
+    backgroundColor: '#014384',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
@@ -468,7 +570,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#d9e4f0',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
@@ -479,51 +581,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   assetHint: {
-    color: '#64748b',
+    color: '#7d91aa',
     fontSize: 12,
     lineHeight: 18,
   },
-  previewCard: {
-    backgroundColor: '#134e4a',
-    borderRadius: 24,
-    padding: 20,
-    gap: 8,
-  },
-  previewBanner: {
-    width: '100%',
-    height: 140,
-    borderRadius: 18,
-    marginBottom: 8,
-  },
-  previewLogo: {
-    width: 84,
-    height: 84,
-    borderRadius: 24,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.28)',
-  },
-  previewName: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  previewCategory: {
-    color: '#99f6e4',
-    fontWeight: '700',
-  },
-  previewCopy: {
-    color: '#d1fae5',
-    lineHeight: 21,
-  },
-  previewMeta: {
-    color: '#ccfbf1',
-    fontSize: 13,
-    lineHeight: 19,
-  },
   primaryButton: {
     borderRadius: 18,
-    backgroundColor: '#ea580c',
+    backgroundColor: '#014384',
     alignItems: 'center',
     paddingVertical: 16,
   },

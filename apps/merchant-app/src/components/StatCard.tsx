@@ -11,9 +11,10 @@ type StatCardProps = {
 export default function StatCard({ label, value, caption, tone = 'brand' }: StatCardProps) {
   return (
     <View style={[styles.card, tone === 'neutral' && styles.neutralCard]}>
+      <View style={[styles.accent, tone === 'neutral' && styles.neutralAccent]} />
       <Text style={[styles.label, tone === 'neutral' && styles.neutralLabel]}>{label}</Text>
       <Text style={[styles.value, tone === 'neutral' && styles.neutralValue]}>{value}</Text>
-      {caption ? <Text style={[styles.caption, tone === 'neutral' && styles.neutralLabel]}>{caption}</Text> : null}
+      {caption ? <Text style={[styles.caption, tone === 'neutral' && styles.neutralCaption]}>{caption}</Text> : null}
     </View>
   )
 }
@@ -21,33 +22,57 @@ export default function StatCard({ label, value, caption, tone = 'brand' }: Stat
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    borderRadius: 20,
-    backgroundColor: '#0f766e',
-    padding: 18,
-    gap: 8,
+    minHeight: 122,
+    borderRadius: 22,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+    shadowColor: '#014384',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2,
   },
   neutralCard: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#fffaf0',
+  },
+  accent: {
+    width: 34,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#0572dc',
+    marginBottom: 8,
+  },
+  neutralAccent: {
+    backgroundColor: '#fcb315',
   },
   label: {
-    color: '#d1fae5',
-    fontSize: 13,
-    fontWeight: '600',
+    color: '#6a7f98',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   neutralLabel: {
-    color: '#9a3412',
+    color: '#7f6d44',
   },
   value: {
-    color: '#ffffff',
-    fontSize: 26,
-    fontWeight: '800',
+    color: '#014384',
+    fontSize: 28,
+    fontWeight: '900',
   },
   caption: {
-    color: '#ccfbf1',
+    color: '#587290',
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   neutralValue: {
-    color: '#c2410c',
+    color: '#9c6500',
+  },
+  neutralCaption: {
+    color: '#8a764e',
   },
 })

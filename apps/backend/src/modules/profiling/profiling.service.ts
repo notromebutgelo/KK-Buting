@@ -1,5 +1,6 @@
 import { db } from "../../config/firebase";
 import { FieldValue } from "firebase-admin/firestore";
+import { createNotification } from "../notifications/notifications.service";
 
 export async function submitProfiling(uid: string, data: Record<string, unknown>) {
   await db.collection("kkProfiling").doc(uid).set({
@@ -9,6 +10,15 @@ export async function submitProfiling(uid: string, data: Record<string, unknown>
     verified: false,
     submittedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
+
+  await createNotification({
+    recipientUid: uid,
+    audience: "youth",
+    type: "info",
+    title: "Profiling submitted",
+    body: "Your KK profiling has been submitted. Upload your verification documents to continue.",
+    link: "/verification/upload",
+  });
 }
 
 export async function getProfiling(uid: string) {

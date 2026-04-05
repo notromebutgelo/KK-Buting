@@ -14,15 +14,21 @@ export default function TransactionCard({ item }: TransactionCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.name}>{item.memberLabel}</Text>
+        <Text style={styles.name} numberOfLines={1}>{item.memberLabel}</Text>
         <Text style={[styles.badge, item.status === 'failed' && styles.badgeFailed]}>
           {item.status}
         </Text>
       </View>
-      <Text style={styles.points}>{item.pointsAwarded} pts</Text>
-      <Text style={styles.meta}>{item.memberIdMasked}</Text>
-      <Text style={styles.meta}>{formatCurrency(item.amountSpent)}</Text>
-      <Text style={styles.meta}>{timeLabel}</Text>
+      <View style={styles.metricsRow}>
+        <View>
+          <Text style={styles.points}>{item.pointsAwarded} pts</Text>
+          <Text style={styles.meta}>{item.memberIdMasked}</Text>
+        </View>
+        <View style={styles.amountBlock}>
+          <Text style={styles.amount}>{formatCurrency(item.amountSpent)}</Text>
+          <Text style={styles.meta}>{timeLabel}</Text>
+        </View>
+      </View>
       {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
     </View>
   )
@@ -31,28 +37,30 @@ export default function TransactionCard({ item }: TransactionCardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 16,
-    gap: 8,
+    gap: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(1, 67, 132, 0.08)',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
   name: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#014384',
   },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: '#dcfce7',
-    color: '#166534',
+    backgroundColor: '#edf4fb',
+    color: '#014384',
     textTransform: 'capitalize',
     fontSize: 12,
     fontWeight: '700',
@@ -63,15 +71,30 @@ const styles = StyleSheet.create({
   },
   points: {
     fontSize: 24,
+    fontWeight: '900',
+    color: '#0572dc',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    gap: 12,
+  },
+  amountBlock: {
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  amount: {
+    fontSize: 16,
     fontWeight: '800',
-    color: '#0f766e',
+    color: '#9c6500',
   },
   meta: {
-    color: '#6b7280',
+    color: '#6a7f98',
     fontSize: 12,
   },
   note: {
-    color: '#4b5563',
+    color: '#586777',
     fontSize: 12,
     lineHeight: 18,
   },

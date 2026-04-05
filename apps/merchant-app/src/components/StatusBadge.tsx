@@ -40,10 +40,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   activeBadge: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#e9f2fb',
   },
   pendingBadge: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#fff3d5',
   },
   suspendedBadge: {
     backgroundColor: '#fee2e2',
@@ -53,10 +53,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   activeText: {
-    color: '#166534',
+    color: '#014384',
   },
   pendingText: {
-    color: '#9a3412',
+    color: '#9c6500',
   },
   suspendedText: {
     color: '#b91c1c',

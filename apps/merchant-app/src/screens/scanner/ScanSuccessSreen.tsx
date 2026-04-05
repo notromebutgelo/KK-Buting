@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import type { RootStackParamList } from '../../navigation/AppNavigator'
 
@@ -15,6 +16,9 @@ export default function ScanSuccessSreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.card}>
+        <View style={styles.iconWrap}>
+          <MaterialCommunityIcons name="check-circle" size={40} color="#014384" />
+        </View>
         <Text style={styles.title}>Scan Successful</Text>
         <Text style={styles.name}>{route.params?.memberLabel ?? 'Verified Member'}</Text>
         <Text style={styles.meta}>{route.params?.memberIdMasked ?? 'Member ID hidden'}</Text>
@@ -31,7 +35,7 @@ export default function ScanSuccessSreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -43,29 +47,42 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+  },
+  iconWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef4fb',
+    marginBottom: 2,
   },
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#166534',
+    color: '#014384',
   },
   name: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#111827',
+    color: '#014384',
+    textAlign: 'center',
   },
   points: {
     fontSize: 18,
-    color: '#0f766e',
-    fontWeight: '700',
+    color: '#0572dc',
+    fontWeight: '800',
   },
   meta: {
-    color: '#4b5563',
+    color: '#60748f',
     fontSize: 14,
+    textAlign: 'center',
   },
   button: {
     marginTop: 16,
-    backgroundColor: '#166534',
+    backgroundColor: '#014384',
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 22,

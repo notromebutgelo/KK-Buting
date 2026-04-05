@@ -16,6 +16,7 @@ export interface Merchant {
   businessInfo?: string
   discountInfo?: string
   termsAndConditions?: string
+  pointsPolicy?: string
   pointsRate?: number
   status: 'pending' | 'approved' | 'rejected' | 'suspended'
   ownerId: string

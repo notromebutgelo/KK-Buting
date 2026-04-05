@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 import { db } from "../../config/firebase";
+import { createNotification } from "../notifications/notifications.service";
 
 type AnyRecord = Record<string, any>;
 
@@ -292,6 +293,18 @@ export async function redeemPublicReward(uid: string, rewardId: string) {
       imageUrl: buildRewardImage(reward, merchant),
     };
   });
+
+  if (result) {
+    const rewardTitle = String((result as AnyRecord).rewardTitle || "a reward");
+    await createNotification({
+      recipientUid: uid,
+      audience: "youth",
+      type: "success",
+      title: "Reward redeemed",
+      body: `You redeemed ${rewardTitle}. Check My Redemptions for your voucher code and expiry date.`,
+      link: "/rewards/my-redemptions",
+    });
+  }
 
   return result;
 }

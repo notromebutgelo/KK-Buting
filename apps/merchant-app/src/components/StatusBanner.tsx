@@ -43,10 +43,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   activeBanner: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#edf4fb',
   },
   pendingBanner: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#fff8e7',
   },
   suspendedBanner: {
     backgroundColor: '#fef2f2',
@@ -57,10 +57,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   activeText: {
-    color: '#166534',
+    color: '#014384',
   },
   pendingText: {
-    color: '#9a3412',
+    color: '#9c6500',
   },
   suspendedText: {
     color: '#991b1b',

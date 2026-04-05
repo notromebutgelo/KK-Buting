@@ -1,15 +1,26 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import QRFrame from '../../components/QRFrame'
 import StatusBanner from '../../components/StatusBanner'
+import type { RootStackParamList } from '../../navigation/AppNavigator'
 import { getMerchantProfile } from '../../services/merchantWorkspace.service'
 import { scanMemberQr } from '../../services/transaction.service'
-import type { RootStackParamList } from '../../navigation/AppNavigator'
 import { useAuthStore } from '../../store/authStore'
 import type { MerchantProfile } from '../../types/merchant'
 
@@ -24,6 +35,7 @@ export default function ScanScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cameraReady, setCameraReady] = useState(true)
   const [profile, setProfile] = useState<MerchantProfile | null>(null)
+  const pesosPerPoint = 10
 
   useFocusEffect(
     useCallback(() => {
@@ -44,10 +56,9 @@ export default function ScanScreen() {
 
   const pointsPreview = useMemo(() => {
     const numericAmount = Number(amountSpent || 0)
-    if (!numericAmount) return 10
-    if (!profile?.pointsRate) return 0
-    return Math.max(1, Math.floor(numericAmount / profile.pointsRate))
-  }, [amountSpent, profile?.pointsRate])
+    if (!numericAmount) return 0
+    return Math.max(1, Math.floor(numericAmount / pesosPerPoint))
+  }, [amountSpent])
 
   const processToken = async (rawToken: string) => {
     if (!rawToken.trim()) {
@@ -61,6 +72,10 @@ export default function ScanScreen() {
     }
 
     const numericAmount = Number(amountSpent || 0)
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      Alert.alert('Amount required', 'Enter the purchase amount so points can follow the PHP 100 = 10 points rule.')
+      return
+    }
 
     try {
       setIsSubmitting(true)
@@ -94,12 +109,35 @@ export default function ScanScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Scan Member QR</Text>
-        <Text style={styles.subtitle}>
-          Scan a youth QR to award points immediately. Enter a purchase amount only when you want points to follow your
-          merchant peso-to-point rate.
-        </Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardShell}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
+      >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.heroCard}>
+          <Text style={styles.title}>Scan Member QR</Text>
+          <Text style={styles.subtitle}>
+            Scan a youth QR, add the purchase amount, and award points using the current rule of 10 points for every PHP 100 spent.
+          </Text>
+
+          <View style={styles.previewRow}>
+            <MiniInfoCard
+              icon="cash-fast"
+              label="Points preview"
+              value={`${pointsPreview} pt${pointsPreview === 1 ? '' : 's'}`}
+            />
+            <MiniInfoCard
+              icon="cash-marker"
+              label="Current rule"
+              value="10 pts / PHP 100"
+            />
+          </View>
+        </View>
 
         {profile ? <StatusBanner status={profile.status} message={profile.adminNote} /> : null}
 
@@ -119,6 +157,9 @@ export default function ScanScreen() {
             </>
           ) : (
             <View style={styles.permissionCard}>
+              <View style={styles.permissionIcon}>
+                <MaterialCommunityIcons name="camera-outline" size={28} color="#014384" />
+              </View>
               <Text style={styles.permissionTitle}>Camera access needed</Text>
               <Text style={styles.permissionBody}>
                 Allow camera access so merchants can scan youth QR passes directly from this screen.
@@ -131,7 +172,9 @@ export default function ScanScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Purchase amount in pesos (optional)</Text>
+          <Text style={styles.sectionTitle}>Scan details</Text>
+
+          <Text style={styles.label}>Purchase amount in pesos</Text>
           <TextInput
             style={styles.input}
             value={amountSpent}
@@ -143,15 +186,13 @@ export default function ScanScreen() {
 
           <Text style={styles.previewText}>
             {Number(amountSpent || 0) > 0
-              ? `Local preview: around ${pointsPreview} point${pointsPreview === 1 ? '' : 's'} at a ${
-                  profile?.pointsRate ?? 50
-                }-peso rate.`
-              : `No amount entered: scanning awards the default ${pointsPreview} points.`}
+              ? `Estimated reward: around ${pointsPreview} point${pointsPreview === 1 ? '' : 's'} based on PHP 10 per point, or 10 points for every PHP 100 spent.`
+              : 'Enter a purchase amount to calculate points before you submit the scan using the 10-points-per-PHP-100 rule.'}
           </Text>
 
           <Text style={styles.label}>Manual QR token entry</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, styles.textArea]}
             value={token}
             onChangeText={setToken}
             multiline
@@ -159,42 +200,99 @@ export default function ScanScreen() {
             placeholderTextColor="#94a3b8"
           />
 
-          <Pressable style={styles.button} onPress={() => void processToken(token)} disabled={isSubmitting}>
-            <Text style={styles.buttonText}>{isSubmitting ? 'Processing...' : 'Validate Scan'}</Text>
-          </Pressable>
+          <View style={styles.buttonRow}>
+            <Pressable style={styles.button} onPress={() => void processToken(token)} disabled={isSubmitting}>
+              <Text style={styles.buttonText}>{isSubmitting ? 'Processing...' : 'Validate Scan'}</Text>
+            </Pressable>
 
-          <Pressable style={styles.secondaryButton} onPress={() => setCameraReady(true)}>
-            <Text style={styles.secondaryButtonText}>Reset Scanner</Text>
-          </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => setCameraReady(true)}>
+              <Text style={styles.secondaryButtonText}>Reset Scanner</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
+  )
+}
+
+function MiniInfoCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name']
+  label: string
+  value: string
+}) {
+  return (
+    <View style={styles.infoCard}>
+      <MaterialCommunityIcons name={icon} size={18} color="#014384" />
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f6f6ef',
+    backgroundColor: '#f0f0f0',
+  },
+  keyboardShell: {
+    flex: 1,
   },
   content: {
-    padding: 20,
-    gap: 18,
+    padding: 18,
+    gap: 14,
+    paddingBottom: 36,
+  },
+  heroCard: {
+    borderRadius: 26,
+    backgroundColor: '#ffffff',
+    padding: 18,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
   },
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#111827',
+    color: '#014384',
   },
   subtitle: {
-    color: '#4b5563',
-    lineHeight: 22,
+    color: '#60748f',
+    lineHeight: 21,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  infoCard: {
+    flex: 1,
+    borderRadius: 18,
+    backgroundColor: '#f8fbff',
+    padding: 14,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+  },
+  infoLabel: {
+    color: '#7d91aa',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  infoValue: {
+    color: '#014384',
+    fontSize: 17,
+    fontWeight: '900',
   },
   cameraShell: {
-    height: 320,
+    height: 300,
     borderRadius: 28,
     overflow: 'hidden',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0c3e74',
     position: 'relative',
   },
   camera: {
@@ -211,14 +309,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 12,
+    backgroundColor: '#ffffff',
+  },
+  permissionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef4fb',
   },
   permissionTitle: {
-    color: '#ffffff',
+    color: '#014384',
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   permissionBody: {
-    color: '#cbd5e1',
+    color: '#60748f',
     textAlign: 'center',
     lineHeight: 21,
   },
@@ -227,10 +334,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 18,
     paddingVertical: 14,
-    backgroundColor: '#14b8a6',
+    backgroundColor: '#014384',
   },
   permissionButtonText: {
-    color: '#042f2e',
+    color: '#ffffff',
     fontWeight: '900',
   },
   card: {
@@ -239,29 +346,41 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#014384',
   },
   label: {
-    color: '#111827',
-    fontWeight: '700',
+    color: '#35506d',
+    fontWeight: '800',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#d9e4f0',
     borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
     color: '#0f172a',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fbff',
+  },
+  textArea: {
+    minHeight: 96,
+    textAlignVertical: 'top',
   },
   previewText: {
-    color: '#64748b',
+    color: '#7d91aa',
     lineHeight: 20,
   },
+  buttonRow: {
+    gap: 10,
+  },
   button: {
-    backgroundColor: '#0f766e',
+    backgroundColor: '#014384',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 15,
     alignItems: 'center',
   },
   buttonText: {
@@ -271,12 +390,12 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderRadius: 16,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#fff4d8',
   },
   secondaryButtonText: {
-    color: '#c2410c',
+    color: '#9c6500',
     fontWeight: '800',
     fontSize: 15,
   },

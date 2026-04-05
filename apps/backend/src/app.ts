@@ -10,6 +10,7 @@ import pointsRoutes from "./modules/points/points.routes";
 import qrRoutes from "./modules/qr/qr.routes";
 import adminRoutes from "./modules/admin/admin.routes";
 import rewardsRoutes from "./modules/rewards/rewards.routes";
+import notificationsRoutes from "./modules/notifications/notifications.routes";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/rewards", rewardsRoutes);
 app.use("/api/points", pointsRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 app.use(errorHandler);
 

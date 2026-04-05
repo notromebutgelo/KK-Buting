@@ -1,5 +1,4 @@
 import { db } from "../../config/firebase";
-import { POINTS_PER_TRANSACTION } from "../../config/points";
 import { generateQrToken, verifyQrToken } from "../../../utils/renerateQrToken";
 import { addPoints, logMerchantScanFailure } from "../points/points.service";
 import { getMerchantByOwnerId } from "../merchants/merhcants.service";
@@ -92,24 +91,8 @@ export async function generateUserQr(uid: string): Promise<string> {
   return token;
 }
 
-export async function processQrScan(rawValue: string, merchantOwnerId: string) {
-  const merchant = await resolveMerchant(merchantOwnerId);
-  const youth = await validateYouthQr(rawValue);
-
-  await addPoints(youth.userId, POINTS_PER_TRANSACTION, String(merchant.id), {
-    memberId: youth.memberId,
-    transactionStatus: "success",
-    reason: "Legacy QR scan",
-  });
-
-  return {
-    userId: youth.userId,
-    userName: youth.userName,
-    memberId: youth.memberId,
-    pointsAwarded: POINTS_PER_TRANSACTION,
-    merchantId: merchant.id,
-    merchantName: merchant.name,
-  };
+export async function processQrScan(rawValue: string, merchantOwnerId: string, amountSpent: number) {
+  return processQrRedeem(rawValue, merchantOwnerId, amountSpent);
 }
 
 export async function processQrRedeem(rawValue: string, merchantOwnerId: string, amountSpent: number) {
@@ -120,7 +103,7 @@ export async function processQrRedeem(rawValue: string, merchantOwnerId: string,
   const merchant = await resolveMerchant(merchantOwnerId);
   try {
     const youth = await validateYouthQr(rawValue);
-    const pointsRate = Number(merchant.pointsRate || 50);
+    const pointsRate = Number(merchant.pointsRate || 10);
     const pointsAwarded = getPointsFromAmount(amountSpent, pointsRate);
 
     await addPoints(youth.userId, pointsAwarded, String(merchant.id), {
