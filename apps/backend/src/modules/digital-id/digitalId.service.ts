@@ -19,6 +19,8 @@ const DOCUMENT_LABELS: Record<string, string> = {
   id_photo: "ID Photo",
 };
 
+const INLINE_DOCUMENT_LIMIT = 350_000;
+
 function toIso(value: any) {
   if (!value) return undefined;
   if (typeof value?.toDate === "function") return value.toDate().toISOString();
@@ -61,6 +63,19 @@ function getDocumentLabel(type: string) {
 
 function normalizeDocumentStatus(document: Record<string, any>) {
   return String(document.reviewStatus || document.status || "pending");
+}
+
+function getDocumentBucketCandidates() {
+  const primaryBucketName = storage.bucket().name;
+  const candidates = [primaryBucketName];
+
+  if (primaryBucketName.endsWith(".appspot.com")) {
+    candidates.push(primaryBucketName.replace(/\.appspot\.com$/, ".firebasestorage.app"));
+  } else if (primaryBucketName.endsWith(".firebasestorage.app")) {
+    candidates.push(primaryBucketName.replace(/\.firebasestorage\.app$/, ".appspot.com"));
+  }
+
+  return Array.from(new Set(candidates.filter(Boolean)));
 }
 
 function computeQueueStatus(profile: Record<string, any>, documents: Record<string, any>[]) {
@@ -255,34 +270,45 @@ export async function uploadDocumentFromBase64(
   const extension = mimeType.split("/")[1] || "jpg";
   const filePath = `verification-documents/${uid}/${docType}-${Date.now()}.${extension}`;
   const downloadToken = randomUUID();
+  let lastError: Error | null = null;
 
-  try {
-    const bucket = storage.bucket();
-    const file = bucket.file(filePath);
+  for (const bucketName of getDocumentBucketCandidates()) {
+    try {
+      const bucket = storage.bucket(bucketName);
+      const file = bucket.file(filePath);
 
-    await file.save(Buffer.from(base64Payload, "base64"), {
-      metadata: {
-        contentType: mimeType,
+      await file.save(Buffer.from(base64Payload, "base64"), {
         metadata: {
-          firebaseStorageDownloadTokens: downloadToken,
+          contentType: mimeType,
+          metadata: {
+            firebaseStorageDownloadTokens: downloadToken,
+          },
         },
-      },
-      resumable: false,
-    });
+        resumable: false,
+      });
 
-    const signedUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
-      filePath
-    )}?alt=media&token=${downloadToken}`;
+      const signedUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
+        filePath
+      )}?alt=media&token=${downloadToken}`;
 
-    await uploadDocument(uid, docType, signedUrl);
+      await uploadDocument(uid, docType, signedUrl);
 
-    return signedUrl;
-  } catch (error: any) {
-    if (error?.message?.includes("bucket does not exist")) {
-      // Fallback for local/dev setups where Firebase Storage is not provisioned yet.
-      await uploadDocument(uid, docType, fileData);
-      return fileData;
+      return signedUrl;
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error || "Upload failed"));
+
+      if (!String(error?.message || "").includes("bucket does not exist")) {
+        throw error;
+      }
     }
-    throw error;
   }
+
+  if (fileData.length <= INLINE_DOCUMENT_LIMIT) {
+    await uploadDocument(uid, docType, fileData);
+    return fileData;
+  }
+
+  throw new Error(
+    "Firebase Storage is not available for document uploads, and this image is too large for the safe inline fallback. Enable the configured storage bucket or upload a smaller image."
+  );
 }

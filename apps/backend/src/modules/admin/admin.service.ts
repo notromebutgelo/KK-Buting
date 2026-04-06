@@ -680,6 +680,15 @@ export async function rejectVerification(
     },
     { merge: true }
   );
+
+  await createNotification({
+    recipientUid: userId,
+    audience: "youth",
+    type: "error",
+    title: "Verification rejected",
+    body: note?.trim() || reason,
+    link: "/verification/upload",
+  });
 }
 
 export async function reviewVerificationDocument(
