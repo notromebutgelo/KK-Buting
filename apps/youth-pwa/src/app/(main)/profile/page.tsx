@@ -1,4 +1,6 @@
 'use client'
+
+import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -13,50 +15,75 @@ const menuItems = [
   {
     href: '/profile/edit',
     label: 'Edit Profile',
+    description: 'Update your account name and keep your personal details current.',
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+        />
       </svg>
     ),
   },
   {
     href: '/profile/change-password',
     label: 'Change Password',
+    description: 'Secure your account with a fresh password whenever you need to.',
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+        />
       </svg>
     ),
   },
   {
     href: '/profile/notifications',
     label: 'Notifications',
+    description: 'See approval updates, reminders, and reward activity in one place.',
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+        />
       </svg>
     ),
   },
   {
     href: '/profile/terms',
     label: 'Terms of Service',
+    description: 'Review the policies and account guidelines for using the KK system.',
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
       </svg>
     ),
   },
   {
     href: '/profile/help',
     label: 'Help & FAQ',
+    description: 'Get quick answers about verification, rewards, and account access.',
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
       </svg>
     ),
   },
@@ -82,6 +109,16 @@ export default function ProfilePage() {
     return fullName || user?.UserName || user?.email?.split('@')[0] || 'Youth Member'
   }, [profile?.firstName, profile?.lastName, profile?.middleName, user?.UserName, user?.email])
 
+  const statusLabel = profile?.status === 'verified'
+    ? 'Verified member'
+    : profile?.status === 'rejected'
+      ? 'Needs attention'
+      : profile
+        ? 'Profile under review'
+        : 'Profile setup needed'
+
+  const memberLocation = [profile?.barangay, profile?.city].filter(Boolean).join(', ') || 'Barangay Buting'
+
   const handleLogout = async () => {
     try {
       await signOut()
@@ -90,7 +127,6 @@ export default function ProfilePage() {
       logout()
       router.push('/login')
     } catch {
-      // force logout anyway
       document.cookie = 'auth-token=; path=/; max-age=0'
       setProfile(null)
       logout()
@@ -105,93 +141,206 @@ export default function ProfilePage() {
   if (!user) return null
 
   return (
-    <div className="min-h-full bg-gray-50">
-      {/* Profile Header */}
-      <div className="bg-gradient-to-br from-green-700 to-teal-600 px-5 pt-14 pb-8">
-        <div className="flex flex-col items-center text-white">
-          <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center ring-4 ring-white/30 mb-4">
-            <span className="text-4xl font-black text-white">
-              {displayName.charAt(0).toUpperCase() || 'Y'}
-            </span>
-          </div>
-          <h1 className="text-xl font-bold">{displayName}</h1>
-          <p className="text-green-200 text-sm mt-0.5">{user.email || 'No email on file'}</p>
-          {profile && (
-            <div className="mt-3">
-              <Badge status={profile.status} />
+    <div className="min-h-full bg-[#f4f4f4] pb-8 text-[#014384]">
+      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#7fb3ec_0%,#bdd7f3_18%,#eef5fd_42%,#fff8eb_74%,#f4f4f4_100%)] px-5 pb-6 pt-8">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/35 via-white/10 to-transparent" />
+        <div className="pointer-events-none absolute -right-12 top-10 h-36 w-36 rounded-full bg-[#fcb315]/18 blur-3xl" />
+
+        <div className="relative z-10 flex items-start justify-between gap-4">
+          <div className="flex gap-3">
+            <div className="flex h-[78px] w-[78px] items-center justify-center overflow-hidden rounded-full border-[2.5px] border-[#014384] bg-[#e7eef8] shadow-[0_10px_24px_rgba(1,67,132,0.10)]">
+              {profile?.idPhotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.idPhotoUrl} alt={displayName} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#8db3e0] to-[#dce8f7] text-[24px] font-bold text-[#014384]">
+                  {getInitials(displayName)}
+                </div>
+              )}
             </div>
-          )}
-          {!profile && (
+
+            <div className="pt-2">
+              <p className="text-[11px] font-medium text-[#7486a2]">My KK Profile</p>
+              <h1 className="max-w-[190px] text-[19px] font-extrabold uppercase leading-[1.02] tracking-[0.01em] text-[#014384]">
+                {displayName}
+              </h1>
+              <p className="mt-1 text-[12px] font-medium text-[#6c87ab]">
+                {statusLabel}
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-1">
+            <Image
+              src="/images/FOOTER.png"
+              alt="SK Barangay Buting"
+              width={132}
+              height={34}
+              className="h-auto w-[132px] object-contain"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5">
+        <div className="-mt-2 rounded-[30px] bg-[linear-gradient(135deg,#014384_0%,#035db7_58%,#0a74de_100%)] p-5 text-white shadow-[0_18px_38px_rgba(1,67,132,0.18)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                Account Overview
+              </p>
+              <h2 className="mt-2 text-[24px] font-black leading-7">
+                {displayName}
+              </h2>
+              <p className="mt-2 max-w-[220px] text-[13px] leading-[1.55] text-white/78">
+                {user.email || 'No email on file'}
+              </p>
+            </div>
+
+            {profile ? (
+              <Badge status={profile.status} className="border-white/20 bg-white/14 text-white [&>span:first-child]:bg-[#fcb315]" />
+            ) : null}
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <ProfileStat label="Age Group" value={profile?.youthAgeGroup || 'Not set'} />
+            <ProfileStat label="Location" value={memberLocation} />
+            <ProfileStat label="Classification" value={profile?.youthClassification || 'Not set'} />
+            <ProfileStat label="Work Status" value={profile?.workStatus || 'Not set'} />
+          </div>
+
+          {!profile ? (
             <Link
               href="/intro"
-              className="mt-3 bg-yellow-400 text-green-900 px-4 py-1.5 rounded-full text-sm font-bold hover:bg-yellow-300 transition-colors"
+              className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#ffd67d_0%,#fcba2c_58%,#fcb315_100%)] px-5 py-4 text-[15px] font-bold text-white shadow-[0_12px_24px_rgba(252,179,21,0.28)]"
             >
               Complete Profile Setup
             </Link>
-          )}
+          ) : null}
         </div>
-      </div>
 
-      {/* Profile Info */}
-      {profile && (
-        <div className="px-5 -mt-4">
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-gray-400 text-xs">Full Name</p>
-                <p className="text-gray-900 font-medium text-sm">
-                  {displayName}
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs">Age Group</p>
-                <p className="text-gray-900 font-medium text-sm">{profile.youthAgeGroup || 'Not set yet'}</p>
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs">Barangay</p>
-                <p className="text-gray-900 font-medium text-sm">{profile.barangay || 'Not set yet'}</p>
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs">City/Municipality</p>
-                <p className="text-gray-900 font-medium text-sm">{profile.city || 'Not set yet'}</p>
-              </div>
+        <div className="mt-4 rounded-[26px] bg-white px-5 py-5 shadow-[0_12px_28px_rgba(1,67,132,0.08)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#7e95b2]">
+                Member Snapshot
+              </p>
+              <h2 className="mt-1 text-[18px] font-extrabold text-[#014384]">
+                Your community profile
+              </h2>
+            </div>
+            <div className="rounded-full bg-[#edf4fb] px-3 py-1 text-[11px] font-bold text-[#0a4e99]">
+              KK Buting
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Menu Items */}
-      <div className="px-5 mt-4">
-        <div className="bg-white rounded-2xl overflow-hidden shadow-sm divide-y divide-gray-50">
-          {menuItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors"
-            >
-              <span className="text-gray-400 flex-shrink-0">{item.icon}</span>
-              <span className="flex-1 text-gray-900 font-medium text-sm">{item.label}</span>
-              <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          ))}
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <InfoCard label="Full Name" value={displayName} />
+            <InfoCard label="Email" value={user.email || 'No email on file'} />
+            <InfoCard label="Barangay" value={profile?.barangay || 'Not set yet'} />
+            <InfoCard label="City / Municipality" value={profile?.city || 'Not set yet'} />
+          </div>
         </div>
-      </div>
 
-      {/* Logout */}
-      <div className="px-5 mt-4 pb-8">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3.5 bg-white rounded-2xl shadow-sm hover:bg-red-50 transition-colors text-red-600"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          <span className="font-semibold text-sm">Sign Out</span>
-        </button>
-      </div>
+        <div className="mt-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[16px] font-extrabold text-[#014384]">Profile Tools</h2>
+            <span className="text-[12px] font-medium text-[#6c87ab]">Manage your account</span>
+          </div>
+
+          <div className="space-y-3">
+            {menuItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-3 rounded-[24px] bg-white px-4 py-4 shadow-[0_10px_24px_rgba(1,67,132,0.06)] transition-transform duration-200 hover:-translate-y-[1px]"
+              >
+                <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,#edf4fb_0%,#d6e7f7_100%)] text-[#014384]">
+                  {item.icon}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold text-[#014384]">
+                    {item.label}
+                  </span>
+                  <span className="mt-1 block text-[12px] leading-[1.45] text-[#5f7b9d]">
+                    {item.description}
+                  </span>
+                </span>
+
+                <svg className="h-5 w-5 flex-shrink-0 text-[#9ab4d3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-[24px] bg-[linear-gradient(180deg,rgba(255,240,205,0.98)_0%,rgba(255,248,231,0.98)_100%)] px-5 py-5 shadow-[0_16px_40px_rgba(252,179,21,0.12)]">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#9a6e08]">
+            KK Support
+          </p>
+          <h2 className="mt-2 text-[18px] font-extrabold text-[#014384]">
+            Keep your profile ready for rewards and verification
+          </h2>
+          <p className="mt-2 text-[13px] leading-[1.55] text-[#7c5a0a]">
+            Make sure your information stays updated so your Digital ID, rewards access, and verification status continue to work smoothly.
+          </p>
+        </div>
+
+        <div className="mt-5 pb-8">
+          <button
+            onClick={handleLogout}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-[#f2bdbd] bg-[#fff3f3] px-5 py-4 text-[15px] font-bold text-[#cc4b4b] shadow-[0_8px_20px_rgba(204,75,75,0.10)] transition-colors hover:bg-[#ffe8e8]"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            Sign Out
+          </button>
+        </div>
+      </section>
     </div>
   )
+}
+
+function ProfileStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[20px] bg-white/10 px-4 py-3 backdrop-blur-[2px]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/62">
+        {label}
+      </p>
+      <p className="mt-2 text-[14px] font-bold leading-[1.35] text-white">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function InfoCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[20px] bg-[#f8fbff] px-4 py-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7e95b2]">
+        {label}
+      </p>
+      <p className="mt-2 text-[14px] font-bold leading-[1.45] text-[#014384]">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function getInitials(value: string) {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0] || '')
+    .join('')
+    .toUpperCase()
 }

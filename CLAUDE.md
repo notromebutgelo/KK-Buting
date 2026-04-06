@@ -209,6 +209,12 @@ The current live points default in code is now:
 - the youth PWA onboarding carousel pager layout is now more stable on short mobile screens
   - the dots now live inside a dedicated media stack below the card instead of floating as a separate block that could visually collide with the artwork
   - the onboarding screen now allows vertical scrolling on shorter viewports so the image, dots, CTAs, and footer do not overlap when height is constrained
+- the youth PWA verification upload card now uses the dashed document area as the first interaction point
+  - the dashed upload container is now clickable and acts as the trigger to reveal the upload source actions
+  - the `Upload from Device` and `Use Camera` buttons stay hidden until the user taps the dashed container, reducing visual clutter and making the upload flow feel more intentional on mobile
+- the youth PWA main profile tab was visually refreshed to match the stronger KK website/system language
+  - the profile screen now uses the shared blue-to-sky gradient atmosphere, cream/yellow support accents, and rounded card treatment already present in the youth home and digital ID screens
+  - profile information, account tools, and logout actions were regrouped into clearer dashboard-style sections so the tab feels like part of the same product family instead of a separate generic settings page
 
 ### Backend status: strong foundation, broad feature coverage
 

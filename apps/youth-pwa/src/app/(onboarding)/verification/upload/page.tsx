@@ -35,6 +35,7 @@ export default function VerificationUploadPage() {
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [error, setError] = useState('')
   const [ageGroup, setAgeGroup] = useState('')
+  const [showSourceActions, setShowSourceActions] = useState(false)
   const isChildYouth = isChildYouthGroup(ageGroup)
 
   const documentSteps = useMemo<DocumentStep[]>(() => {
@@ -105,6 +106,10 @@ export default function VerificationUploadPage() {
     setPreviews(Array.from({ length: documentSteps.length }, (_, index) => previews[index] || null))
     setCurrentStep((current) => Math.min(current, Math.max(documentSteps.length - 1, 0)))
   }, [documentSteps.length])
+
+  useEffect(() => {
+    setShowSourceActions(false)
+  }, [currentStep])
 
   const acceptedIDs = [
     'PhilSys / National ID',
@@ -240,12 +245,18 @@ export default function VerificationUploadPage() {
                 ) : null}
               </div>
 
-              <div
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSourceActions(true)
+                  setError('')
+                }}
                 className={`flex w-full flex-col items-center rounded-[24px] border-2 border-dashed px-4 py-8 text-center transition-colors ${
                   currentPreview
                     ? 'border-[#2b69ac] bg-[#edf4fb]'
                     : 'border-[#2b69ac] bg-[#edf4fb]'
-                }`}
+                } ${showSourceActions ? 'ring-2 ring-[#2b69ac]/15' : ''}`}
+                aria-label={currentPreview ? 'Change uploaded document' : 'Choose how to upload your document'}
               >
                 {currentPreview ? (
                   <div className="relative h-[170px] w-full overflow-hidden rounded-[18px] bg-white">
@@ -268,26 +279,31 @@ export default function VerificationUploadPage() {
                     <span className="mt-3 text-[18px] font-medium text-[#1e4f91]">
                       {isIdPhotoStep ? 'ID Photo Ready' : 'Document Ready'}
                     </span>
+                    <span className="mt-2 text-[12px] font-medium text-[#5f7b9d]">
+                      Tap here to choose upload source
+                    </span>
                   </>
                 )}
-              </div>
+              </button>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => uploadInputRef.current?.click()}
-                  className="inline-flex items-center justify-center rounded-[18px] border border-[#cfe0f2] bg-white px-4 py-3 text-[14px] font-semibold text-[#014384] shadow-sm transition hover:bg-[#f7fbff]"
-                >
-                  Upload from Device
-                </button>
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="inline-flex items-center justify-center rounded-[18px] bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_10px_22px_rgba(5,114,220,0.18)]"
-                >
-                  {isIdPhotoStep ? 'Take a Photo' : 'Use Camera'}
-                </button>
-              </div>
+              {showSourceActions ? (
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => uploadInputRef.current?.click()}
+                    className="inline-flex items-center justify-center rounded-[18px] border border-[#cfe0f2] bg-white px-4 py-3 text-[14px] font-semibold text-[#014384] shadow-sm transition hover:bg-[#f7fbff]"
+                  >
+                    Upload from Device
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="inline-flex items-center justify-center rounded-[18px] bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_10px_22px_rgba(5,114,220,0.18)]"
+                  >
+                    {isIdPhotoStep ? 'Take a Photo' : 'Use Camera'}
+                  </button>
+                </div>
+              ) : null}
 
               <input
                 ref={uploadInputRef}
