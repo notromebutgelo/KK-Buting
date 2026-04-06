@@ -33,6 +33,10 @@ function getMerchantTags(merchant: Merchant) {
   return Array.from(tags).slice(0, 2)
 }
 
+function getMerchantDescription(merchant: Merchant) {
+  return merchant.shortDescription || merchant.description || merchant.businessInfo || ''
+}
+
 function toBulletLines(content?: string) {
   if (!content) return []
 
@@ -181,7 +185,7 @@ export default function MerchantDetailPage() {
 
           <div className="mt-4">
             <p className="text-[16px] leading-7 text-[#4d6785]">
-              {merchant.shortDescription || merchant.description || merchant.businessInfo || 'Merchant details coming soon.'}
+              {getMerchantDescription(merchant) || 'This merchant has not added a storefront description yet.'}
             </p>
           </div>
 

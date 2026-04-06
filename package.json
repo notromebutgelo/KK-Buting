@@ -1,0 +1,27 @@
+{
+  "name": "kk-system",
+  "private": true,
+  "workspaces": [
+    "apps/admin-panel",
+    "apps/backend",
+    "apps/merchant-app",
+    "apps/youth-pwa"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace admin-panel",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:merchant": "npm run start --workspace merchant-app",
+    "dev:youth": "npm run dev --workspace youth-pwa",
+    "dev:web": "concurrently \"npm run dev:youth\" \"npm run dev:admin\"",
+    "dev:core": "concurrently \"npm run dev:backend\" \"npm run dev:youth\" \"npm run dev:admin\"",
+    "build:admin": "npm run build --workspace admin-panel",
+    "build:backend": "npm run build --workspace backend",
+    "build:youth": "npm run build --workspace youth-pwa",
+    "build:web": "npm run build:youth && npm run build:admin",
+    "build:core": "npm run build:backend && npm run build:web",
+    "typecheck:merchant": "npm run typecheck --workspace merchant-app"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

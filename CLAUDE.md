@@ -21,7 +21,7 @@ The repo currently contains four application codebases:
 - `apps/admin-panel`: Next.js admin and superadmin dashboard
 - `apps/merchant-app`: Expo React Native merchant app
 
-There is no root workspace/orchestration config in the repo right now, so each app is effectively managed as its own project.
+A root `package.json` workspace configuration now exists, so installs and common app scripts can be run from the repo root more easily.
 
 ## High-Level System Flow
 
@@ -183,6 +183,9 @@ The current live points default in code is now:
 - the refreshed merchant-app visual system now extends across notifications, scanner, shop profile, account, transactions, products, promotions, login, and scan result screens
 - merchant-app form and search screens now use keyboard-safe layouts, and the login screen now supports password visibility toggle
 - the merchant dashboard footer area was replaced with a more useful storefront summary panel instead of the earlier generic alignment note
+- deployment readiness was improved for the two Next.js apps by generating dedicated `package-lock.json` files inside `apps/admin-panel` and `apps/youth-pwa`
+- the youth PWA home and merchant discovery surfaces no longer rely on sample merchant or promo content and now show backend-driven empty states when live data is unavailable
+- a root workspace setup now exists with npm workspaces plus shared root scripts for backend, admin panel, youth PWA, and merchant app tasks
 
 ### Backend status: strong foundation, broad feature coverage
 
@@ -226,7 +229,6 @@ The youth app already supports the main user lifecycle:
 
 Known incomplete or placeholder areas in the current youth app:
 
-- some home/merchant presentation still falls back to static sample content when live merchant data is missing
 - the PDF mentions splash/onboarding variants that are not fully represented as dedicated production-ready flows in the current repo
 - the production build still has unrelated pre-existing `useSearchParams()` suspense issues on `/login`, `/otp`, and `/reset-password`
 
@@ -284,7 +286,6 @@ Known partial area:
 ## Notable Gaps and Risks
 
 - There are currently no automated tests in the repository.
-- There is no top-level monorepo task runner or shared workspace config.
 - Some features still use fallback presentation content instead of a fully curated backend-driven implementation.
 - The PDF and the codebase are no longer perfectly aligned; the repo reflects a newer and broader product scope than the original module document.
 - The youth PWA production build currently fails on pre-existing auth-page suspense issues unrelated to the merchant storefront or notifications work.
@@ -300,14 +301,14 @@ If we describe the project in plain terms today:
 - the merchant app already supports live QR workflows
 - the merchant storefront flow is shared end-to-end across backend, merchant app, and youth PWA
 - notifications are now backend-driven across youth and merchant experiences
+- the youth home and merchant discovery surfaces now avoid sample storefront data and fall back to honest empty states instead
 - the remaining work is mostly about tightening product completeness, removing leftover presentation fallbacks, fixing production build issues, and adding confidence through testing
 
 ## What To Do Next
 
-1. Replace remaining presentation-only fallback content in the youth home and merchant discovery surfaces with fully curated backend content.
-2. Add storefront-specific admin controls if admins should review or override merchant-facing copy such as `pointsPolicy`, banners, and descriptions.
-3. Extract reusable merchant-app UI primitives for branded headers, compact cards, and form sections so future screens stay visually consistent with less duplication.
-4. Standardize any future admin analytics widgets on the same shadcn chart primitives added for the reports page.
-5. Fix the youth PWA auth-page `useSearchParams()` suspense issues so production builds complete cleanly.
-6. Add automated tests for notifications, points conversion, merchant storefront payloads, QR awarding logic, and reward redemption flows.
-7. Add a root workspace setup so running and maintaining all apps is easier.
+1. Add storefront-specific admin controls if admins should review or override merchant-facing copy such as `pointsPolicy`, banners, and descriptions.
+2. Extract reusable merchant-app UI primitives for branded headers, compact cards, and form sections so future screens stay visually consistent with less duplication.
+3. Standardize any future admin analytics widgets on the same shadcn chart primitives added for the reports page.
+4. Fix the youth PWA auth-page `useSearchParams()` suspense issues so production builds complete cleanly.
+5. Add automated tests for notifications, points conversion, merchant storefront payloads, QR awarding logic, and reward redemption flows.
+6. Expand the root workspace scripts further if you want one-command flows for more checks, previews, or deployment tasks.

@@ -31,6 +31,10 @@ function getMerchantTags(merchant: Merchant) {
   return Array.from(tags).slice(0, 2)
 }
 
+function getMerchantDescription(merchant: Merchant) {
+  return merchant.shortDescription || merchant.description || merchant.businessInfo || ''
+}
+
 export default function MerchantsPage() {
   const router = useRouter()
   const { merchants, isLoading, error } = useMerchants()
@@ -237,9 +241,15 @@ export default function MerchantsPage() {
 
                         {expanded ? (
                           <div className="pt-4">
-                            <p className="text-[13px] leading-5 text-[#58718e]">
-                              {merchant.shortDescription || merchant.description || merchant.businessInfo || 'Merchant details coming soon.'}
-                            </p>
+                            {getMerchantDescription(merchant) ? (
+                              <p className="text-[13px] leading-5 text-[#58718e]">
+                                {getMerchantDescription(merchant)}
+                              </p>
+                            ) : (
+                              <p className="text-[13px] leading-5 text-[#7e94ad]">
+                                This merchant has not added a storefront description yet.
+                              </p>
+                            )}
 
                             <div className="mt-3 flex flex-wrap gap-2">
                               {getMerchantTags(merchant).map((tag) => (
