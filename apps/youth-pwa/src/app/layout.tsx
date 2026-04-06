@@ -43,6 +43,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${poppinsDisplay.variable} ${poppinsBody.variable}`}>
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
       <body>{children}</body>
     </html>
   );

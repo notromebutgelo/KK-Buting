@@ -187,6 +187,7 @@ The current live points default in code is now:
 - the youth PWA home and merchant discovery surfaces no longer rely on sample merchant or promo content and now show backend-driven empty states when live data is unavailable
 - a root workspace setup now exists with npm workspaces plus shared root scripts for backend, admin panel, youth PWA, and merchant app tasks
 - the youth PWA auth and scanner result routes now wrap `useSearchParams()` usage in `Suspense`-safe client components, and the youth production build completes successfully again
+- the youth PWA deployment flow is hardened so `manifest.json` and `sw.js` bypass auth middleware, and the root layout now includes the non-deprecated `mobile-web-app-capable` meta tag alongside the Apple PWA metadata
 
 ### Backend status: strong foundation, broad feature coverage
 
@@ -310,4 +311,5 @@ If we describe the project in plain terms today:
 2. Extract reusable merchant-app UI primitives for branded headers, compact cards, and form sections so future screens stay visually consistent with less duplication.
 3. Standardize any future admin analytics widgets on the same shadcn chart primitives added for the reports page.
 4. Add automated tests for notifications, points conversion, merchant storefront payloads, QR awarding logic, and reward redemption flows.
-5. Expand the root workspace scripts further if you want one-command flows for more checks, previews, or deployment tasks.
+5. Finish deployment polish for the youth PWA by adding a real favicon, verifying `NEXT_PUBLIC_API_URL` includes `/api`, and ensuring Firebase Authorized Domains include the live Vercel hostname.
+6. Expand the root workspace scripts further if you want one-command flows for more checks, previews, or deployment tasks.
