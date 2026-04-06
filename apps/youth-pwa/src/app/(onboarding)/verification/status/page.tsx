@@ -105,9 +105,17 @@ export default function VerificationStatusPage() {
             )}
 
             {profile.status === 'rejected' && (
-              <Link href="/verification/upload">
-                <Button fullWidth>Re-upload ID</Button>
-              </Link>
+              <div className="space-y-3">
+                {(profile.verificationRejectReason || profile.verificationRejectNote) ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {profile.verificationRejectReason}
+                    {profile.verificationRejectNote ? ` ${profile.verificationRejectNote}` : ''}
+                  </div>
+                ) : null}
+                <Link href="/verification/upload">
+                  <Button fullWidth>Retry Submission</Button>
+                </Link>
+              </div>
             )}
 
             {queueStatus === 'resubmission_requested' && (
