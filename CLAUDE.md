@@ -186,6 +186,7 @@ The current live points default in code is now:
 - deployment readiness was improved for the two Next.js apps by generating dedicated `package-lock.json` files inside `apps/admin-panel` and `apps/youth-pwa`
 - the youth PWA home and merchant discovery surfaces no longer rely on sample merchant or promo content and now show backend-driven empty states when live data is unavailable
 - a root workspace setup now exists with npm workspaces plus shared root scripts for backend, admin panel, youth PWA, and merchant app tasks
+- the youth PWA auth and scanner result routes now wrap `useSearchParams()` usage in `Suspense`-safe client components, and the youth production build completes successfully again
 
 ### Backend status: strong foundation, broad feature coverage
 
@@ -230,7 +231,6 @@ The youth app already supports the main user lifecycle:
 Known incomplete or placeholder areas in the current youth app:
 
 - the PDF mentions splash/onboarding variants that are not fully represented as dedicated production-ready flows in the current repo
-- the production build still has unrelated pre-existing `useSearchParams()` suspense issues on `/login`, `/otp`, and `/reset-password`
 
 ### Admin panel status: operationally meaningful
 
@@ -288,7 +288,6 @@ Known partial area:
 - There are currently no automated tests in the repository.
 - Some features still use fallback presentation content instead of a fully curated backend-driven implementation.
 - The PDF and the codebase are no longer perfectly aligned; the repo reflects a newer and broader product scope than the original module document.
-- The youth PWA production build currently fails on pre-existing auth-page suspense issues unrelated to the merchant storefront or notifications work.
 
 ## Practical Snapshot of Current Progress
 
@@ -302,13 +301,13 @@ If we describe the project in plain terms today:
 - the merchant storefront flow is shared end-to-end across backend, merchant app, and youth PWA
 - notifications are now backend-driven across youth and merchant experiences
 - the youth home and merchant discovery surfaces now avoid sample storefront data and fall back to honest empty states instead
-- the remaining work is mostly about tightening product completeness, removing leftover presentation fallbacks, fixing production build issues, and adding confidence through testing
+- the youth PWA production build is now clean again after the auth and scanner search-param routes were moved behind `Suspense`-safe wrappers
+- the remaining work is mostly about tightening product completeness, removing leftover presentation fallbacks, and adding confidence through testing
 
 ## What To Do Next
 
 1. Add storefront-specific admin controls if admins should review or override merchant-facing copy such as `pointsPolicy`, banners, and descriptions.
 2. Extract reusable merchant-app UI primitives for branded headers, compact cards, and form sections so future screens stay visually consistent with less duplication.
 3. Standardize any future admin analytics widgets on the same shadcn chart primitives added for the reports page.
-4. Fix the youth PWA auth-page `useSearchParams()` suspense issues so production builds complete cleanly.
-5. Add automated tests for notifications, points conversion, merchant storefront payloads, QR awarding logic, and reward redemption flows.
-6. Expand the root workspace scripts further if you want one-command flows for more checks, previews, or deployment tasks.
+4. Add automated tests for notifications, points conversion, merchant storefront payloads, QR awarding logic, and reward redemption flows.
+5. Expand the root workspace scripts further if you want one-command flows for more checks, previews, or deployment tasks.
