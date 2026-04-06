@@ -104,7 +104,8 @@
   flex-direction: column;
   align-items: center;
   padding: 0 24px 24px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 
   animation: onboardingIn 0.45s ease both;
 }
@@ -116,7 +117,7 @@
 
 /* ── Slide area ───────────────────────────────────────────────── */
 .slide-area {
-  flex: 1;
+  flex: 1 0 auto;
   width: 100%;
   max-width: 380px;
   display: flex;
@@ -126,6 +127,15 @@
   gap: 28px;
   padding-top: 40px;
   transition: opacity 0.32s ease, transform 0.32s ease;
+}
+
+.slide-media-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
 .slide-area[data-animating="true"][data-dir="left"] {
@@ -156,6 +166,8 @@
   width: 100%;
   position: relative;
   overflow: visible;
+  display: flex;
+  justify-content: center;
 }
 
 .slide-image-wrap {
@@ -216,7 +228,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
+  min-height: 24px;
 }
 
 .slide-dot {
@@ -243,6 +255,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: 20px;
   margin-bottom: 20px;
 }
 
@@ -325,8 +338,10 @@
 /* ── Mobile-first responsive tweaks ──────────────────────────── */
 @media (max-height: 680px) {
   .slide-area { padding-top: 20px; gap: 18px; }
+  .slide-media-stack { gap: 12px; }
   .slide-title { font-size: 17px; }
   .splash-seal { width: 130px; height: 130px; }
+  .cta-area { margin-top: 16px; }
 }
 
 @media (min-width: 480px) {

@@ -20,6 +20,10 @@ interface DocumentStep {
   helper: string
 }
 
+function isChildYouthGroup(ageGroup: string) {
+  return ['Early Youth (15-17)', 'Child Youth', 'Child Youth (15-17)'].includes(String(ageGroup || '').trim())
+}
+
 export default function VerificationUploadPage() {
   const router = useRouter()
   const uploadInputRef = useRef<HTMLInputElement>(null)
@@ -31,9 +35,10 @@ export default function VerificationUploadPage() {
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [error, setError] = useState('')
   const [ageGroup, setAgeGroup] = useState('')
+  const isChildYouth = isChildYouthGroup(ageGroup)
 
   const documentSteps = useMemo<DocumentStep[]>(() => {
-    if (ageGroup === 'Early Youth (15-17)') {
+    if (isChildYouth) {
       return [
         {
           docType: 'certificate_of_residency',
@@ -70,7 +75,7 @@ export default function VerificationUploadPage() {
         helper: 'Upload a clear selfie-style ID photo for your digital record.',
       },
     ]
-  }, [ageGroup])
+  }, [isChildYouth])
 
   useEffect(() => {
     let mounted = true
@@ -415,7 +420,7 @@ export default function VerificationUploadPage() {
               </ul>
             </div>
 
-            {ageGroup !== 'Early Youth (15-17)' ? (
+            {!isChildYouth ? (
               <div className="mt-4 rounded-[24px] bg-white/88 px-5 py-5 shadow-[0_16px_40px_rgba(1,67,132,0.1)] backdrop-blur-[4px]">
                 <h2 className="text-[16px] font-extrabold text-[#014384]">
                   Accepted IDs

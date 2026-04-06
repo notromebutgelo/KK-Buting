@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 export const PROFILING_STORAGE_KEY = "profiling";
 export const TOTAL_STEPS = 9;
@@ -104,7 +104,7 @@ export function getAgeGroupFromAge(age: number | string) {
   if (!value || Number.isNaN(value)) return "";
   if (value >= 15 && value <= 17) return "Child Youth";
   if (value >= 18 && value <= 24) return "Core Youth";
-  if (value >= 25 && value <= 30) return "Young Adult";
+  if (value >= 25 && value <= 30) return "Adult Youth";
   return "";
 }
 
@@ -127,7 +127,8 @@ export function getProfilingResumePath(draft: ProfilingDraft = readProfilingDraf
     Boolean(draft.age) &&
     Boolean(draft.email) &&
     Boolean(draft.contactNumber) &&
-    String(draft.contactNumber).length === 11;
+    String(draft.contactNumber).length === 10 &&
+    String(draft.contactNumber).startsWith("9");
 
   if (!hasStep2) return "/profiling/step-2";
 
@@ -304,26 +305,108 @@ export function SelectField({
   placeholder: string;
   required?: boolean;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const listboxId = useId();
+  const selectedLabel = useMemo(
+    () => options.find((option) => option === value) || "",
+    [options, value]
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!wrapperRef.current) return;
+
+      const target = event.target;
+      if (target instanceof Node && !wrapperRef.current.contains(target)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
   return (
     <div className="pf-col">
       <label className="pf-label">
         {label}
         {required ? <span className="req">*</span> : null}
       </label>
-      <div className="pf-select-wrap">
-        <select
-          className="pf-select"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          required={required}
+      <div
+        className={`pf-select-wrap${isOpen ? " open" : ""}`}
+        ref={wrapperRef}
+      >
+        <button
+          type="button"
+          className={`pf-select-trigger${value ? "" : " placeholder"}`}
+          onClick={() => setIsOpen((current) => !current)}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          aria-controls={listboxId}
+          aria-required={required}
         >
-          <option value="">{placeholder}</option>
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+          <span className="pf-select-value">
+            {selectedLabel || placeholder}
+          </span>
+          <ChevronDownIcon className="pf-select-chevron" />
+        </button>
+
+        {isOpen ? (
+          <div className="pf-select-popover">
+            <div
+              id={listboxId}
+              className="pf-select-options"
+              role="listbox"
+              aria-label={label}
+            >
+              {!required ? (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={value === ""}
+                  className={`pf-select-option${value === "" ? " selected" : ""}`}
+                  onClick={() => {
+                    onChange("");
+                    setIsOpen(false);
+                  }}
+                >
+                  {placeholder}
+                </button>
+              ) : null}
+              {options.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="option"
+                  aria-selected={value === option}
+                  className={`pf-select-option${value === option ? " selected" : ""}`}
+                  onClick={() => {
+                    onChange(option);
+                    setIsOpen(false);
+                  }}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

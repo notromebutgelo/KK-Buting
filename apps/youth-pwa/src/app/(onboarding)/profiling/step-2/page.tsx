@@ -6,6 +6,7 @@ import {
   FooterBranding,
   NextArrowButton,
   ProfilingShell,
+  SelectField,
   getAgeFromBirthday,
   getAgeGroupFromAge,
   readProfilingDraft,
@@ -13,6 +14,14 @@ import {
 } from "../profiling-ui";
 
 const genderOptions = ["Male", "Female", "Prefer not to say"];
+
+function normalizePhilippineMobileInput(value: string) {
+  const digitsOnly = value.replace(/\D/g, "").slice(0, 10);
+
+  if (!digitsOnly) return "";
+
+  return `9${digitsOnly.slice(1)}`;
+}
 
 export default function ProfilingStep2() {
   const router = useRouter();
@@ -29,9 +38,9 @@ export default function ProfilingStep2() {
     setForm({
       gender: saved.gender || "",
       birthday: saved.birthday || "",
-      age: saved.age ? String(saved.age) : "",
+      age: saved.birthday ? getAgeFromBirthday(saved.birthday) : saved.age ? String(saved.age) : "",
       email: saved.email || "",
-      contactNumber: saved.contactNumber || "",
+      contactNumber: normalizePhilippineMobileInput(saved.contactNumber || ""),
     });
   }, []);
 
@@ -41,16 +50,20 @@ export default function ProfilingStep2() {
     form.birthday &&
     form.age &&
     form.email &&
-    form.contactNumber.length === 11;
+    form.contactNumber.length === 10 &&
+    form.contactNumber.startsWith("9");
 
   const handleContactNumberChange = (value: string) => {
-    const digitsOnly = value.replace(/\D/g, "").slice(0, 11);
-    setForm((prev) => ({ ...prev, contactNumber: digitsOnly }));
+    setForm((prev) => ({
+      ...prev,
+      contactNumber: normalizePhilippineMobileInput(value),
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) return;
+
     saveProfilingDraft({
       gender: form.gender,
       birthday: form.birthday,
@@ -73,44 +86,25 @@ export default function ProfilingStep2() {
       >
         <div className="pf-form-card">
           <div className="pf-row pf-row-2">
-            <div className="pf-col">
-              <label className="pf-label">
-                Gender<span className="req">*</span>
-              </label>
-              <div className="pf-select-wrap">
-                <select
-                  className="pf-select"
-                  value={form.gender}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, gender: e.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Select gender</option>
-                  {genderOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <SelectField
+              label="Gender"
+              value={form.gender}
+              onChange={(gender) => setForm((prev) => ({ ...prev, gender }))}
+              options={genderOptions}
+              placeholder="Select gender"
+            />
 
             <div className="pf-col">
               <label className="pf-label">
                 Age<span className="req">*</span>
               </label>
               <input
-                className="pf-input"
+                className="pf-input pf-input-readonly"
                 type="text"
                 value={form.age}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    age: e.target.value.replace(/\D/g, "").slice(0, 2),
-                  }))
-                }
-                placeholder="27"
+                placeholder="Auto-filled from birthday"
+                readOnly
+                aria-readonly="true"
                 required
               />
             </div>
@@ -157,9 +151,6 @@ export default function ProfilingStep2() {
             </label>
             <div className="pf-phone-row">
               <div className="pf-phone-prefix-box">
-                <span className="pf-phone-flag" aria-hidden="true">
-                  🇵🇭
-                </span>
                 <span>+63</span>
               </div>
               <input
@@ -167,10 +158,14 @@ export default function ProfilingStep2() {
                 type="tel"
                 value={form.contactNumber}
                 onChange={(e) => handleContactNumberChange(e.target.value)}
-                placeholder="9222222222"
+                inputMode="numeric"
+                pattern="9[0-9]{9}"
+                placeholder="9XXXXXXXXX"
+                maxLength={10}
                 required
               />
             </div>
+            <p className="pf-input-hint">Enter 10 digits only. Mobile numbers always begin with 9.</p>
           </div>
         </div>
 

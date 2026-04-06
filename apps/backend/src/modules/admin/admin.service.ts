@@ -43,9 +43,9 @@ const DOCUMENT_LABELS: Record<string, string> = {
 };
 
 const REQUIRED_DOCUMENTS_BY_GROUP: Record<string, string[]> = {
-  "Early Youth (15-17)": ["certificate_of_residency", "school_id", "id_photo"],
-  "Late Youth (18-24)": ["proof_of_voter_registration", "valid_government_id", "id_photo"],
-  "Young Adult (25-30)": ["proof_of_voter_registration", "valid_government_id", "id_photo"],
+  "Child Youth": ["certificate_of_residency", "school_id", "id_photo"],
+  "Core Youth": ["proof_of_voter_registration", "valid_government_id", "id_photo"],
+  "Adult Youth": ["proof_of_voter_registration", "valid_government_id", "id_photo"],
 };
 
 function toIso(value: any): string | undefined {
@@ -71,6 +71,24 @@ function serializeRecord<T extends AnyRecord>(record: T): T {
 
 function normalizeString(value: any) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeYouthAgeGroup(ageGroup?: string) {
+  const value = String(ageGroup || "").trim();
+
+  if (["Early Youth (15-17)", "Child Youth", "Child Youth (15-17)"].includes(value)) {
+    return "Child Youth";
+  }
+
+  if (["Late Youth (18-24)", "Core Youth", "Core Youth (18-24)"].includes(value)) {
+    return "Core Youth";
+  }
+
+  if (["Young Adult", "Young Adult (25-30)", "Adult Youth", "Adult Youth (25-30)"].includes(value)) {
+    return "Adult Youth";
+  }
+
+  return value;
 }
 
 function sanitizeProfilePayload(data: Record<string, unknown>) {
@@ -111,7 +129,7 @@ function getDocumentLabel(type: string) {
 }
 
 function getRequiredDocumentTypes(profile: AnyRecord) {
-  const ageGroup = String(profile?.youthAgeGroup || "");
+  const ageGroup = normalizeYouthAgeGroup(profile?.youthAgeGroup);
   return REQUIRED_DOCUMENTS_BY_GROUP[ageGroup] || ["valid_government_id", "id_photo"];
 }
 
@@ -302,12 +320,12 @@ export async function getDashboardStats() {
     .reduce((sum, transaction) => sum + Number(transaction.points || 0), 0);
 
   const ageGroups = [
-    "Early Youth (15-17)",
-    "Late Youth (18-24)",
-    "Young Adult (25-30)",
+    "Child Youth",
+    "Core Youth",
+    "Adult Youth",
   ].map((label) => ({
     name: label,
-    value: profiles.filter((profile) => profile.youthAgeGroup === label).length,
+    value: profiles.filter((profile) => normalizeYouthAgeGroup(profile.youthAgeGroup) === label).length,
   }));
 
   const genderMap = new Map<string, number>();
@@ -493,7 +511,10 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
         normalizeString(profile.email).includes(search) ||
         normalizeString(profile.contactNumber).includes(search) ||
         normalizeString(profile.city).includes(search);
-      const matchesAgeGroup = !ageGroup || ageGroup === "all" ? true : profile.youthAgeGroup === ageGroup;
+      const matchesAgeGroup =
+        !ageGroup || ageGroup === "all"
+          ? true
+          : normalizeYouthAgeGroup(profile.youthAgeGroup) === normalizeYouthAgeGroup(ageGroup);
       const matchesDocumentType =
         !documentType || documentType === "all"
           ? true
@@ -521,7 +542,7 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
   const ageGroupOptions = Array.from(
     new Set(
       profiles
-        .map((profile) => String(profile.youthAgeGroup || "").trim())
+        .map((profile) => normalizeYouthAgeGroup(profile.youthAgeGroup))
         .filter(Boolean)
     )
   ).sort((a, b) => a.localeCompare(b));
@@ -1892,7 +1913,16 @@ export async function getReports() {
   }
 
   return {
-    byAgeGroup: countBy("youthAgeGroup"),
+    byAgeGroup: (() => {
+      const counts = new Map<string, number>();
+
+      for (const profile of profiles) {
+        const value = normalizeYouthAgeGroup(profile.youthAgeGroup) || "Unknown";
+        counts.set(value, (counts.get(value) || 0) + 1);
+      }
+
+      return [...counts.entries()].map(([name, value]) => ({ name, value }));
+    })(),
     byStatus: countBy("status"),
     byClassification: countBy("youthClassification"),
     byEducation: countBy("educationalBackground"),

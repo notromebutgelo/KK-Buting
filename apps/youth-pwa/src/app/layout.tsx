@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
+import AuthBootstrap from "@/components/providers/AuthBootstrap";
 import "./globals.css";
 import "./(onboarding)/onboarding.css";
 
@@ -46,7 +47,10 @@ export default function RootLayout({
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthBootstrap />
+        {children}
+      </body>
     </html>
   );
 }

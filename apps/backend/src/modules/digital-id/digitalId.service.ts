@@ -6,9 +6,9 @@ import { randomUUID } from "crypto";
 import { generateQrToken } from "../../../utils/renerateQrToken";
 
 const REQUIRED_DOCUMENTS_BY_GROUP: Record<string, string[]> = {
-  "Early Youth (15-17)": ["certificate_of_residency", "school_id", "id_photo"],
-  "Late Youth (18-24)": ["proof_of_voter_registration", "valid_government_id", "id_photo"],
-  "Young Adult (25-30)": ["proof_of_voter_registration", "valid_government_id", "id_photo"],
+  "Child Youth": ["certificate_of_residency", "school_id", "id_photo"],
+  "Core Youth": ["proof_of_voter_registration", "valid_government_id", "id_photo"],
+  "Adult Youth": ["proof_of_voter_registration", "valid_government_id", "id_photo"],
 };
 
 const DOCUMENT_LABELS: Record<string, string> = {
@@ -27,8 +27,28 @@ function toIso(value: any) {
   return undefined;
 }
 
+function normalizeYouthAgeGroup(ageGroup?: string) {
+  const value = String(ageGroup || "").trim();
+
+  if (["Early Youth (15-17)", "Child Youth", "Child Youth (15-17)"].includes(value)) {
+    return "Child Youth";
+  }
+
+  if (["Late Youth (18-24)", "Core Youth", "Core Youth (18-24)"].includes(value)) {
+    return "Core Youth";
+  }
+
+  if (["Young Adult", "Young Adult (25-30)", "Adult Youth", "Adult Youth (25-30)"].includes(value)) {
+    return "Adult Youth";
+  }
+
+  return value;
+}
+
 function getRequiredDocumentTypes(ageGroup?: string) {
-  return REQUIRED_DOCUMENTS_BY_GROUP[String(ageGroup || "")] || [
+  const normalizedAgeGroup = normalizeYouthAgeGroup(ageGroup);
+
+  return REQUIRED_DOCUMENTS_BY_GROUP[normalizedAgeGroup] || [
     "proof_of_voter_registration",
     "valid_government_id",
     "id_photo",
@@ -173,7 +193,7 @@ export async function getMyVerificationStatus(uid: string) {
     barangay: profile.barangay || "",
     purok: profile.purok || "",
     civilStatus: profile.civilStatus || "",
-    youthAgeGroup: profile.youthAgeGroup || "",
+    youthAgeGroup: normalizeYouthAgeGroup(profile.youthAgeGroup) || "",
     educationalBackground: profile.educationalBackground || "",
     youthClassification: profile.youthClassification || "",
     workStatus: profile.workStatus || "",

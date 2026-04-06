@@ -170,8 +170,7 @@
   margin-left: 2px;
 }
 
-.pf-input,
-.pf-select {
+.pf-input {
   width: 100%;
   padding: 12px 14px;
   background: var(--kk-input-bg);
@@ -188,20 +187,100 @@
   color: rgba(27, 58, 107, 0.35);
 }
 
+.pf-input-readonly {
+  background: rgba(220, 229, 241, 0.95);
+  border-color: rgba(180, 196, 218, 0.95);
+  color: rgba(15, 40, 86, 0.82);
+  cursor: not-allowed;
+}
+
+.pf-input-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(15, 40, 86, 0.6);
+}
+
 .pf-select-wrap {
   position: relative;
 }
 
-.pf-select-wrap::after {
-  content: "";
+.pf-select-trigger {
+  width: 100%;
+  min-height: 49px;
+  padding: 12px 14px;
+  background: var(--kk-input-bg);
+  border: 1.5px solid var(--kk-input-border);
+  border-radius: var(--radius-input);
+  color: var(--kk-blue);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(255, 255, 255, 0.16);
+}
+
+.pf-select-trigger.placeholder {
+  color: rgba(27, 58, 107, 0.35);
+}
+
+.pf-select-value {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-select-chevron {
+  flex-shrink: 0;
+  color: rgba(27, 58, 107, 0.58);
+  transition: transform 0.18s ease;
+}
+
+.pf-select-wrap.open .pf-select-chevron {
+  transform: rotate(180deg);
+}
+
+.pf-select-popover {
   position: absolute;
-  right: 13px;
-  top: 50%;
-  transform: translateY(-50%);
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 6px solid rgba(27, 58, 107, 0.5);
-  pointer-events: none;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+}
+
+.pf-select-options {
+  max-height: 240px;
+  overflow-y: auto;
+  border-radius: 18px;
+  padding: 8px;
+  background: rgba(255, 249, 236, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 18px 34px rgba(15, 40, 86, 0.18);
+  backdrop-filter: blur(14px);
+}
+
+.pf-select-option {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  text-align: left;
+  color: var(--kk-blue);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pf-select-option.selected {
+  background: linear-gradient(90deg, #014384 0%, #035db7 52%, #0572dc 100%);
+  color: white;
+}
+
+.pf-select-option:not(.selected):hover {
+  background: rgba(1, 67, 132, 0.08);
 }
 
 .pf-phone-row {

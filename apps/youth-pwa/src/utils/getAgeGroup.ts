@@ -13,14 +13,14 @@ export function getAgeGroup(birthday: string): string {
   const age = getAge(birthday)
   if (age >= 15 && age <= 17) return 'Child Youth (15-17)'
   if (age >= 18 && age <= 24) return 'Core Youth (18-24)'
-  if (age >= 25 && age <= 30) return 'Young Adult (25-30)'
+  if (age >= 25 && age <= 30) return 'Adult Youth (25-30)'
   return 'Unknown'
 }
 
-export function getAgeGroupCode(birthday: string): 'child_youth' | 'core_youth' | 'young_adult' | 'unknown' {
+export function getAgeGroupCode(birthday: string): 'child_youth' | 'core_youth' | 'adult_youth' | 'unknown' {
   const age = getAge(birthday)
   if (age >= 15 && age <= 17) return 'child_youth'
   if (age >= 18 && age <= 24) return 'core_youth'
-  if (age >= 25 && age <= 30) return 'young_adult'
+  if (age >= 25 && age <= 30) return 'adult_youth'
   return 'unknown'
 }

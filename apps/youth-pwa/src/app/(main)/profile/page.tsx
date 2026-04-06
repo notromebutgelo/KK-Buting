@@ -1,6 +1,8 @@
 'use client'
 import Link from 'next/link'
+import { useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useUser } from '@/hooks/useUser'
 import { useAuthStore } from '@/store/authStore'
 import { useUserStore } from '@/store/userStore'
 import { signOut } from '@/services/auth.service'
@@ -62,26 +64,45 @@ const menuItems = [
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, logout } = useAuthStore()
-  const { profile } = useUserStore()
+  const { user, logout, isLoading: isAuthLoading } = useAuthStore()
+  const { setProfile } = useUserStore()
+  const { profile, isLoading: isProfileLoading } = useUser()
+
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.replace('/login')
+    }
+  }, [isAuthLoading, router, user])
+
+  const displayName = useMemo(() => {
+    const fullName = [profile?.firstName, profile?.middleName, profile?.lastName]
+      .filter(Boolean)
+      .join(' ')
+
+    return fullName || user?.UserName || user?.email?.split('@')[0] || 'Youth Member'
+  }, [profile?.firstName, profile?.lastName, profile?.middleName, user?.UserName, user?.email])
 
   const handleLogout = async () => {
     try {
       await signOut()
       document.cookie = 'auth-token=; path=/; max-age=0'
+      setProfile(null)
       logout()
       router.push('/login')
     } catch {
       // force logout anyway
       document.cookie = 'auth-token=; path=/; max-age=0'
+      setProfile(null)
       logout()
       router.push('/login')
     }
   }
 
-  if (!user) {
+  if (isAuthLoading || (!profile && isProfileLoading)) {
     return <Spinner fullPage />
   }
+
+  if (!user) return null
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -90,11 +111,11 @@ export default function ProfilePage() {
         <div className="flex flex-col items-center text-white">
           <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center ring-4 ring-white/30 mb-4">
             <span className="text-4xl font-black text-white">
-              {user.UserName?.charAt(0).toUpperCase() || 'Y'}
+              {displayName.charAt(0).toUpperCase() || 'Y'}
             </span>
           </div>
-          <h1 className="text-xl font-bold">{user.UserName}</h1>
-          <p className="text-green-200 text-sm mt-0.5">{user.email}</p>
+          <h1 className="text-xl font-bold">{displayName}</h1>
+          <p className="text-green-200 text-sm mt-0.5">{user.email || 'No email on file'}</p>
           {profile && (
             <div className="mt-3">
               <Badge status={profile.status} />
@@ -119,20 +140,20 @@ export default function ProfilePage() {
               <div>
                 <p className="text-gray-400 text-xs">Full Name</p>
                 <p className="text-gray-900 font-medium text-sm">
-                  {profile.firstName} {profile.lastName}
+                  {displayName}
                 </p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs">Age Group</p>
-                <p className="text-gray-900 font-medium text-sm">{profile.youthAgeGroup}</p>
+                <p className="text-gray-900 font-medium text-sm">{profile.youthAgeGroup || 'Not set yet'}</p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs">Barangay</p>
-                <p className="text-gray-900 font-medium text-sm">{profile.barangay}</p>
+                <p className="text-gray-900 font-medium text-sm">{profile.barangay || 'Not set yet'}</p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs">City/Municipality</p>
-                <p className="text-gray-900 font-medium text-sm">{profile.city}</p>
+                <p className="text-gray-900 font-medium text-sm">{profile.city || 'Not set yet'}</p>
               </div>
             </div>
           </div>

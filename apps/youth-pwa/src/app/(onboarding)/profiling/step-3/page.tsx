@@ -7,12 +7,13 @@ import {
   NextArrowButton,
   ProfilingShell,
   SelectField,
+  getAgeFromBirthday,
+  getAgeGroupFromAge,
   readProfilingDraft,
   saveProfilingDraft,
 } from "../profiling-ui";
 
 const civilStatuses = ["Single", "Married", "Widowed", "Separated", "Annulled"];
-const youthAgeGroups = ["Child Youth", "Core Youth", "Young Adult"];
 const educationLevels = [
   "Elementary Level",
   "Elementary Graduate",
@@ -50,9 +51,13 @@ export default function ProfilingStep3() {
 
   useEffect(() => {
     const saved = readProfilingDraft();
+    const derivedAge =
+      saved.birthday ? getAgeFromBirthday(saved.birthday) : saved.age ? String(saved.age) : "";
+    const derivedAgeGroup = getAgeGroupFromAge(derivedAge);
+
     setForm({
       civilStatus: saved.civilStatus || "",
-      youthAgeGroup: saved.youthAgeGroup || "",
+      youthAgeGroup: derivedAgeGroup || saved.youthAgeGroup || "",
       educationalBackground: saved.educationalBackground || "",
       youthClassification: saved.youthClassification || "",
       workStatus: saved.workStatus || "",
@@ -91,13 +96,22 @@ export default function ProfilingStep3() {
               options={civilStatuses}
               placeholder="Select civil status"
             />
-            <SelectField
-              label="Youth Age Group"
-              value={form.youthAgeGroup}
-              onChange={(youthAgeGroup) => setForm((prev) => ({ ...prev, youthAgeGroup }))}
-              options={youthAgeGroups}
-              placeholder="Select age group"
-            />
+
+            <div className="pf-col">
+              <label className="pf-label">
+                Youth Age Group<span className="req">*</span>
+              </label>
+              <input
+                className="pf-input pf-input-readonly"
+                type="text"
+                value={form.youthAgeGroup}
+                placeholder="Auto-filled from age"
+                readOnly
+                aria-readonly="true"
+                required
+              />
+              <p className="pf-input-hint">Automatically assigned from the birthday and age in the previous step.</p>
+            </div>
           </div>
 
           <SelectField

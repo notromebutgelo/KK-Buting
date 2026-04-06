@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import api from '@/lib/api'
+import { getVerificationStatus } from '@/services/verification.service'
 import { useUserStore } from '@/store/userStore'
 
 export function useUser() {
@@ -8,19 +8,46 @@ export function useUser() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
+
     async function fetchUser() {
       setLoading(true)
       try {
-        const res = await api.get('/users/me')
-        setProfile(res.data.profile ?? res.data)
+        const nextProfile = await getVerificationStatus()
+        if (active) {
+          setProfile(nextProfile)
+          setError(null)
+        }
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Failed to fetch user'
-        setError(message)
+        if (!active) return
+
+        const statusCode =
+          typeof err === 'object' &&
+          err !== null &&
+          'response' in err &&
+          typeof (err as { response?: { status?: number } }).response?.status === 'number'
+            ? (err as { response?: { status?: number } }).response?.status
+            : undefined
+
+        if (statusCode === 404) {
+          setProfile(null)
+          setError(null)
+        } else {
+          const message = err instanceof Error ? err.message : 'Failed to fetch user profile'
+          setError(message)
+        }
       } finally {
-        setLoading(false)
+        if (active) {
+          setLoading(false)
+        }
       }
     }
-    fetchUser()
+
+    void fetchUser()
+
+    return () => {
+      active = false
+    }
   }, [setProfile, setLoading])
 
   return { profile, isLoading, error }

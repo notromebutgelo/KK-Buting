@@ -210,9 +210,9 @@ function formatBirthday(value: unknown) {
 
 function formatContactNumber(value: unknown) {
   if (!value || typeof value !== "string") return "-";
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  if (digits.length !== 11) return value;
-  return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+  if (digits.length !== 10) return value;
+  return `+63 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
 }
 
 function formatAssemblyAttendance(value: unknown) {

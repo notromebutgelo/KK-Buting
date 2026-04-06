@@ -127,34 +127,36 @@ export default function SplashOnboardingPage() {
           <p className="slide-desc">{slide.description}</p>
         </div>
 
-        <div className="slide-carousel-shell">
-          <div className="slide-image-card">
-            <div className="slide-image-wrap">
-              <Image
-                src={slide.image}
-                alt={slide.title}
-                className="slide-image"
-                fill
-                sizes="(max-width: 480px) 88vw, 380px"
-                priority={currentSlide === 0}
-              />
+        <div className="slide-media-stack">
+          <div className="slide-carousel-shell">
+            <div className="slide-image-card">
+              <div className="slide-image-wrap">
+                <Image
+                  src={slide.image}
+                  alt={slide.title}
+                  className="slide-image"
+                  fill
+                  sizes="(max-width: 480px) 88vw, 380px"
+                  priority={currentSlide === 0}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="slide-dots" role="tablist" aria-label="Onboarding slides">
-        {SLIDES.map((_, i) => (
-          <button
-            key={i}
-            role="tab"
-            aria-selected={i === currentSlide}
-            aria-label={`Slide ${i + 1}`}
-            className="slide-dot"
-            data-active={i === currentSlide}
-            onClick={() => goToSlide(i)}
-          />
-        ))}
+          <div className="slide-dots" role="tablist" aria-label="Onboarding slides">
+            {SLIDES.map((_, i) => (
+              <button
+                key={i}
+                role="tab"
+                aria-selected={i === currentSlide}
+                aria-label={`Slide ${i + 1}`}
+                className="slide-dot"
+                data-active={i === currentSlide}
+                onClick={() => goToSlide(i)}
+              />
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="cta-area">

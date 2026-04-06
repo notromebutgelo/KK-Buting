@@ -188,6 +188,27 @@ The current live points default in code is now:
 - a root workspace setup now exists with npm workspaces plus shared root scripts for backend, admin panel, youth PWA, and merchant app tasks
 - the youth PWA auth and scanner result routes now wrap `useSearchParams()` usage in `Suspense`-safe client components, and the youth production build completes successfully again
 - the youth PWA deployment flow is hardened so `manifest.json` and `sw.js` bypass auth middleware, and the root layout now includes the non-deprecated `mobile-web-app-capable` meta tag alongside the Apple PWA metadata
+- the youth PWA profile area is now more reliable on refresh and deep links
+  - a root auth bootstrap now mounts on app load so `authStore` is repopulated before `/profile` and `/profile/edit` depend on it
+  - this fixes the prior blank/stuck profile screen behavior that could happen when the protected route loaded before the in-memory auth store had been restored
+- the youth PWA profile store no longer gets populated from the ambiguous `/api/users/me` payload on the home screen
+  - home/profile loading now relies on verification/profile-shaped data instead, which avoids intermittent profile-tab glitches caused by mixing account data and profiling data in one client store
+- backend `/api/users/me` now returns an explicit structured payload with `user`, `profile`, and `merged`
+  - the old merged-only shape made it too easy for the frontend to confuse account identity data with KK profiling data
+- the youth PWA KK profiling flow now uses an app-styled custom dropdown instead of the phone's native select UI
+  - shared profiling select fields render an in-app popover/listbox style picker so mobile users see the KK design language instead of the device default picker sheet
+  - step 2 gender selection was migrated to the same shared custom dropdown so the profiling experience is visually consistent across the form
+- the youth PWA profiling step-2 and step-3 rules were tightened for the member data model
+  - age is now treated as a birthday-derived readonly field rather than a manually editable input
+  - Philippine mobile input now assumes the `+63` prefix outside the field and accepts exactly 10 local digits, auto-normalizing the first digit to `9`
+  - youth age group is now auto-derived from the saved age/birthday and shown as readonly in step 3 instead of asking the user to choose it manually
+  - the preferred age-group labels in the youth app are now `Child Youth`, `Core Youth`, and `Adult Youth`
+- backend age-group handling is now normalized across verification and admin reporting
+  - verification document requirements accept both legacy labels like `Early Youth` / `Late Youth` / `Young Adult` and the newer youth-pwa labels
+  - admin age-group summaries and filters now collapse legacy and new labels into the canonical `Child Youth`, `Core Youth`, and `Adult Youth` buckets
+- the youth PWA onboarding carousel pager layout is now more stable on short mobile screens
+  - the dots now live inside a dedicated media stack below the card instead of floating as a separate block that could visually collide with the artwork
+  - the onboarding screen now allows vertical scrolling on shorter viewports so the image, dots, CTAs, and footer do not overlap when height is constrained
 
 ### Backend status: strong foundation, broad feature coverage
 

@@ -1,21 +1,35 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
 import PageHeader from '@/components/layout/PageHeader'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import Spinner from '@/components/ui/Spinner'
 
 export default function EditProfilePage() {
   const router = useRouter()
-  const { user } = useAuthStore()
+  const { user, setUser, isLoading: isAuthLoading } = useAuthStore()
 
   const [username, setUsername] = useState(user?.UserName || '')
-  const [email] = useState(user?.email || '')
+  const [email, setEmail] = useState(user?.email || '')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      setUsername(user.UserName || '')
+      setEmail(user.email || '')
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.replace('/login')
+    }
+  }, [isAuthLoading, router, user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,6 +37,9 @@ export default function EditProfilePage() {
     setIsLoading(true)
     try {
       await api.patch('/users/me', { UserName: username })
+      if (user) {
+        setUser({ ...user, UserName: username })
+      }
       setSuccess(true)
       setTimeout(() => router.back(), 1500)
     } catch {
@@ -31,6 +48,12 @@ export default function EditProfilePage() {
       setIsLoading(false)
     }
   }
+
+  if (isAuthLoading) {
+    return <Spinner fullPage />
+  }
+
+  if (!user) return null
 
   return (
     <div className="min-h-full bg-gray-50">

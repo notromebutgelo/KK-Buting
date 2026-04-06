@@ -15,7 +15,16 @@ export async function getUserProfile(uid: string) {
     db.collection("users").doc(uid).get(),
     db.collection("kkProfiling").doc(uid).get(),
   ]);
-  const user = userSnap.exists ? userSnap.data() : {};
-  const profile = profileSnap.exists ? profileSnap.data() : {};
-  return { ...user, ...profile, id: uid };
+  const user = userSnap.exists ? { id: userSnap.id, ...userSnap.data() } : { id: uid };
+  const profile = profileSnap.exists ? { id: profileSnap.id, ...profileSnap.data() } : null;
+
+  return {
+    user,
+    profile,
+    merged: {
+      ...(userSnap.exists ? userSnap.data() : {}),
+      ...(profileSnap.exists ? profileSnap.data() : {}),
+      id: uid,
+    },
+  };
 }
