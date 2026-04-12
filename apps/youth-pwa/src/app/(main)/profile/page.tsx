@@ -1,10 +1,13 @@
 'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { useUserStore } from '@/store/userStore'
 import { signOut } from '@/services/auth.service'
 import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
+import Modal from '@/components/ui/Modal'
 import Spinner from '@/components/ui/Spinner'
 
 const menuItems = [
@@ -62,10 +65,19 @@ const menuItems = [
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, logout } = useAuthStore()
+  const { user, logout, isLoading } = useAuthStore()
   const { profile } = useUserStore()
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/login')
+    }
+  }, [isLoading, router, user])
 
   const handleLogout = async () => {
+    setIsSigningOut(true)
     try {
       await signOut()
       document.cookie = 'auth-token=; path=/; max-age=0'
@@ -76,15 +88,56 @@ export default function ProfilePage() {
       document.cookie = 'auth-token=; path=/; max-age=0'
       logout()
       router.push('/login')
+    } finally {
+      setIsSigningOut(false)
+      setShowLogoutConfirm(false)
     }
   }
 
-  if (!user) {
+  if (isLoading || !user) {
     return <Spinner fullPage />
   }
 
   return (
-    <div className="min-h-full bg-gray-50">
+    <>
+      <Modal
+        isOpen={showLogoutConfirm}
+        onClose={() => {
+          if (!isSigningOut) {
+            setShowLogoutConfirm(false)
+          }
+        }}
+        title="Sign out?"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-gray-600">
+            You&apos;re about to sign out of your KK Buting account on this device.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              fullWidth
+              onClick={() => setShowLogoutConfirm(false)}
+              disabled={isSigningOut}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              fullWidth
+              isLoading={isSigningOut}
+              onClick={handleLogout}
+            >
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <div className="min-h-full bg-gray-50">
       {/* Profile Header */}
       <div className="bg-gradient-to-br from-green-700 to-teal-600 px-5 pt-14 pb-8">
         <div className="flex flex-col items-center text-white">
@@ -161,7 +214,7 @@ export default function ProfilePage() {
       {/* Logout */}
       <div className="px-5 mt-4 pb-8">
         <button
-          onClick={handleLogout}
+          onClick={() => setShowLogoutConfirm(true)}
           className="w-full flex items-center gap-3 px-4 py-3.5 bg-white rounded-2xl shadow-sm hover:bg-red-50 transition-colors text-red-600"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,6 +224,7 @@ export default function ProfilePage() {
           <span className="font-semibold text-sm">Sign Out</span>
         </button>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

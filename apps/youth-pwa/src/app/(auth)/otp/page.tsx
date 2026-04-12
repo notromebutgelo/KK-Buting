@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { refreshVerifiedUser, resendVerificationEmail } from '@/services/auth.service'
 import { getPostAuthRedirect } from '@/services/profiling.service'
 import { useAuthStore } from '@/store/authStore'
+import AlertModal from '@/components/ui/AlertModal'
 
 const RESEND_SECONDS = 60
 
@@ -107,12 +108,6 @@ export default function OTPPage() {
               </p>
             </div>
 
-            {error ? (
-              <div className="mt-4 rounded-[18px] bg-[#fff0f0] px-4 py-3 text-center text-[13px] font-medium text-[#c24b4b]">
-                {error}
-              </div>
-            ) : null}
-
             {message ? (
               <div className="mt-4 rounded-[18px] bg-[#edf8f0] px-4 py-3 text-center text-[13px] font-medium text-[#2f855a]">
                 {message}
@@ -162,6 +157,13 @@ export default function OTPPage() {
           </div>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Verification Issue"
+        message={error}
+        onClose={() => setError('')}
+      />
     </div>
   )
 }

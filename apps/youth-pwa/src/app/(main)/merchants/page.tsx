@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
+import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
 import { type Merchant, useMerchants } from '@/hooks/useMerchants'
 
@@ -41,6 +42,7 @@ export default function MerchantsPage() {
   const [query, setQuery] = useState('')
   const [favorites, setFavorites] = useState<string[]>([])
   const [expandedMerchantId, setExpandedMerchantId] = useState<string | null>(null)
+  const [isErrorDismissed, setIsErrorDismissed] = useState(false)
 
   useEffect(() => {
     try {
@@ -88,6 +90,10 @@ export default function MerchantsPage() {
         : filteredMerchants[0].id
     )
   }, [filteredMerchants])
+
+  useEffect(() => {
+    setIsErrorDismissed(false)
+  }, [error])
 
   const toggleFavorite = (merchantId: string) => {
     setFavorites((current) => {
@@ -143,10 +149,6 @@ export default function MerchantsPage() {
         {isLoading ? (
           <div className="flex justify-center py-20">
             <Spinner size="lg" />
-          </div>
-        ) : error ? (
-          <div className="rounded-[28px] bg-white px-6 py-10 text-center text-sm font-semibold text-red-500 shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
-            {error}
           </div>
         ) : filteredMerchants.length === 0 ? (
           <div className="rounded-[28px] bg-white px-6 py-12 text-center shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
@@ -282,6 +284,13 @@ export default function MerchantsPage() {
           </div>
         )}
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error) && !isErrorDismissed}
+        title="Merchants Unavailable"
+        message={error || ''}
+        onClose={() => setIsErrorDismissed(true)}
+      />
     </div>
   )
 }

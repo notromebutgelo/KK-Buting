@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
 import RewardCard from '@/components/features/RewardCard'
+import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
 import { usePoints } from '@/hooks/usePoints'
 import { useRewards } from '@/hooks/useRewards'
@@ -60,6 +61,7 @@ export default function RewardsPage() {
   const [activeCategory, setActiveCategory] = useState('all')
   const [search, setSearch] = useState('')
   const [heroIndex, setHeroIndex] = useState(0)
+  const [isErrorDismissed, setIsErrorDismissed] = useState(false)
   const { rewards, isLoading, error } = useRewards(activeCategory, search)
   const { data: pointsData, isLoading: isPointsLoading } = usePoints()
 
@@ -79,6 +81,10 @@ export default function RewardsPage() {
 
     return () => window.clearInterval(interval)
   }, [featuredRewards.length])
+
+  useEffect(() => {
+    setIsErrorDismissed(false)
+  }, [error])
 
   return (
     <div className="min-h-full bg-[#0a5ca8] pb-28">
@@ -131,10 +137,6 @@ export default function RewardsPage() {
         {isLoading ? (
           <div className="flex justify-center py-20">
             <Spinner size="lg" />
-          </div>
-        ) : error ? (
-          <div className="mt-5 rounded-[28px] bg-white px-6 py-10 text-center text-sm font-semibold text-red-500 shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
-            {error}
           </div>
         ) : (
           <div className="mt-5 space-y-6">
@@ -236,6 +238,13 @@ export default function RewardsPage() {
           </div>
         )}
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error) && !isErrorDismissed}
+        title="Rewards Unavailable"
+        message={error || ''}
+        onClose={() => setIsErrorDismissed(true)}
+      />
     </div>
   )
 }

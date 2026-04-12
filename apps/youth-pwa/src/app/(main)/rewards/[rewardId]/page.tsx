@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
+import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
 import { usePoints } from '@/hooks/usePoints'
 import { getReward, redeemReward } from '@/services/rewards.service'
@@ -116,12 +117,6 @@ export default function RewardDetailPage() {
       </header>
 
       <div className="px-4 py-5">
-        {error ? (
-          <div className="mb-4 rounded-[18px] border border-[#ffd5d5] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#c63f3f]">
-            {error}
-          </div>
-        ) : null}
-
         <section className="overflow-hidden rounded-[24px] bg-[#0d4f92] shadow-[0_18px_30px_rgba(4,60,121,0.22)]">
           <div className="grid grid-cols-[108px_1fr] gap-0">
             <div className="relative min-h-[152px] bg-[linear-gradient(135deg,#ffdb8d_0%,#7fdcff_100%)]">
@@ -242,6 +237,13 @@ export default function RewardDetailPage() {
           </div>
         </div>
       ) : null}
+
+      <AlertModal
+        isOpen={Boolean(error) && Boolean(reward)}
+        title="Reward Action Failed"
+        message={error}
+        onClose={() => setError('')}
+      />
     </div>
   )
 }

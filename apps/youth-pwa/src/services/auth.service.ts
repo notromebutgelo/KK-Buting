@@ -9,6 +9,7 @@ import {
   reauthenticateWithCredential,
   sendEmailVerification,
   GoogleAuthProvider,
+  FacebookAuthProvider,
   signInWithPopup,
 } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
@@ -109,8 +110,23 @@ export async function signInWithGoogle() {
   })
 }
 
+export async function signInWithFacebook() {
+  const provider = new FacebookAuthProvider()
+  provider.setCustomParameters({
+    display: 'popup',
+  })
+
+  const credential = await signInWithPopup(auth, provider)
+  const firebaseUser = credential.user
+  const token = await firebaseUser.getIdToken()
+
+  return syncBackendUser(token, {
+    email: firebaseUser.email,
+    username: firebaseUser.displayName,
+  })
+}
+
 export async function signOut() {
-  await api.post('/auth/logout')
   await firebaseSignOut(auth)
 }
 

@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import DigitalIDCard from '@/components/features/DigitalIDCard'
+import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
 import { getDigitalID, getVerificationStatus } from '@/services/verification.service'
 import { useAuthStore } from '@/store/authStore'
@@ -90,19 +91,19 @@ export default function DigitalIDPage() {
       <section className="relative overflow-hidden bg-[linear-gradient(180deg,#7fb3ec_0%,#bdd7f3_20%,#eef5fd_44%,#fff8eb_72%,#f5f5f5_100%)] px-5 pb-6 pt-8">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/35 via-white/12 to-transparent" />
 
-        <div className="relative z-10 flex items-start justify-between gap-4">
-          <div className="flex gap-3">
-            <div className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-full border-[2.5px] border-[#014384] bg-[#e7eef8]">
+        <div className="relative z-10 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 gap-3">
+            <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-full border-[2.5px] border-[#014384] bg-[#e7eef8]">
               <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#8db3e0] to-[#dce8f7] text-[24px] font-bold text-[#014384]">
                 {getInitials(displayName)}
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="min-w-0 flex-1 pt-2">
               <p className="text-[11px] font-medium text-[#7486a2]">
                 Welcome Back
               </p>
-              <h1 className="max-w-[190px] text-[18px] font-extrabold uppercase leading-[1.02] tracking-[0.01em] text-[#014384]">
+              <h1 className="pr-1 text-[18px] font-extrabold uppercase leading-[1.02] tracking-[0.01em] text-[#014384] [overflow-wrap:anywhere]">
                 {displayName}
               </h1>
               <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium">
@@ -118,13 +119,13 @@ export default function DigitalIDPage() {
             </div>
           </div>
 
-          <div className="pt-1">
+          <div className="shrink-0 pt-1">
             <Image
               src="/images/FOOTER.png"
               alt="SK Barangay Buting"
               width={132}
               height={34}
-              className="h-auto w-[132px] object-contain"
+              className="h-auto w-[86px] object-contain sm:w-[132px]"
             />
           </div>
         </div>
@@ -283,6 +284,13 @@ export default function DigitalIDPage() {
           </div>
         )}
       </section>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Digital ID Unavailable"
+        message={error}
+        onClose={() => setError('')}
+      />
     </div>
   )
 }

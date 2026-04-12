@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { changePassword } from '@/services/auth.service'
 import PageHeader from '@/components/layout/PageHeader'
+import AlertModal from '@/components/ui/AlertModal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
@@ -47,9 +48,6 @@ export default function ChangePasswordPage() {
             Password changed successfully!
           </div>
         )}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>
-        )}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
@@ -80,6 +78,13 @@ export default function ChangePasswordPage() {
           </form>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Password Change Failed"
+        message={error}
+        onClose={() => setError('')}
+      />
     </div>
   )
 }

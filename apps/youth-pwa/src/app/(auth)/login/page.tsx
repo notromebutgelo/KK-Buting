@@ -5,9 +5,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-import { signIn, signInWithGoogle } from "@/services/auth.service";
+import { signIn, signInWithFacebook, signInWithGoogle } from "@/services/auth.service";
 import { getPostAuthRedirect } from "@/services/profiling.service";
 import { useAuthStore } from "@/store/authStore";
+import AlertModal from "@/components/ui/AlertModal";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [facebookLoading, setFacebookLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -75,6 +77,23 @@ export default function LoginPage() {
     }
   };
 
+  const handleFacebookSignIn = async () => {
+    setError(null);
+    setFacebookLoading(true);
+
+    try {
+      const { user, token } = await signInWithFacebook();
+      setUser(user);
+      setToken(token);
+      document.cookie = `auth-token=${token}; path=/; max-age=${60 * 60 * 24 * 30}`;
+      router.push(await getPostAuthRedirect("/home"));
+    } catch (err: any) {
+      setError(err?.message || "Facebook sign-in failed. Please try again.");
+    } finally {
+      setFacebookLoading(false);
+    }
+  };
+
   return (
     <div className="sk-login-root">
       {/* Hero header with background image */}
@@ -95,12 +114,6 @@ export default function LoginPage() {
       {/* Card */}
       <div className="sk-card">
         <form onSubmit={handleSubmit} noValidate>
-          {error && (
-            <div className="sk-error-banner" role="alert">
-              {error}
-            </div>
-          )}
-
           {/* Email */}
           <div className="sk-field">
             <label htmlFor="email" className="sk-label">
@@ -194,7 +207,7 @@ export default function LoginPage() {
             className="sk-social-btn"
             aria-label="Continue with Google"
             onClick={handleGoogleSignIn}
-            disabled={googleLoading}
+            disabled={googleLoading || facebookLoading}
           >
             <svg viewBox="0 0 24 24" width="20" height="20">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -203,7 +216,13 @@ export default function LoginPage() {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
           </button>
-          <button type="button" className="sk-social-btn" aria-label="Continue with Facebook">
+          <button
+            type="button"
+            className="sk-social-btn"
+            aria-label="Continue with Facebook"
+            onClick={handleFacebookSignIn}
+            disabled={facebookLoading || googleLoading}
+          >
             <svg viewBox="0 0 24 24" width="20" height="20">
               <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
             </svg>
@@ -226,6 +245,13 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Login Failed"
+        message={error || ""}
+        onClose={() => setError(null)}
+      />
 
       <style jsx>{`
         /* ---- Root & layout ---- */
@@ -273,17 +299,6 @@ export default function LoginPage() {
           padding: 32px 24px 40px;
           position: relative;
           z-index: 2;
-        }
-
-        /* ---- Error ---- */
-        .sk-error-banner {
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          color: #dc2626;
-          border-radius: 10px;
-          padding: 10px 14px;
-          font-size: 13px;
-          margin-bottom: 16px;
         }
 
         /* ---- Fields ---- */

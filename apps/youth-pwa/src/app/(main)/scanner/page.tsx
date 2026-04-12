@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import MemberQrPass from '@/components/features/MemberQrPass'
+import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
 import { getDigitalID, getVerificationStatus } from '@/services/verification.service'
 import { useAuthStore } from '@/store/authStore'
@@ -153,9 +154,9 @@ export default function ScannerPage() {
       <section className="relative overflow-hidden bg-[linear-gradient(180deg,#7fb3ec_0%,#bdd7f3_20%,#eef5fd_44%,#fff8eb_72%,#f5f5f5_100%)] px-5 pb-6 pt-8">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/35 via-white/12 to-transparent" />
 
-        <div className="relative z-10 flex items-start justify-between gap-4">
-          <div className="flex gap-3">
-            <div className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-full border-[2.5px] border-[#014384] bg-[#e7eef8]">
+        <div className="relative z-10 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 gap-3">
+            <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-full border-[2.5px] border-[#014384] bg-[#e7eef8]">
               {profile.idPhotoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={profile.idPhotoUrl} alt={displayName} className="h-full w-full object-cover" />
@@ -166,9 +167,9 @@ export default function ScannerPage() {
               )}
             </div>
 
-            <div className="pt-2">
+            <div className="min-w-0 flex-1 pt-2">
               <p className="text-[11px] font-medium text-[#7486a2]">KK Youth Member</p>
-              <h1 className="max-w-[190px] text-[18px] font-extrabold uppercase leading-[1.02] tracking-[0.01em] text-[#014384]">
+              <h1 className="pr-1 text-[18px] font-extrabold uppercase leading-[1.02] tracking-[0.01em] text-[#014384] [overflow-wrap:anywhere]">
                 {displayName}
               </h1>
               <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium">
@@ -180,13 +181,13 @@ export default function ScannerPage() {
             </div>
           </div>
 
-          <div className="pt-1">
+          <div className="shrink-0 pt-1">
             <Image
               src="/images/FOOTER.png"
               alt="SK Barangay Buting"
               width={132}
               height={34}
-              className="h-auto w-[132px] object-contain"
+              className="h-auto w-[86px] object-contain sm:w-[132px]"
             />
           </div>
         </div>
@@ -208,12 +209,6 @@ export default function ScannerPage() {
           onRefresh={loadQr}
         />
 
-        {error ? (
-          <div className="mt-4 rounded-[22px] border border-[#f4c9c9] bg-[#fff1f1] px-4 py-3 text-[14px] font-medium text-[#c53030]">
-            {error}
-          </div>
-        ) : null}
-
         <div className="mt-4 rounded-[22px] bg-white px-5 py-4 shadow-[0_14px_28px_rgba(1,67,132,0.08)]">
           <p className="text-[14px] font-bold text-[#0E2E58]">Use this at partner merchants</p>
           <p className="mt-2 text-[13px] leading-[1.6] text-[#5f7b9d]">
@@ -221,6 +216,13 @@ export default function ScannerPage() {
           </p>
         </div>
       </section>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="QR Code Unavailable"
+        message={error}
+        onClose={() => setError('')}
+      />
     </div>
   )
 }

@@ -1,8 +1,15 @@
 import axios from 'axios'
 import { auth } from './firebase'
 
+function normalizeApiBaseUrl(url?: string) {
+  const fallback = 'http://localhost:4000/api'
+  const value = (url || fallback).trim()
+
+  return value.replace(/\/+$/, '')
+}
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+  baseURL: normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_URL),
   headers: {
     'Content-Type': 'application/json',
   },

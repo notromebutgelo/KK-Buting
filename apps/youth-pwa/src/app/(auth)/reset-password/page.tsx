@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { confirmReset } from '@/services/auth.service'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import AlertModal from '@/components/ui/AlertModal'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -77,11 +78,6 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-6">
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {error}
-            </div>
-          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="New Password"
@@ -108,6 +104,13 @@ export default function ResetPasswordPage() {
           </p>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Reset Password Failed"
+        message={error}
+        onClose={() => setError('')}
+      />
     </div>
   )
 }

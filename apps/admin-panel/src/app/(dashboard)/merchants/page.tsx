@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '@/lib/api'
 import Spinner from '@/components/ui/Spinner'
+import LoadingModal from '@/components/ui/LoadingModal'
 import { cn } from '@/utils/cn'
 
 type MerchantStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
@@ -59,6 +60,7 @@ export default function MerchantsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [loadingLabel, setLoadingLabel] = useState('Updating merchant')
   const [message, setMessage] = useState('')
   const [editor, setEditor] = useState({
     discountInfo: '',
@@ -182,6 +184,15 @@ export default function MerchantsPage() {
   async function handleMerchantAction(action: 'approve' | 'reject' | 'suspend' | 'reactivate') {
     if (!selectedMerchant) return
 
+    setLoadingLabel(
+      action === 'approve'
+        ? 'Approving merchant'
+        : action === 'reactivate'
+          ? 'Reactivating merchant'
+          : action === 'suspend'
+            ? 'Suspending merchant'
+            : 'Rejecting merchant'
+    )
     setIsSaving(true)
     setMessage('')
 
@@ -216,6 +227,7 @@ export default function MerchantsPage() {
   async function handleSaveMerchantProfile() {
     if (!selectedMerchant) return
 
+    setLoadingLabel('Saving merchant profile')
     setIsSaving(true)
     setMessage('')
 
@@ -241,7 +253,13 @@ export default function MerchantsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <LoadingModal
+        open={isSaving}
+        title={loadingLabel}
+        description="Please wait while the merchant record and related dashboard data are updated."
+      />
+      <div className="space-y-6">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Merchant Management</h1>
@@ -573,7 +591,8 @@ export default function MerchantsPage() {
           )}
         </aside>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 

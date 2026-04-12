@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import api from '@/lib/api'
+import LoadingModal from '@/components/ui/LoadingModal'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -55,8 +56,14 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(252,179,21,0.18),transparent_28%),linear-gradient(180deg,#eef5fd_0%,#f0f0f0_48%,#fffaf0_100%)] px-4">
-      <div className="w-full max-w-md">
+    <>
+      <LoadingModal
+        open={isLoading}
+        title="Signing in"
+        description="Verifying your credentials and preparing the admin workspace."
+      />
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(252,179,21,0.18),transparent_28%),linear-gradient(180deg,#eef5fd_0%,#f0f0f0_48%,#fffaf0_100%)] px-4">
+        <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-5 flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-full bg-white p-2 shadow-[0_16px_36px_rgba(1,67,132,0.14)]">
             <img
@@ -136,7 +143,8 @@ export default function AdminLoginPage() {
             Kabataang Katipunan &copy; {new Date().getFullYear()} • Admin Access Only
           </p>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
