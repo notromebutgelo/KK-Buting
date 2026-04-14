@@ -38,6 +38,7 @@ export default function AdminLoginPage() {
       window.localStorage.setItem('kk-admin-role', role)
       window.localStorage.setItem('kk-admin-email', res.data.user?.email || email)
       document.cookie = `admin-token=${token}; path=/; max-age=${60 * 60 * 24 * 7}`
+      document.cookie = `admin-role=${role}; path=/; max-age=${60 * 60 * 24 * 7}`
       router.push('/dashboard')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed'

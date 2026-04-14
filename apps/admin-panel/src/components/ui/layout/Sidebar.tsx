@@ -1,13 +1,15 @@
 'use client'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/utils/cn'
 
-const navItems = [
+const allNavItems = [
   {
     href: '/dashboard',
     label: 'Dashboard',
+    superadminOnly: false,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -18,6 +20,7 @@ const navItems = [
   {
     href: '/verification',
     label: 'Verification',
+    superadminOnly: false,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -28,6 +31,7 @@ const navItems = [
   {
     href: '/youth',
     label: 'Youth Members',
+    superadminOnly: false,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -38,6 +42,7 @@ const navItems = [
   {
     href: '/merchants',
     label: 'Merchants',
+    superadminOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -48,6 +53,7 @@ const navItems = [
   {
     href: '/rewards',
     label: 'Rewards',
+    superadminOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -58,6 +64,7 @@ const navItems = [
   {
     href: '/points-transactions',
     label: 'Points & Txns',
+    superadminOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -68,6 +75,7 @@ const navItems = [
   {
     href: '/reports',
     label: 'Reports',
+    superadminOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -78,6 +86,7 @@ const navItems = [
   {
     href: '/digital-ids',
     label: 'Digital IDs',
+    superadminOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -96,6 +105,15 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, isCollapsed, onClose, onNavigate }: SidebarProps) {
   const pathname = usePathname()
+  const [role, setRole] = useState<string>('admin')
+
+  useEffect(() => {
+    setRole(window.localStorage.getItem('kk-admin-role') || 'admin')
+  }, [])
+
+  const navItems = role === 'superadmin'
+    ? allNavItems
+    : allNavItems.filter((item) => !item.superadminOnly)
 
   return (
     <>

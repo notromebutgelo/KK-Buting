@@ -464,12 +464,21 @@ export default function DigitalIdsPage() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex flex-wrap gap-2">
-                            {member.digitalIdStatus === 'draft' ? (
+                            {member.digitalIdStatus === 'draft' && !isSuperadmin ? (
                               <ActionChip
                                 label="Send for Approval"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAction('submit', member)
+                                }}
+                              />
+                            ) : null}
+                            {member.digitalIdStatus === 'draft' && isSuperadmin ? (
+                              <ActionChip
+                                label="Approve & Activate"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleAction('approve', member)
                                 }}
                               />
                             ) : null}
@@ -484,7 +493,7 @@ export default function DigitalIdsPage() {
                             ) : null}
                             {!member.memberId ? (
                               <ActionChip
-                                label="Generate Draft"
+                                label={isSuperadmin ? 'Generate ID' : 'Generate Draft'}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAction('generate', member)
@@ -538,8 +547,9 @@ export default function DigitalIdsPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                {!selectedMember.memberId ? <PrimaryButton label="Generate Draft ID" disabled={isActionLoading} onClick={() => handleAction('generate', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'draft' ? <PrimaryButton label="Send to Superadmin" disabled={isActionLoading} onClick={() => handleAction('submit', selectedMember)} /> : null}
+                {!selectedMember.memberId ? <PrimaryButton label={isSuperadmin ? 'Generate ID' : 'Generate Draft ID'} disabled={isActionLoading} onClick={() => handleAction('generate', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'draft' && !isSuperadmin ? <PrimaryButton label="Send to Superadmin" disabled={isActionLoading} onClick={() => handleAction('submit', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading} onClick={() => handleAction('approve', selectedMember)} /> : null}
                 {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading} onClick={() => handleAction('approve', selectedMember)} /> : null}
                 {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label="Download PDF" onClick={() => handleDownloadPdf(selectedMember)} /> : null}
                 {selectedMember.memberId && isSuperadmin ? <SecondaryButton label="Regenerate ID" onClick={() => handleAction('regenerate', selectedMember)} disabled={isActionLoading} /> : null}

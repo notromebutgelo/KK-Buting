@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-04-06
+Last updated: 2026-04-15
 
 ## What This Repository Is
 
@@ -165,6 +165,15 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- admin panel now enforces role-based access at both the UI and routing levels
+  - basic `admin` role sees only Dashboard, Verification, and Youth Members in the sidebar
+  - Merchants, Rewards, Points & Transactions, Reports, and Digital IDs are restricted to `superadmin` only
+  - the middleware now reads an `admin-role` cookie (set at login alongside `admin-token`) and redirects non-superadmin users away from superadmin-only routes back to `/dashboard`
+  - the `admin-role` cookie is cleared on logout alongside the `admin-token` cookie
+- the Digital IDs page now adapts buttons to the logged-in role
+  - for basic `admin`: the draft status shows "Send to Superadmin" and no-ID members show "Generate Draft ID" (same as before)
+  - for `superadmin`: the "Send to Superadmin" step is bypassed — draft members show "Approve & Activate" directly, and no-ID members show "Generate ID" with immediate approve capability
+  - this applies to both the inline table action chips and the detail panel buttons
 - a backend-backed merchant storefront model is now in place
   - merchant records support storefront copy for `pointsPolicy`
   - youth merchant pages read the shared merchant profile, promo, and product data from the backend

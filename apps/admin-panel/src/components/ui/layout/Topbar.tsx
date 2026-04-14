@@ -32,6 +32,7 @@ export default function Topbar({
     window.localStorage.removeItem('kk-admin-role')
     window.localStorage.removeItem('kk-admin-email')
     document.cookie = 'admin-token=; path=/; max-age=0'
+    document.cookie = 'admin-role=; path=/; max-age=0'
     router.push('/login')
   }
 
