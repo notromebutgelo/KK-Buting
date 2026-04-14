@@ -215,6 +215,21 @@ The current live points default in code is now:
 - the youth PWA main profile tab was visually refreshed to match the stronger KK website/system language
   - the profile screen now uses the shared blue-to-sky gradient atmosphere, cream/yellow support accents, and rounded card treatment already present in the youth home and digital ID screens
   - profile information, account tools, and logout actions were regrouped into clearer dashboard-style sections so the tab feels like part of the same product family instead of a separate generic settings page
+- youth PWA document-upload diagnosis: the verification upload path likely fails when Firebase Storage is unavailable or misconfigured
+  - the youth uploader posts full image data as base64 JSON to `/api/digital-id/documents`
+  - if storage upload throws `bucket does not exist`, the current backend fallback stores that base64 string in Firestore as `fileUrl`
+  - that fallback is unsafe for normal photos because Firestore document size limits are far smaller than a typical base64-encoded mobile image
+  - unlike the merchant asset upload flow, the youth document flow currently has no size-bounded inline fallback or alternate bucket-candidate retry logic
+- backend fix applied for youth verification uploads
+  - the digital-id upload path now retries alternate Firebase bucket candidates (`.appspot.com` and `.firebasestorage.app`) before giving up
+  - large base64 document payloads are no longer blindly written into Firestore when storage is unavailable
+  - only small inline-safe payloads can use the fallback; otherwise the backend now returns a clear storage-configuration error instead of hitting the Firestore 1 MB document limit
+- deployment note: the current Firebase Storage bucket visible in console is `kkprofiling-c42b4.firebasestorage.app`
+  - for this project, Render `FIREBASE_STORAGE_BUCKET` and frontend `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` should use the real bucket value from Firebase Console, not the older `.appspot.com` example placeholder
+- rejected youth verification submissions now surface a real retry flow
+  - admin rejection now creates a youth notification that links back to `/verification/upload`
+  - the youth digital ID page no longer treats `rejected` as "under review" and instead shows the rejection reason/note plus a `Retry Submission` CTA
+  - the dedicated verification status screen also shows the rejection feedback and lets the user resubmit immediately
 
 ### Backend status: strong foundation, broad feature coverage
 
