@@ -184,30 +184,27 @@ export default function ProfilePage() {
         </div>
       </Modal>
 
-      <div className="min-h-full bg-gray-50 pb-8">
-        <section className="bg-gradient-to-br from-green-700 to-teal-600 px-5 pb-8 pt-14">
-          <div className="flex flex-col items-center text-white">
-            <div className="mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30">
-              <span className="text-4xl font-black text-white">
-                {getInitials(displayName) || 'Y'}
-              </span>
-            </div>
-            <p className="text-sm font-medium text-white/75">KK Youth Member</p>
-            <h1 className="mt-2 text-center text-2xl font-black leading-tight">{displayName}</h1>
-          </div>
-        </section>
-
-        <section className="px-5">
-          <div className="-mt-2 rounded-[30px] bg-[linear-gradient(135deg,#014384_0%,#035db7_58%,#0a74de_100%)] p-5 text-white shadow-[0_18px_38px_rgba(1,67,132,0.18)]">
+      <div className="min-h-full bg-gray-50 px-5 pb-8 pt-6">
+        <section>
+          <div className="rounded-[30px] bg-[linear-gradient(135deg,#014384_0%,#035db7_58%,#0a74de_100%)] p-5 text-white shadow-[0_18px_38px_rgba(1,67,132,0.18)]">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
-                  Account Overview
-                </p>
-                <h2 className="mt-2 text-[24px] font-black leading-7">{displayName}</h2>
-                <p className="mt-2 max-w-[220px] text-[13px] leading-[1.55] text-white/78">
-                  {user.email || 'No email on file'}
-                </p>
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-white/16 ring-4 ring-white/20">
+                  <span className="text-3xl font-black text-white">
+                    {getInitials(displayName) || 'Y'}
+                  </span>
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                    Account Overview
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-white/75">KK Youth Member</p>
+                  <h1 className="mt-1 text-[24px] font-black leading-7">{displayName}</h1>
+                  <p className="mt-2 max-w-[220px] text-[13px] leading-[1.55] text-white/78">
+                    {user.email || 'No email on file'}
+                  </p>
+                </div>
               </div>
 
               {profile ? (
