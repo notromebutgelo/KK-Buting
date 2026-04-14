@@ -131,8 +131,10 @@ function QuickAction({
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [role, setRole] = useState<string>('admin')
 
   useEffect(() => {
+    setRole(window.localStorage.getItem('kk-admin-role') || 'admin')
     api
       .get('/admin/dashboard')
       .then((res) => setStats(res.data.stats || res.data))
@@ -147,6 +149,8 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  const isSuperadmin = role === 'superadmin'
 
   const s: DashboardStats = stats || {
     totalUsers: 0,
@@ -166,14 +170,298 @@ export default function DashboardPage() {
 
   const queueUrgent = s.verificationQueue > 0
 
+  if (!isSuperadmin) {
+    return <AdminDashboard s={s} queueUrgent={queueUrgent} />
+  }
+
+  return <SuperadminDashboard s={s} queueUrgent={queueUrgent} />
+}
+
+// ─── Admin-only dashboard ────────────────────────────────────────────────────
+
+function AdminDashboard({ s, queueUrgent }: { s: DashboardStats; queueUrgent: boolean }) {
   return (
     <div className="space-y-6">
+      {/* Hero */}
       <section className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#014384_0%,#035DB7_50%,#0572DC_100%)] px-7 py-7 text-white shadow-[0_24px_70px_rgba(1,67,132,0.24)]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(252,186,44,0.28),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.12),transparent_30%)]" />
         <div className="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/12 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-[#fff3cf]">
-              Dashboard Overview
+              Admin Dashboard
+              {queueUrgent ? (
+                <span className="rounded-full bg-[color:var(--kk-accent)] px-2 py-0.5 text-[10px] tracking-[0.14em] text-[#014384]">
+                  {s.verificationQueue} pending
+                </span>
+              ) : null}
+            </div>
+            <h1 className="mt-4 max-w-3xl text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl">
+              Verification queue, profiling status, and youth member monitoring.
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#edf4fb]">
+              Review pending document submissions, track profiling completion, and keep
+              the youth member registry accurate and up to date.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-[#fff3cf]">Profiling Done</p>
+              <p className="mt-1 text-2xl font-black">{s.profilingCompletionRate}%</p>
+            </div>
+            <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-[#fff3cf]">Queue</p>
+              <p className="mt-1 text-2xl font-black">{s.verificationQueue.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Summary cards — verification-focused */}
+      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <SummaryCard
+          label="Registered Youth"
+          value={s.totalUsers}
+          sublabel="Total accounts in system"
+          tone="bg-[linear-gradient(135deg,#014384,#0572DC)]"
+          icon={<UsersIcon />}
+        />
+        <SummaryCard
+          label="Verified"
+          value={s.verified}
+          sublabel="Cleared for digital ID"
+          tone="bg-[linear-gradient(135deg,#035DB7,#0572DC)]"
+          icon={<CheckIcon />}
+        />
+        <SummaryCard
+          label="Pending Review"
+          value={s.pending}
+          sublabel="Waiting on admin action"
+          tone="bg-[linear-gradient(135deg,#FCB315,#FCBA2C)]"
+          icon={<ClockIcon />}
+        />
+        <SummaryCard
+          label="Rejected"
+          value={s.rejected}
+          sublabel="Needs resubmission"
+          tone="bg-[linear-gradient(135deg,#dc2626,#fb7185)]"
+          icon={<CloseIcon />}
+        />
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="space-y-6">
+          {/* Profiling + Queue side by side */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                    Profiling Completion
+                  </p>
+                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
+                    {s.profilingCompletionRate}% complete
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    {s.profileSubmitted.toLocaleString()} completed vs{' '}
+                    {s.incompleteProfiles.toLocaleString()} incomplete.
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[#eef5fd] px-3 py-2 text-right">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--kk-primary)]">Done</p>
+                  <p className="text-2xl font-black text-[color:var(--kk-primary)]">{s.profileSubmitted}</p>
+                </div>
+              </div>
+              <div className="mt-6 h-4 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#014384_0%,#0572DC_55%,#FCBA2C_100%)]"
+                  style={{ width: `${Math.max(s.profilingCompletionRate, 6)}%` }}
+                />
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <MetricTile label="Completed" value={s.profileSubmitted} tone="text-[color:var(--kk-primary)]" />
+                <MetricTile label="Incomplete" value={s.incompleteProfiles} tone="text-[color:var(--kk-muted)]" />
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                      Verification Queue
+                    </p>
+                    {queueUrgent ? (
+                      <span className="rounded-full bg-[color:var(--kk-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#014384]">
+                        Attention
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-[#eef5fd] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--kk-primary)]">
+                        Clear
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
+                    {s.verificationQueue.toLocaleString()} pending review
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Document checks awaiting your review.
+                  </p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fff3cf] text-[color:var(--kk-primary)]">
+                  <QueueIcon />
+                </div>
+              </div>
+              <div className="mt-6 space-y-3">
+                <StatusLine
+                  label="Pending documents"
+                  value={s.verificationQueue}
+                  barClassName="bg-[color:var(--kk-accent)]"
+                  width={queueUrgent ? 100 : 12}
+                />
+                <StatusLine
+                  label="Verified members"
+                  value={s.verified}
+                  barClassName="bg-[color:var(--kk-primary-2)]"
+                  width={s.totalUsers ? (s.verified / s.totalUsers) * 100 : 0}
+                />
+                <StatusLine
+                  label="Rejected profiles"
+                  value={s.rejected}
+                  barClassName="bg-[#c85b5b]"
+                  width={s.totalUsers ? (s.rejected / s.totalUsers) * 100 : 0}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions — admin scope only */}
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Quick Actions</p>
+                <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">Jump into admin work</h2>
+              </div>
+            </div>
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <QuickAction
+                href="/verification"
+                title="Review pending docs"
+                description="Open the verification queue and process pending document submissions."
+                tone="bg-[linear-gradient(135deg,#FCB315,#FCBA2C)]"
+                badge={s.verificationQueue > 0 ? String(s.verificationQueue) : undefined}
+                icon={<QueueIcon />}
+              />
+              <QuickAction
+                href="/youth"
+                title="View youth members"
+                description="Browse the full youth member registry and inspect individual profiles."
+                tone="bg-[linear-gradient(135deg,#014384,#0572DC)]"
+                icon={<UsersIcon />}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right column — demographics + recent activity */}
+        <div className="space-y-6">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Demographics</p>
+              <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">Youth snapshot</h2>
+            </div>
+            <div className="mt-6">
+              <h3 className="text-sm font-bold text-slate-800">Age group breakdown</h3>
+              <div className="mt-3 h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={s.demographics.ageGroups} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#d9e6f3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6a7f98' }} interval={0} angle={-10} textAnchor="end" height={55} />
+                    <YAxis tick={{ fontSize: 11, fill: '#6a7f98' }} allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="value" radius={[10, 10, 0, 0]} fill="#0572DC" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="mt-6 border-t border-slate-100 pt-6">
+              <h3 className="text-sm font-bold text-slate-800">Gender split</h3>
+              <div className="mt-3 h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={s.demographics.genderSplit} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={44} outerRadius={74} paddingAngle={3}>
+                      {s.demographics.genderSplit.map((entry, index) => (
+                        <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {s.demographics.genderSplit.map((entry, index) => (
+                  <span key={entry.name} className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    {entry.name}: {entry.value}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Recent activity — verification/registration/document only */}
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Recent Activity</p>
+              <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">Latest events</h2>
+            </div>
+            <div className="mt-6 space-y-3">
+              {(() => {
+                const filtered = s.recentActivity.filter(
+                  (a) => a.type === 'registration' || a.type === 'verification' || a.type === 'document'
+                )
+                if (filtered.length === 0) {
+                  return (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">
+                      No recent verification or registration activity.
+                    </div>
+                  )
+                }
+                return filtered.map((activity) => (
+                  <div key={activity.id} className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <div className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white', activityTone(activity.type, activity.status))}>
+                      {activityIcon(activity.type)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-bold text-slate-900">{activity.title}</p>
+                        <span className="text-[11px] font-medium text-slate-400">{formatRelativeTime(activity.timestamp)}</span>
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">{activity.description}</p>
+                    </div>
+                  </div>
+                ))
+              })()}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+// ─── Superadmin full dashboard ───────────────────────────────────────────────
+
+function SuperadminDashboard({ s, queueUrgent }: { s: DashboardStats; queueUrgent: boolean }) {
+  return (
+    <div className="space-y-6">
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#014384_0%,#035DB7_50%,#0572DC_100%)] px-7 py-7 text-white shadow-[0_24px_70px_rgba(1,67,132,0.24)]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(252,186,44,0.28),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.12),transparent_30%)]" />
+        <div className="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/12 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-[#fff3cf]">
+              Superadmin Dashboard
               {queueUrgent ? (
                 <span className="rounded-full bg-[color:var(--kk-accent)] px-2 py-0.5 text-[10px] tracking-[0.14em] text-[#014384]">
                   {s.verificationQueue} pending
@@ -206,6 +494,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* Summary cards — all 5 */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           label="Registered Youth"
@@ -250,32 +539,24 @@ export default function DashboardPage() {
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                    Profiling Completion
-                  </p>
-                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
-                    {s.profilingCompletionRate}% complete
-                  </h2>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Profiling Completion</p>
+                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">{s.profilingCompletionRate}% complete</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     {s.profileSubmitted.toLocaleString()} completed profiles versus{' '}
                     {s.incompleteProfiles.toLocaleString()} incomplete registrations.
                   </p>
                 </div>
                 <div className="rounded-2xl bg-[#eef5fd] px-3 py-2 text-right">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--kk-primary)]">
-                    Done
-                  </p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--kk-primary)]">Done</p>
                   <p className="text-2xl font-black text-[color:var(--kk-primary)]">{s.profileSubmitted}</p>
                 </div>
               </div>
-
               <div className="mt-6 h-4 overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-[linear-gradient(90deg,#014384_0%,#0572DC_55%,#FCBA2C_100%)]"
                   style={{ width: `${Math.max(s.profilingCompletionRate, 6)}%` }}
                 />
               </div>
-
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <MetricTile label="Completed" value={s.profileSubmitted} tone="text-[color:var(--kk-primary)]" />
                 <MetricTile label="Incomplete" value={s.incompleteProfiles} tone="text-[color:var(--kk-muted)]" />
@@ -286,50 +567,24 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                      Verification Queue
-                    </p>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Verification Queue</p>
                     {queueUrgent ? (
-                      <span className="rounded-full bg-[color:var(--kk-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#014384]">
-                        Attention
-                      </span>
+                      <span className="rounded-full bg-[color:var(--kk-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#014384]">Attention</span>
                     ) : (
-                      <span className="rounded-full bg-[#eef5fd] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--kk-primary)]">
-                        Clear
-                      </span>
+                      <span className="rounded-full bg-[#eef5fd] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--kk-primary)]">Clear</span>
                     )}
                   </div>
-                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
-                    {s.verificationQueue.toLocaleString()} pending review
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Pending document checks should stay visible here so admins can resolve them fast.
-                  </p>
+                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">{s.verificationQueue.toLocaleString()} pending review</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">Pending document checks should stay visible here so admins can resolve them fast.</p>
                 </div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fff3cf] text-[color:var(--kk-primary)]">
                   <QueueIcon />
                 </div>
               </div>
-
               <div className="mt-6 space-y-3">
-                <StatusLine
-                  label="Pending documents"
-                  value={s.verificationQueue}
-                  barClassName="bg-[color:var(--kk-accent)]"
-                  width={queueUrgent ? 100 : 12}
-                />
-                <StatusLine
-                  label="Verified members"
-                  value={s.verified}
-                  barClassName="bg-[color:var(--kk-primary-2)]"
-                  width={s.totalUsers ? (s.verified / s.totalUsers) * 100 : 0}
-                />
-                <StatusLine
-                  label="Rejected profiles"
-                  value={s.rejected}
-                  barClassName="bg-[#c85b5b]"
-                  width={s.totalUsers ? (s.rejected / s.totalUsers) * 100 : 0}
-                />
+                <StatusLine label="Pending documents" value={s.verificationQueue} barClassName="bg-[color:var(--kk-accent)]" width={queueUrgent ? 100 : 12} />
+                <StatusLine label="Verified members" value={s.verified} barClassName="bg-[color:var(--kk-primary-2)]" width={s.totalUsers ? (s.verified / s.totalUsers) * 100 : 0} />
+                <StatusLine label="Rejected profiles" value={s.rejected} barClassName="bg-[#c85b5b]" width={s.totalUsers ? (s.rejected / s.totalUsers) * 100 : 0} />
               </div>
             </div>
           </div>
@@ -338,18 +593,11 @@ export default function DashboardPage() {
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                    Points Activity
-                  </p>
-                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
-                    Awarded points summary
-                  </h2>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Points Activity</p>
+                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">Awarded points summary</h2>
                 </div>
-                <div className="rounded-2xl bg-[#eef5fd] px-3 py-2 text-[color:var(--kk-primary)]">
-                  <SparkIcon />
-                </div>
+                <div className="rounded-2xl bg-[#eef5fd] px-3 py-2 text-[color:var(--kk-primary)]"><SparkIcon /></div>
               </div>
-
               <div className="mt-6 grid grid-cols-3 gap-3">
                 <MetricTile label="Today" value={s.pointsActivity.today} tone="text-[color:var(--kk-primary)]" />
                 <MetricTile label="This week" value={s.pointsActivity.thisWeek} tone="text-[color:var(--kk-primary-2)]" />
@@ -360,18 +608,11 @@ export default function DashboardPage() {
             <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                    Merchants
-                  </p>
-                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
-                    Partner status overview
-                  </h2>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Merchants</p>
+                  <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">Partner status overview</h2>
                 </div>
-                <div className="rounded-2xl bg-[#fff3cf] px-3 py-2 text-[#9b6500]">
-                  <StoreIcon />
-                </div>
+                <div className="rounded-2xl bg-[#fff3cf] px-3 py-2 text-[#9b6500]"><StoreIcon /></div>
               </div>
-
               <div className="mt-6 grid grid-cols-3 gap-3">
                 <MetricTile label="Approved" value={s.merchantStats.approved} tone="text-[color:var(--kk-primary)]" />
                 <MetricTile label="Pending" value={s.merchantStats.pending} tone="text-[#d18b00]" />
@@ -383,15 +624,10 @@ export default function DashboardPage() {
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Quick Actions
-                </p>
-                <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
-                  Jump straight into admin work
-                </h2>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Quick Actions</p>
+                <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">Jump straight into admin work</h2>
               </div>
             </div>
-
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
               <QuickAction
                 href="/verification"
@@ -424,29 +660,17 @@ export default function DashboardPage() {
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Demographics
-                </p>
-                <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
-                  Youth snapshot
-                </h2>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Demographics</p>
+                <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">Youth snapshot</h2>
               </div>
             </div>
-
             <div className="mt-6">
               <h3 className="text-sm font-bold text-slate-800">Age group breakdown</h3>
               <div className="mt-3 h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={s.demographics.ageGroups} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#d9e6f3" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 11, fill: '#6a7f98' }}
-                      interval={0}
-                      angle={-10}
-                      textAnchor="end"
-                      height={55}
-                    />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6a7f98' }} interval={0} angle={-10} textAnchor="end" height={55} />
                     <YAxis tick={{ fontSize: 11, fill: '#6a7f98' }} allowDecimals={false} />
                     <Tooltip />
                     <Bar dataKey="value" radius={[10, 10, 0, 0]} fill="#0572DC" />
@@ -454,22 +678,12 @@ export default function DashboardPage() {
                 </ResponsiveContainer>
               </div>
             </div>
-
             <div className="mt-6 border-t border-slate-100 pt-6">
               <h3 className="text-sm font-bold text-slate-800">Gender split</h3>
               <div className="mt-3 h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie
-                      data={s.demographics.genderSplit}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={48}
-                      outerRadius={82}
-                      paddingAngle={3}
-                    >
+                    <Pie data={s.demographics.genderSplit} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={82} paddingAngle={3}>
                       {s.demographics.genderSplit.map((entry, index) => (
                         <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
@@ -478,17 +692,10 @@ export default function DashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-
               <div className="mt-3 flex flex-wrap gap-2">
                 {s.demographics.genderSplit.map((entry, index) => (
-                  <span
-                    key={entry.name}
-                    className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600"
-                  >
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
-                    />
+                  <span key={entry.name} className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
                     {entry.name}: {entry.value}
                   </span>
                 ))}
@@ -499,15 +706,10 @@ export default function DashboardPage() {
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Recent Activity
-                </p>
-                <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">
-                  Latest 10 events
-                </h2>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Recent Activity</p>
+                <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-900">Latest 10 events</h2>
               </div>
             </div>
-
             <div className="mt-6 space-y-3">
               {s.recentActivity.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">
@@ -515,23 +717,16 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 s.recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3"
-                  >
+                  <div key={activity.id} className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
                     <div className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white', activityTone(activity.type, activity.status))}>
                       {activityIcon(activity.type)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-bold text-slate-900">{activity.title}</p>
-                        <span className="text-[11px] font-medium text-slate-400">
-                          {formatRelativeTime(activity.timestamp)}
-                        </span>
+                        <span className="text-[11px] font-medium text-slate-400">{formatRelativeTime(activity.timestamp)}</span>
                       </div>
-                      <p className="mt-1 text-sm leading-6 text-slate-500">
-                        {activity.description}
-                      </p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">{activity.description}</p>
                     </div>
                   </div>
                 ))
@@ -544,36 +739,18 @@ export default function DashboardPage() {
   )
 }
 
-function MetricTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: number
-  tone: string
-}) {
+// ─── Shared helpers ──────────────────────────────────────────────────────────
+
+function MetricTile({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-4 py-3">
       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className={cn('mt-2 text-2xl font-black tracking-[-0.03em]', tone)}>
-        {value.toLocaleString()}
-      </p>
+      <p className={cn('mt-2 text-2xl font-black tracking-[-0.03em]', tone)}>{value.toLocaleString()}</p>
     </div>
   )
 }
 
-function StatusLine({
-  label,
-  value,
-  width,
-  barClassName,
-}: {
-  label: string
-  value: number
-  width: number
-  barClassName: string
-}) {
+function StatusLine({ label, value, width, barClassName }: { label: string; value: number; width: number; barClassName: string }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-4">
@@ -581,10 +758,7 @@ function StatusLine({
         <p className="text-sm font-bold text-slate-900">{value.toLocaleString()}</p>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className={cn('h-full rounded-full', barClassName)}
-          style={{ width: `${Math.min(Math.max(width, 0), 100)}%` }}
-        />
+        <div className={cn('h-full rounded-full', barClassName)} style={{ width: `${Math.min(Math.max(width, 0), 100)}%` }} />
       </div>
     </div>
   )
@@ -593,7 +767,6 @@ function StatusLine({
 function formatRelativeTime(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'Unknown time'
-
   const diffMs = Date.now() - date.getTime()
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
   if (diffMinutes < 1) return 'Just now'

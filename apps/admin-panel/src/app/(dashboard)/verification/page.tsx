@@ -130,8 +130,14 @@ export default function VerificationPage() {
             resubmissionRequested: 0,
           }
         )
-        setAgeGroupOptions(queueRes.data.filters?.ageGroupOptions || [])
-        setDocumentTypeOptions(queueRes.data.filters?.documentTypeOptions || [])
+        setAgeGroupOptions((prev) => {
+          const incoming = queueRes.data.filters?.ageGroupOptions || []
+          return Array.from(new Set([...prev, ...incoming]))
+        })
+        setDocumentTypeOptions((prev) => {
+          const incoming = queueRes.data.filters?.documentTypeOptions || []
+          return Array.from(new Set([...prev, ...incoming]))
+        })
         setAdminRole(meRes.data?.role || window.localStorage.getItem('kk-admin-role') || 'admin')
       } catch {
         if (!mounted) return

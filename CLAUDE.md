@@ -165,6 +165,20 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- the admin panel Topbar notification bell is now fully functional for both admin and superadmin roles
+  - on mount, fetches `/api/notifications/me` silently to populate the unread badge count
+  - clicking the bell opens a dropdown panel and re-fetches the latest notification list
+  - the badge shows the numeric unread count (capped at "9+") when unread notifications exist, or a plain dot when all are read
+  - the dropdown lists each notification with title, body, relative timestamp, and a colored dot per type (success = green, error/warning = red, transaction = blue, default = primary blue)
+  - unread notifications are highlighted with a light blue row background; read ones use plain white
+  - a "Mark all read" button calls `/api/notifications/me/read-all` and optimistically updates the list in-place
+  - clicking outside the dropdown closes it
+  - empty state and loading spinner are shown appropriately
+  - the existing `/api/notifications/me` endpoint works for any Firebase-authenticated user including admin UIDs, so no backend changes were needed
+- the admin dashboard now renders two distinct views based on the logged-in role
+  - `admin` view: hero focuses on verification queue and profiling status; shows 4 summary cards (Registered, Verified, Pending, Rejected); no Points Activity or Merchants widgets; quick actions are "Review pending docs" and "View youth members" only; recent activity is filtered to registration, verification, and document events only
+  - `superadmin` view: full dashboard unchanged — all 5 summary cards, Points Activity, Merchants, all 3 quick actions, and unfiltered recent activity
+  - role is read from `localStorage` (`kk-admin-role`) on mount; the hero banner label also adapts ("Admin Dashboard" vs "Superadmin Dashboard")
 - admin panel now enforces role-based access at both the UI and routing levels
   - basic `admin` role sees only Dashboard, Verification, and Youth Members in the sidebar
   - Merchants, Rewards, Points & Transactions, Reports, and Digital IDs are restricted to `superadmin` only
