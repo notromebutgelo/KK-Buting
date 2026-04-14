@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import Spinner from '@/components/ui/Spinner'
+import LoadingModal from '@/components/ui/LoadingModal'
 import { cn } from '@/utils/cn'
 
 interface ReviewDocument {
@@ -75,6 +76,7 @@ export default function VerificationDetailPage() {
   const [isRejecting, setIsRejecting] = useState(false)
   const [isRequestingResubmission, setIsRequestingResubmission] = useState(false)
   const [busyDocId, setBusyDocId] = useState<string | null>(null)
+  const [loadingTitle, setLoadingTitle] = useState('Updating verification')
 
   const isSuperadmin = adminRole === 'superadmin'
 
@@ -117,6 +119,7 @@ export default function VerificationDetailPage() {
   }
 
   const handleDocumentReview = async (documentId: string, action: 'approved' | 'rejected') => {
+    setLoadingTitle(action === 'approved' ? 'Approving document' : 'Rejecting document')
     setBusyDocId(documentId)
     setMessage('')
     try {
@@ -134,6 +137,7 @@ export default function VerificationDetailPage() {
   }
 
   const handleVerify = async () => {
+    setLoadingTitle('Verifying submission')
     setIsApproving(true)
     setMessage('')
     try {
@@ -148,6 +152,7 @@ export default function VerificationDetailPage() {
   }
 
   const handleReject = async () => {
+    setLoadingTitle('Rejecting submission')
     setIsRejecting(true)
     setMessage('')
     try {
@@ -165,6 +170,7 @@ export default function VerificationDetailPage() {
   }
 
   const handleRequestResubmission = async () => {
+    setLoadingTitle('Requesting resubmission')
     setIsRequestingResubmission(true)
     setMessage('')
     try {
@@ -196,7 +202,13 @@ export default function VerificationDetailPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <>
+      <LoadingModal
+        open={Boolean(busyDocId) || isApproving || isRejecting || isRequestingResubmission}
+        title={loadingTitle}
+        description="Please wait while the review action is saved and the submission details are refreshed."
+      />
+      <div className="space-y-5">
       <div className="flex flex-col gap-4 rounded-[28px] border border-[color:var(--kk-border)] bg-white/95 p-6 shadow-[0_14px_34px_rgba(1,67,132,0.08)] lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
           <button
@@ -472,7 +484,8 @@ export default function VerificationDetailPage() {
           </div>
         </div>
       ) : null}
-    </div>
+      </div>
+    </>
   )
 }
 

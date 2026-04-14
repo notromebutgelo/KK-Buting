@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import PageHeader from '@/components/layout/PageHeader'
+import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
 import { getMyNotifications, markMyNotificationsRead, type YouthNotification } from '@/services/notifications.service'
 
@@ -79,10 +80,6 @@ export default function NotificationsPage() {
           <div className="flex justify-center py-20">
             <Spinner size="lg" />
           </div>
-        ) : error ? (
-          <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-5 text-sm text-red-700">
-            {error}
-          </div>
         ) : notifications.length === 0 ? (
           <div className="text-center py-16">
             <svg className="w-16 h-16 text-gray-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,6 +117,13 @@ export default function NotificationsPage() {
           ))
         )}
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Notifications Unavailable"
+        message={error || ''}
+        onClose={() => setError(null)}
+      />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
+import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
 import { getMyRedemptions } from '@/services/rewards.service'
 import type { RewardRedemption } from '@/types/rewards'
@@ -65,6 +66,7 @@ export default function MyRedemptionsPage() {
   const [redemptions, setRedemptions] = useState<RewardRedemption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isErrorDismissed, setIsErrorDismissed] = useState(false)
 
   useEffect(() => {
     getMyRedemptions()
@@ -72,6 +74,10 @@ export default function MyRedemptionsPage() {
       .catch(() => setError('Failed to load redemptions.'))
       .finally(() => setIsLoading(false))
   }, [])
+
+  useEffect(() => {
+    setIsErrorDismissed(false)
+  }, [error])
 
   const filtered = useMemo(
     () => redemptions.filter((redemption) => redemption.status === activeTab),
@@ -124,10 +130,6 @@ export default function MyRedemptionsPage() {
         {isLoading ? (
           <div className="flex justify-center py-20">
             <Spinner size="lg" />
-          </div>
-        ) : error ? (
-          <div className="rounded-[28px] bg-white px-6 py-10 text-center text-sm font-semibold text-red-500 shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
-            {error}
           </div>
         ) : (
           <div>
@@ -212,6 +214,13 @@ export default function MyRedemptionsPage() {
           </div>
         )}
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error) && !isErrorDismissed}
+        title="Redemptions Unavailable"
+        message={error}
+        onClose={() => setIsErrorDismissed(true)}
+      />
     </div>
   )
 }

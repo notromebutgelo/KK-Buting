@@ -12,6 +12,10 @@ type NavItem = {
   icon: (active: boolean) => React.ReactNode
 }
 
+interface BottomNavProps {
+  onNavigate?: () => void
+}
+
 const sideItems: NavItem[] = [
   {
     href: '/home',
@@ -112,7 +116,7 @@ const sideItems: NavItem[] = [
   },
 ]
 
-export default function BottomNav() {
+export default function BottomNav({ onNavigate }: BottomNavProps) {
   const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(true)
   const lastScrollYRef = useRef(0)
@@ -158,13 +162,18 @@ export default function BottomNav() {
           {leftItems.map((item) => {
             const active = item.isActive(pathname)
             return (
-              <NavLink key={item.href} item={item} active={active} />
+              <NavLink key={item.href} item={item} active={active} onNavigate={onNavigate} />
             )
           })}
         </div>
 
         <Link
           href="/scanner"
+          onClick={() => {
+            if (!isScannerActive) {
+              onNavigate?.()
+            }
+          }}
           className="absolute left-1/2 top-0 flex h-[74px] w-[74px] -translate-x-1/2 -translate-y-[34px] items-center justify-center rounded-full border-[8px] border-white bg-[#014384] shadow-[0_10px_24px_rgba(1,67,132,0.25)]"
           aria-label="Open my QR code"
         >
@@ -175,7 +184,7 @@ export default function BottomNav() {
           {rightItems.map((item) => {
             const active = item.isActive(pathname)
             return (
-              <NavLink key={item.href} item={item} active={active} />
+              <NavLink key={item.href} item={item} active={active} onNavigate={onNavigate} />
             )
           })}
         </div>
@@ -184,10 +193,23 @@ export default function BottomNav() {
   )
 }
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({
+  item,
+  active,
+  onNavigate,
+}: {
+  item: NavItem
+  active: boolean
+  onNavigate?: () => void
+}) {
   return (
     <Link
       href={item.href}
+      onClick={() => {
+        if (!active) {
+          onNavigate?.()
+        }
+      }}
       className="flex min-w-[64px] flex-col items-center justify-end gap-1.5"
     >
       {item.icon(active)}

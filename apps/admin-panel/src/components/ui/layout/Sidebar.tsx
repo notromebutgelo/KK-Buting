@@ -91,9 +91,10 @@ interface SidebarProps {
   isOpen: boolean
   isCollapsed: boolean
   onClose: () => void
+  onNavigate?: (label: string) => void
 }
 
-export default function Sidebar({ isOpen, isCollapsed, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, isCollapsed, onClose, onNavigate }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -117,13 +118,13 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }: SidebarProps) 
       {/* Logo */}
       <div className={cn('border-b border-white/12 py-5', isCollapsed ? 'px-4' : 'px-6')}>
         <div className={cn('flex items-start gap-3', isCollapsed && 'justify-center')}>
-          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white/95 p-1 shadow-[0_10px_24px_rgba(0,0,0,0.12)]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/95 p-1 shadow-[0_10px_24px_rgba(0,0,0,0.12)] ring-2 ring-white/20">
             <Image
               src="/images/SKButingLogo.png"
               alt="SK Buting logo"
               width={40}
               height={40}
-              className="h-10 w-10 object-contain"
+              className="h-10 w-10 rounded-full object-cover"
             />
           </div>
           {!isCollapsed ? (
@@ -144,6 +145,9 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }: SidebarProps) 
               key={item.href}
               href={item.href}
               onClick={() => {
+                if (!pathname.startsWith(item.href)) {
+                  onNavigate?.(item.label)
+                }
                 if (typeof window !== 'undefined' && window.innerWidth < 1024) {
                   onClose()
                 }

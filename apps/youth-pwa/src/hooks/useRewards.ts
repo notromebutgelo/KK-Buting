@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { isAxiosError } from 'axios'
 import api from '@/lib/api'
 import type { Reward } from '@/types/rewards'
 
@@ -11,6 +12,7 @@ export function useRewards(category?: string, search?: string, merchantId?: stri
   useEffect(() => {
     async function fetchRewards() {
       setIsLoading(true)
+      setError(null)
       try {
         const params = Object.fromEntries(
           Object.entries({
@@ -22,6 +24,12 @@ export function useRewards(category?: string, search?: string, merchantId?: stri
         const res = await api.get('/rewards', { params })
         setRewards(res.data.rewards || res.data)
       } catch (err: unknown) {
+        if (isAxiosError(err) && err.response?.status === 403) {
+          setRewards([])
+          setError(null)
+          return
+        }
+
         const message = err instanceof Error ? err.message : 'Failed to fetch rewards'
         setError(message)
       } finally {

@@ -141,17 +141,17 @@ export default function HomePage() {
       <div className="relative overflow-hidden bg-[linear-gradient(180deg,#7fb3ec_0%,#b7d3f2_18%,#eef5fd_42%,#fffaf0_68%,#ffffff_100%)] px-5 pb-4 pt-8">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/35 via-white/10 to-transparent" />
 
-        <div className="relative z-10 flex items-start justify-between gap-4">
-          <div className="flex gap-3">
-            <div className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-full border-[2.5px] border-[#014384] bg-[#e7eef8]">
+        <div className="relative z-10 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 gap-3">
+            <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-full border-[2.5px] border-[#014384] bg-[#e7eef8]">
               <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#8db3e0] to-[#dce8f7] text-[24px] font-bold text-[#014384]">
                 {getInitials(displayName)}
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="min-w-0 flex-1 pt-2">
               <p className="text-[11px] font-medium text-[#7486a2]">Welcome Back</p>
-              <h1 className="max-w-[180px] text-[18px] font-extrabold uppercase leading-[1.02] tracking-[0.01em] text-[#014384]">
+              <h1 className="pr-1 text-[18px] font-extrabold uppercase leading-[1.02] tracking-[0.01em] text-[#014384] [overflow-wrap:anywhere]">
                 {displayName}
               </h1>
               <p className="mt-1 text-[12px] font-medium text-[#9aa8bf]">
@@ -160,13 +160,13 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="pt-1">
+          <div className="shrink-0 pt-1">
             <Image
               src="/images/FOOTER.png"
               alt="SK Barangay Buting"
               width={132}
               height={34}
-              className="h-auto w-[132px] object-contain"
+              className="h-auto w-[86px] object-contain sm:w-[132px]"
             />
           </div>
         </div>

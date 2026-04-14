@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Mail } from 'lucide-react'
 import { resetPassword } from '@/services/auth.service'
+import AlertModal from '@/components/ui/AlertModal'
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -79,12 +80,6 @@ export default function ForgotPasswordPage() {
           </div>
         ) : (
           <>
-            {error ? (
-              <div className="sk-forgot-error" role="alert">
-                {error}
-              </div>
-            ) : null}
-
             <form onSubmit={handleSubmit} noValidate>
               <div className="sk-forgot-field">
                 <label htmlFor="email" className="sk-forgot-label">
@@ -125,6 +120,13 @@ export default function ForgotPasswordPage() {
           </>
         )}
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Reset Email Failed"
+        message={error}
+        onClose={() => setError('')}
+      />
 
       <style jsx>{`
         .sk-forgot-root {
@@ -211,16 +213,6 @@ export default function ForgotPasswordPage() {
           padding: 32px 18px 40px;
           position: relative;
           z-index: 2;
-        }
-
-        .sk-forgot-error {
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          color: #dc2626;
-          border-radius: 12px;
-          padding: 10px 14px;
-          font-size: 13px;
-          margin-bottom: 16px;
         }
 
         .sk-forgot-field {

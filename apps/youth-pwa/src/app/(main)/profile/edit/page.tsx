@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
 import PageHeader from '@/components/layout/PageHeader'
+import AlertModal from '@/components/ui/AlertModal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Spinner from '@/components/ui/Spinner'
@@ -64,11 +65,6 @@ export default function EditProfilePage() {
             Profile updated successfully!
           </div>
         )}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-            {error}
-          </div>
-        )}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
@@ -92,6 +88,13 @@ export default function EditProfilePage() {
           </form>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Profile Update Failed"
+        message={error}
+        onClose={() => setError('')}
+      />
     </div>
   )
 }

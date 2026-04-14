@@ -81,7 +81,7 @@ function SummaryCard({
         </div>
         <div
           className={cn(
-            'flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg',
+            'flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white shadow-lg',
             tone
           )}
         >
@@ -519,7 +519,7 @@ export default function DashboardPage() {
                     key={activity.id}
                     className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3"
                   >
-                    <div className={cn('mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl text-white', activityTone(activity.type, activity.status))}>
+                    <div className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white', activityTone(activity.type, activity.status))}>
                       {activityIcon(activity.type)}
                     </div>
                     <div className="min-w-0 flex-1">

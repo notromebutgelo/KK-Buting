@@ -16,7 +16,7 @@ export default function Spinner({ size = 'md', className, fullPage }: SpinnerPro
   const spinner = (
     <div
       className={cn(
-        'rounded-full border-green-200 border-t-green-600 animate-spin',
+        'rounded-full border-[#014384]/18 border-t-[#014384] animate-spin',
         sizes[size],
         className
       )}

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import Spinner from '@/components/ui/Spinner'
+import LoadingModal from '@/components/ui/LoadingModal'
 import { cn } from '@/utils/cn'
 
 interface MemberDetail {
@@ -82,6 +83,7 @@ export default function YouthDetailPage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isAdjustingPoints, setIsAdjustingPoints] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
+  const [loadingTitle, setLoadingTitle] = useState('Saving youth record')
 
   const profile = member?.profile || {}
   const isSuperadmin = adminRole === 'superadmin'
@@ -138,6 +140,7 @@ export default function YouthDetailPage() {
   const patchForm = (key: string, value: string) => setEditForm((current) => ({ ...current, [key]: value }))
 
   const handleStatusSave = async () => {
+    setLoadingTitle('Saving verification status')
     setIsSavingStatus(true)
     setMessage('')
     try {
@@ -152,6 +155,7 @@ export default function YouthDetailPage() {
   }
 
   const handleProfileSave = async () => {
+    setLoadingTitle('Saving profile changes')
     setIsSavingProfile(true)
     setMessage('')
     try {
@@ -174,6 +178,7 @@ export default function YouthDetailPage() {
   }
 
   const handlePointsAdjustment = async () => {
+    setLoadingTitle('Submitting points adjustment')
     setIsAdjustingPoints(true)
     setMessage('')
     try {
@@ -190,6 +195,7 @@ export default function YouthDetailPage() {
   }
 
   const handleArchive = async () => {
+    setLoadingTitle('Archiving youth record')
     setIsArchiving(true)
     setMessage('')
     try {
@@ -207,7 +213,13 @@ export default function YouthDetailPage() {
   if (!member) return <div className="py-20 text-center text-[color:var(--kk-muted)]">Member not found.</div>
 
   return (
-    <div className="space-y-5">
+    <>
+      <LoadingModal
+        open={isSavingStatus || isSavingProfile || isAdjustingPoints || isArchiving}
+        title={loadingTitle}
+        description="Please wait while the member record is updated and the latest profile data is loaded."
+      />
+      <div className="space-y-5">
       <div className="flex flex-col gap-4 rounded-[28px] border border-[color:var(--kk-border)] bg-white/95 p-6 shadow-[0_14px_34px_rgba(1,67,132,0.08)] lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
           <button onClick={() => router.back()} className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[color:var(--kk-border)] text-[color:var(--kk-primary)] hover:bg-[#eef5fd]">
@@ -315,7 +327,8 @@ export default function YouthDetailPage() {
           </ActionCard>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 

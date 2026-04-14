@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import AlertModal from '@/components/ui/AlertModal'
 import { getProfiling } from '@/services/profiling.service'
 import { uploadVerificationID } from '@/services/verification.service'
 
@@ -121,15 +122,18 @@ export default function VerificationUploadPage() {
   ]
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target
     const file = e.target.files?.[0]
     if (!file) return
 
     if (file.size > 5 * 1024 * 1024) {
+      input.value = ''
       setError('File size must be less than 5MB.')
       return
     }
 
     if (!file.type.startsWith('image/')) {
+      input.value = ''
       setError('Please upload an image file (JPG, PNG).')
       return
     }
@@ -151,7 +155,7 @@ export default function VerificationUploadPage() {
     }
     reader.readAsDataURL(file)
 
-    e.target.value = ''
+    input.value = ''
   }
 
   const handleSubmit = async () => {
@@ -222,12 +226,6 @@ export default function VerificationUploadPage() {
         <div className="relative z-10 px-4 pb-24 pt-10">
           <div className="mx-auto w-full max-w-[360px]">
             <div className="rounded-[28px] bg-white px-5 pb-5 pt-6 shadow-[0_24px_60px_rgba(1,67,132,0.18)]">
-              {error ? (
-                <div className="mb-4 rounded-[18px] bg-[#fff0f0] px-4 py-3 text-center text-[13px] font-medium text-[#c24b4b]">
-                  {error}
-                </div>
-              ) : null}
-
               <div className="mb-5 text-center">
                 <p className="mx-auto max-w-[250px] text-[13px] leading-[1.5] text-[#4f6f9b]">
                   {currentDocument.helper}
@@ -286,24 +284,32 @@ export default function VerificationUploadPage() {
                 )}
               </button>
 
-              {showSourceActions ? (
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => uploadInputRef.current?.click()}
-                    className="inline-flex items-center justify-center rounded-[18px] border border-[#cfe0f2] bg-white px-4 py-3 text-[14px] font-semibold text-[#014384] shadow-sm transition hover:bg-[#f7fbff]"
-                  >
-                    Upload from Device
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="inline-flex items-center justify-center rounded-[18px] bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_10px_22px_rgba(5,114,220,0.18)]"
-                  >
-                    {isIdPhotoStep ? 'Take a Photo' : 'Use Camera'}
-                  </button>
-                </div>
-              ) : null}
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (uploadInputRef.current) {
+                      uploadInputRef.current.value = ''
+                      uploadInputRef.current.click()
+                    }
+                  }}
+                  className="inline-flex items-center justify-center rounded-[18px] border border-[#cfe0f2] bg-white px-4 py-3 text-[14px] font-semibold text-[#014384] shadow-sm transition hover:bg-[#f7fbff]"
+                >
+                  Upload from Device
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (cameraInputRef.current) {
+                      cameraInputRef.current.value = ''
+                      cameraInputRef.current.click()
+                    }
+                  }}
+                  className="inline-flex items-center justify-center rounded-[18px] bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_10px_22px_rgba(5,114,220,0.18)]"
+                >
+                  {isIdPhotoStep ? 'Take a Photo' : 'Use Camera'}
+                </button>
+              </div>
 
               <input
                 ref={uploadInputRef}
@@ -470,6 +476,13 @@ export default function VerificationUploadPage() {
           </div>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Verification Upload Issue"
+        message={error}
+        onClose={() => setError('')}
+      />
     </div>
   )
 }

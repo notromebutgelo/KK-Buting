@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { submitProfiling } from "@/services/profiling.service";
+import AlertModal from "@/components/ui/AlertModal";
 import {
   FooterBranding,
   ReviewAccordion,
@@ -159,13 +160,19 @@ export default function ProfilingReviewPage() {
       </div>
 
       <form className="pf-review-bottombar" onSubmit={handleSubmit}>
-        {error ? <p className="pf-review-error">{error}</p> : null}
         <button className="pf-review-next-btn" type="submit" disabled={isLoading}>
           {isLoading ? "Submitting..." : "Next"}
         </button>
       </form>
 
       <FooterBranding dark />
+
+      <AlertModal
+        isOpen={Boolean(error)}
+        title="Profiling Submission Failed"
+        message={error}
+        onClose={() => setError("")}
+      />
     </div>
   );
 }
