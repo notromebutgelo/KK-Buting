@@ -1,4 +1,4 @@
-import { db } from "../../config/firebase";
+import { db, auth } from "../../config/firebase";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { generateIdNumber } from "../../../utils/generateIdNumber";
 import { setUserRole } from "../auth/user.service";
@@ -1936,5 +1936,72 @@ export async function getReports() {
     byClassification: countBy("youthClassification"),
     byEducation: countBy("educationalBackground"),
     monthlySummary: [...monthly.values()],
+  };
+}
+
+export async function createMerchantAccount(data: {
+  name: string;
+  category?: string;
+  address?: string;
+  ownerName?: string;
+  email: string;
+  password: string;
+}) {
+  // 1. Create Firebase Auth user
+  const userRecord = await auth.createUser({
+    email: data.email,
+    password: data.password,
+    displayName: data.ownerName || data.name,
+  });
+
+  const uid = userRecord.uid;
+
+  // 2. Set merchant role claim
+  await auth.setCustomUserClaims(uid, { role: "merchant" });
+
+  // 3. Write users doc
+  await db.collection("users").doc(uid).set({
+    uid,
+    email: data.email,
+    UserName: data.ownerName || data.name,
+    role: "merchant",
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  // 4. Create merchant record (pre-approved since superadmin is creating it directly)
+  const merchantRef = await db.collection("merchants").add({
+    name: data.name,
+    businessName: data.name,
+    category: data.category || "",
+    address: data.address || "",
+    description: "",
+    shortDescription: "",
+    ownerId: uid,
+    ownerName: data.ownerName || data.name,
+    ownerEmail: data.email,
+    status: "approved",
+    pointsRate: 10,
+    pointsPolicy:
+      "Earn 10 points for every PHP 100 spent at this shop. Present your youth QR during checkout.",
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  // 5. Notify the new merchant
+  await createNotification({
+    recipientUid: uid,
+    audience: "merchant",
+    type: "account",
+    title: "Merchant account created",
+    body: "Your KK merchant account has been set up by the superadmin. Log in using the credentials provided to you.",
+    link: "/shop",
+  });
+
+  return {
+    merchantId: merchantRef.id,
+    uid,
+    email: data.email,
+    name: data.name,
   };
 }

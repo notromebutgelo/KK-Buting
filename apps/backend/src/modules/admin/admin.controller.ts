@@ -38,6 +38,7 @@ import {
   deactivateDigitalId,
   regenerateDigitalId,
   getReports,
+  createMerchantAccount,
 } from "./admin.service";
 
 export async function getDashboard(req: AuthRequest, res: Response) {
@@ -481,5 +482,28 @@ export async function getReportsHandler(req: AuthRequest, res: Response) {
     return res.json(reports);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function createMerchantAccountHandler(req: AuthRequest, res: Response) {
+  const { name, category, address, ownerName, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "name, email, and password are required." });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters." });
+  }
+
+  try {
+    const result = await createMerchantAccount({ name, category, address, ownerName, email, password });
+    return res.status(201).json({ merchant: result });
+  } catch (err: any) {
+    const message = err.message || "Failed to create merchant account.";
+    if (message.includes("email-already-exists") || message.includes("EMAIL_EXISTS")) {
+      return res.status(409).json({ error: "An account with this email already exists." });
+    }
+    return res.status(500).json({ error: message });
   }
 }

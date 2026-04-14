@@ -36,6 +36,7 @@ import {
   deactivateDigitalIdHandler,
   regenerateDigitalIdHandler,
   getReportsHandler,
+  createMerchantAccountHandler,
 } from "./admin.controller";
 import { verifyToken } from "../../middleware/verifyToken";
 import { requireRole } from "../../middleware/requireRole";
@@ -66,6 +67,7 @@ router.post("/rewards", ...adminOrSuperadmin, addReward);
 router.patch("/rewards/:rewardId", ...adminOrSuperadmin, updateRewardHandler);
 router.get("/rewards/redemptions", ...adminOrSuperadmin, listRewardRedemptionsHandler);
 router.patch("/rewards/redemptions/:transactionId/claim", ...adminOrSuperadmin, markRewardRedemptionClaimedHandler);
+router.post("/merchants/create", ...superadminOnly, createMerchantAccountHandler);
 router.get("/merchants", ...adminOrSuperadmin, listMerchants);
 router.get("/merchants/:merchantId", ...adminOrSuperadmin, getMerchantHandler);
 router.get("/merchants/pending", ...adminOrSuperadmin, listPendingMerchants);

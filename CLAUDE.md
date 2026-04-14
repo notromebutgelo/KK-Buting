@@ -165,6 +165,14 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- superadmin can now create merchant accounts directly from the admin panel
+  - a "Create Merchant Account" tab appears in the Merchants page for superadmin only
+  - the form collects: business name, category, address, owner name, login email, and password
+  - "Auto-fill" derives an email slug from the business name; "Generate" creates a cryptographically random 12-character password; the password field has a show/hide toggle
+  - on submit, the backend (`POST /api/admin/merchants/create`, superadmin-only) creates a Firebase Auth user, sets the `merchant` role claim, writes the users doc, and creates a Firestore merchant record with `status: approved` (pre-approved since the superadmin is creating it directly)
+  - a welcome notification is sent to the new merchant's UID
+  - success shows the credentials (email + password) in a copyable card with individual copy buttons and a show/hide toggle for the password; the superadmin is prompted to share these with the merchant
+  - the merchant list refreshes automatically after creation
 - the admin panel Topbar notification bell is now fully functional for both admin and superadmin roles
   - on mount, fetches `/api/notifications/me` silently to populate the unread badge count
   - clicking the bell opens a dropdown panel and re-fetches the latest notification list

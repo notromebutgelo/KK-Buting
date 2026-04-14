@@ -61,6 +61,7 @@ export default function Topbar({
   const [notifLoading, setNotifLoading] = useState(false)
   const [markingRead, setMarkingRead] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -300,7 +301,7 @@ export default function Topbar({
 
         {/* Logout */}
         <button
-          onClick={handleLogout}
+          onClick={() => setShowLogoutConfirm(true)}
           className="text-[color:var(--kk-primary)]/55 transition-colors hover:text-[color:var(--kk-primary)]"
           title="Logout"
         >
@@ -310,6 +311,40 @@ export default function Topbar({
           </svg>
         </button>
       </div>
+
+      {/* Logout confirmation dialog */}
+      {showLogoutConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-[24px] border border-[color:var(--kk-border)] bg-white p-7 shadow-[0_24px_60px_rgba(1,67,132,0.18)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+              <svg className="h-6 w-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </div>
+            <h2 className="mt-4 text-lg font-black text-[color:var(--kk-primary)]">Sign out?</h2>
+            <p className="mt-2 text-sm leading-6 text-[color:var(--kk-muted)]">
+              You will be returned to the login screen. Any unsaved changes will be lost.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 rounded-xl border border-[color:var(--kk-border)] bg-white py-2.5 text-sm font-semibold text-[color:var(--kk-primary)] transition-colors hover:bg-[#eef5fd]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </header>
   )
 }

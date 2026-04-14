@@ -37,7 +37,7 @@ interface MerchantTransaction {
   createdAt?: string
 }
 
-type MerchantTab = 'applications' | 'directory' | 'transactions'
+type MerchantTab = 'applications' | 'directory' | 'transactions' | 'create'
 
 const statusOptions: Array<{ value: MerchantStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All Statuses' },
@@ -69,6 +69,26 @@ export default function MerchantsPage() {
   })
 
   const isSuperadmin = adminRole === 'superadmin'
+
+  // Create merchant form state
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    category: '',
+    address: '',
+    ownerName: '',
+    email: '',
+    password: '',
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [createResult, setCreateResult] = useState<{
+    merchantId: string
+    uid: string
+    email: string
+    name: string
+    password: string
+  } | null>(null)
+  const [createError, setCreateError] = useState('')
 
   const filteredMerchants = useMemo(() => {
     return merchants.filter((merchant) => {
@@ -246,6 +266,44 @@ export default function MerchantsPage() {
     }
   }
 
+  function generateEmail(name: string) {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'merchant'
+    return `${slug}@kkbuting.merchant`
+  }
+
+  function generatePassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#'
+    return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  }
+
+  async function handleCreateMerchant() {
+    setCreateError('')
+    if (!createForm.name.trim()) { setCreateError('Business name is required.'); return }
+    if (!createForm.email.trim()) { setCreateError('Email is required.'); return }
+    if (!createForm.password.trim()) { setCreateError('Password is required.'); return }
+    if (createForm.password.length < 8) { setCreateError('Password must be at least 8 characters.'); return }
+
+    setIsCreating(true)
+    try {
+      const res = await api.post('/admin/merchants/create', {
+        name: createForm.name.trim(),
+        category: createForm.category.trim() || undefined,
+        address: createForm.address.trim() || undefined,
+        ownerName: createForm.ownerName.trim() || undefined,
+        email: createForm.email.trim(),
+        password: createForm.password,
+      })
+      const merchant = res.data.merchant
+      setCreateResult({ ...merchant, password: createForm.password })
+      setCreateForm({ name: '', category: '', address: '', ownerName: '', email: '', password: '' })
+      await refreshMerchants(merchant.merchantId)
+    } catch (error: any) {
+      setCreateError(error?.response?.data?.error || 'Failed to create merchant account.')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   const counts = {
     applications: merchants.filter((merchant) => merchant.status === 'pending').length,
     directory: merchants.filter((merchant) => merchant.status !== 'pending').length,
@@ -279,15 +337,24 @@ export default function MerchantsPage() {
           { id: 'applications', label: 'Applications Queue' },
           { id: 'directory', label: 'Merchant Directory' },
           { id: 'transactions', label: 'Transaction History' },
+          ...(isSuperadmin ? [{ id: 'create', label: '+ Create Merchant Account' }] : []),
         ] as const).map((tab) => (
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id as MerchantTab)
+              if (tab.id === 'create') {
+                setCreateResult(null)
+                setCreateError('')
+              }
+            }}
             className={cn(
               'rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors',
               activeTab === tab.id
-                ? 'bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.18)]'
+                ? tab.id === 'create'
+                  ? 'bg-[linear-gradient(135deg,#014384,#0572DC)] text-white shadow-[0_12px_24px_rgba(1,67,132,0.22)]'
+                  : 'bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.18)]'
                 : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
             )}
           >
@@ -296,6 +363,178 @@ export default function MerchantsPage() {
         ))}
       </div>
 
+      {activeTab === 'create' && (
+        <div className="mx-auto w-full max-w-2xl">
+          {createResult ? (
+            <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-8 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-emerald-900">Merchant account created</h2>
+                  <p className="text-sm text-emerald-700">Share these credentials with the merchant. The account is already active.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-3 rounded-2xl border border-emerald-200 bg-white p-5">
+                <CredentialRow label="Business Name" value={createResult.name} />
+                <CredentialRow label="Login Email" value={createResult.email} copyable />
+                <CredentialRow label="Password" value={createResult.password} copyable secret />
+                <CredentialRow label="Merchant ID" value={createResult.merchantId} />
+              </div>
+
+              <p className="mt-4 text-xs text-emerald-700">
+                The merchant can log in immediately using the KK Merchant App with the credentials above. Advise them to change their password after the first login.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => { setCreateResult(null); setCreateError('') }}
+                className="mt-6 rounded-xl bg-[linear-gradient(135deg,#014384,#0572DC)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90"
+              >
+                Create Another Merchant
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-[28px] border border-gray-100 bg-white p-8 shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-xl font-black text-gray-900">Create Merchant Account</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Generate a merchant login and register the business in one step. The account will be immediately active.
+                </p>
+              </div>
+
+              {createError ? (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {createError}
+                </div>
+              ) : null}
+
+              <div className="space-y-4">
+                <FormField label="Business Name *">
+                  <input
+                    type="text"
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Juan's Bakery"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </FormField>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Category">
+                    <input
+                      type="text"
+                      value={createForm.category}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, category: e.target.value }))}
+                      placeholder="e.g. Food & Beverage"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </FormField>
+                  <FormField label="Owner / Contact Name">
+                    <input
+                      type="text"
+                      value={createForm.ownerName}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, ownerName: e.target.value }))}
+                      placeholder="e.g. Juan Dela Cruz"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </FormField>
+                </div>
+
+                <FormField label="Business Address">
+                  <input
+                    type="text"
+                    value={createForm.address}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, address: e.target.value }))}
+                    placeholder="e.g. 123 Buting Street, Pasig City"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </FormField>
+
+                <FormField label="Login Email *">
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={createForm.email}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="merchant@email.com"
+                      className="min-w-0 flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCreateForm((f) => ({ ...f, email: generateEmail(f.name) }))}
+                      className="shrink-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                    >
+                      Auto-fill
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">Or click Auto-fill to generate one from the business name.</p>
+                </FormField>
+
+                <FormField label="Password *">
+                  <div className="flex gap-2">
+                    <div className="relative min-w-0 flex-1">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={createForm.password}
+                        onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+                        placeholder="Min. 8 characters"
+                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 pr-10 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? (
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pwd = generatePassword()
+                        setCreateForm((f) => ({ ...f, password: pwd }))
+                        setShowPassword(true)
+                      }}
+                      className="shrink-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">Or click Generate to create a secure random password.</p>
+                </FormField>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateMerchant()}
+                    disabled={isCreating}
+                    className="w-full rounded-xl bg-[linear-gradient(135deg,#014384,#0572DC)] py-3 text-sm font-bold text-white shadow-[0_12px_24px_rgba(1,67,132,0.2)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isCreating ? 'Creating account...' : 'Create Merchant Account'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab !== 'create' && (
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
         <section className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -591,6 +830,7 @@ export default function MerchantsPage() {
           )}
         </aside>
       </div>
+      )}
       </div>
     </>
   )
@@ -764,4 +1004,66 @@ function getInitials(value: string) {
     .map((part) => part[0] || '')
     .join('')
     .toUpperCase()
+}
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-gray-400">
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function CredentialRow({
+  label,
+  value,
+  copyable = false,
+  secret = false,
+}: {
+  label: string
+  value: string
+  copyable?: boolean
+  secret?: boolean
+}) {
+  const [copied, setCopied] = useState(false)
+  const [revealed, setRevealed] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="max-w-[240px] truncate text-right text-sm font-mono font-semibold text-gray-800">
+          {secret && !revealed ? '••••••••••••' : value}
+        </span>
+        {secret ? (
+          <button
+            type="button"
+            onClick={() => setRevealed((v) => !v)}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            {revealed ? 'Hide' : 'Show'}
+          </button>
+        ) : null}
+        {copyable ? (
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-200"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
 }
