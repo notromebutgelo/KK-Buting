@@ -43,6 +43,14 @@ function isPrivateIpv4(hostname: string) {
   )
 }
 
+function shouldApplyDefaultPort(url: URL) {
+  if (url.port) {
+    return false
+  }
+
+  return url.protocol === 'http:' && (isLocalOnlyHost(url.hostname) || isPrivateIpv4(url.hostname))
+}
+
 function getHostFromUri(candidate?: string | null) {
   if (!candidate) {
     return null
@@ -140,7 +148,9 @@ function getApiConfig(): ApiConfig {
       url.hostname = expoHost
     }
 
-    url.port = url.port || DEFAULT_API_PORT
+    if (shouldApplyDefaultPort(url)) {
+      url.port = DEFAULT_API_PORT
+    }
     url.pathname = ensureApiPath(url.pathname)
     const normalizedUrl = trimTrailingSlash(url.toString())
 
