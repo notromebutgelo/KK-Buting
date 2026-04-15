@@ -7,6 +7,9 @@
     "apps/merchant-app",
     "apps/youth-pwa"
   ],
+  "engines": {
+    "node": ">=20.19.0 <21"
+  },
   "scripts": {
     "dev:admin": "npm run dev --workspace admin-panel",
     "dev:backend": "npm run dev --workspace backend",

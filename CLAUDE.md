@@ -266,6 +266,11 @@ The current live points default in code is now:
   - production and preview builds now require a real public `EXPO_PUBLIC_API_URL` instead of silently falling back to localhost
   - request auth now refreshes Firebase ID tokens from `auth.currentUser.getIdToken()` before backend calls
   - auth session sync now uses `onIdTokenChanged`, so long-lived merchant APK sessions refresh more reliably instead of depending only on the initial login token
+- the Expo merchant app should currently be run with Node 20, not Node 22
+  - Expo SDK 54 documents a minimum Node.js version of `20.19.x`
+  - this repo now advertises `>=20.19.0 <21` in the root `package.json` and `apps/merchant-app/package.json`
+  - root `.nvmrc` and `.node-version` were added with `20.19.4` so local toolchains can switch consistently
+  - on Windows, `nvm-windows` may install successfully but still miss `NVM_HOME` / `NVM_SYMLINK`; if `nvm` is not found after install, set those user env vars to `C:\Users\hp\AppData\Local\nvm` and `C:\Users\hp\nodejs`, then reopen the terminal
 - merchant APK deployment target is currently the existing Render backend hosted at `https://kk-buting-admin-panel.onrender.com`
   - for the merchant app, the API base URL should be `https://kk-buting-admin-panel.onrender.com/api`
   - despite the Render service name, this is currently being treated as the backend deployment
@@ -273,6 +278,9 @@ The current live points default in code is now:
   - `apps/merchant-app/.env.example` for local/dev
   - `apps/merchant-app/.env.preview.example` for preview/internal APK builds
   - `apps/merchant-app/.env.production.example` for production APK builds
+- current local troubleshooting setup for `apps/merchant-app/.env` now points directly to `https://kk-buting-admin-panel.onrender.com/api`
+  - this is specifically to avoid Expo Go/dev sessions rewriting localhost to a LAN IP like `192.168.x.x:4000`
+  - after changing the local `.env`, Expo/Metro must be restarted so the new `EXPO_PUBLIC_API_URL` is picked up
 
 ## Merchant APK Release Checklist
 
