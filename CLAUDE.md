@@ -21,6 +21,10 @@ The repo currently contains four application codebases:
 - `apps/admin-panel`: Next.js admin and superadmin dashboard
 - `apps/merchant-app`: Expo React Native merchant app
 
+## Working Agreement
+
+- when shipping meaningful implementation or deployment changes, update this `CLAUDE.md` so the repo keeps an in-project record of the current setup and release path
+
 A root `package.json` workspace configuration now exists, so installs and common app scripts can be run from the repo root more easily.
 
 ## High-Level System Flow
@@ -258,6 +262,108 @@ The current live points default in code is now:
 - deployment note: the current Firebase Storage bucket visible in console is `kkprofiling-c42b4.firebasestorage.app`
   - for this project, Render `FIREBASE_STORAGE_BUCKET` and frontend `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` should use the real bucket value from Firebase Console, not the older `.appspot.com` example placeholder
 - rejected youth verification submissions now surface a real retry flow
+- the merchant Expo app is now hardened for APK distribution
+  - production and preview builds now require a real public `EXPO_PUBLIC_API_URL` instead of silently falling back to localhost
+  - request auth now refreshes Firebase ID tokens from `auth.currentUser.getIdToken()` before backend calls
+  - auth session sync now uses `onIdTokenChanged`, so long-lived merchant APK sessions refresh more reliably instead of depending only on the initial login token
+- merchant APK deployment target is currently the existing Render backend hosted at `https://kk-buting-admin-panel.onrender.com`
+  - for the merchant app, the API base URL should be `https://kk-buting-admin-panel.onrender.com/api`
+  - despite the Render service name, this is currently being treated as the backend deployment
+- merchant app env examples now exist for local, preview, and production
+  - `apps/merchant-app/.env.example` for local/dev
+  - `apps/merchant-app/.env.preview.example` for preview/internal APK builds
+  - `apps/merchant-app/.env.production.example` for production APK builds
+
+## Merchant APK Release Checklist
+
+Use this checklist when preparing a downloadable merchant build:
+
+1. Confirm the backend Render service is healthy.
+   - Open `https://kk-buting-admin-panel.onrender.com/health`
+   - Expected result: backend health JSON from the Express app
+2. Confirm the backend API base URL to use in mobile builds.
+   - Current value: `https://kk-buting-admin-panel.onrender.com/api`
+3. Confirm the merchant account was created through the superadmin flow or otherwise has all required backend data.
+   - Firebase Auth user exists
+   - custom claim `role: merchant` exists
+   - `users/{uid}` exists with `role: merchant`
+   - a Firestore merchant record exists with `ownerId = uid`
+   - merchant status is `approved`
+4. Set EAS environment variables for the merchant app.
+   - `development` should keep `EXPO_PUBLIC_API_URL=http://localhost:4000/api`
+   - `preview` should use `EXPO_PUBLIC_API_URL=https://kk-buting-admin-panel.onrender.com/api`
+   - `production` should use `EXPO_PUBLIC_API_URL=https://kk-buting-admin-panel.onrender.com/api`
+   - all three environments should also include the public Firebase client values already used by the app
+5. Build a preview APK first.
+   - `eas build --platform android --profile preview`
+6. Install the preview APK on a real device and test on:
+   - the same Wi-Fi as development
+   - a different Wi-Fi
+   - mobile data
+7. Validate the core merchant flow.
+   - login
+   - load dashboard
+   - load merchant profile
+   - load notifications
+   - scan/redeem flow
+8. After preview passes, create the production build.
+   - `eas build --platform android --profile production`
+
+## Exact EAS Variable Set
+
+The merchant app `eas.json` now maps build profiles to EAS environments:
+
+- `development`
+- `preview`
+- `production`
+
+Exact values to create in EAS:
+
+### `development`
+
+- `EXPO_PUBLIC_API_URL=http://localhost:4000/api`
+- `EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyB9kyNcE2xFxfVD4en8pXm6_5XZnT8-hDI`
+- `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=kkprofiling-c42b4.firebaseapp.com`
+- `EXPO_PUBLIC_FIREBASE_PROJECT_ID=kkprofiling-c42b4`
+- `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=kkprofiling-c42b4.firebasestorage.app`
+- `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=227327975687`
+- `EXPO_PUBLIC_FIREBASE_APP_ID=1:227327975687:web:a4cdea992aa1844062e5a2`
+
+### `preview`
+
+- `EXPO_PUBLIC_API_URL=https://kk-buting-admin-panel.onrender.com/api`
+- `EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyB9kyNcE2xFxfVD4en8pXm6_5XZnT8-hDI`
+- `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=kkprofiling-c42b4.firebaseapp.com`
+- `EXPO_PUBLIC_FIREBASE_PROJECT_ID=kkprofiling-c42b4`
+- `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=kkprofiling-c42b4.firebasestorage.app`
+- `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=227327975687`
+- `EXPO_PUBLIC_FIREBASE_APP_ID=1:227327975687:web:a4cdea992aa1844062e5a2`
+
+### `production`
+
+- `EXPO_PUBLIC_API_URL=https://kk-buting-admin-panel.onrender.com/api`
+- `EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyB9kyNcE2xFxfVD4en8pXm6_5XZnT8-hDI`
+- `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=kkprofiling-c42b4.firebaseapp.com`
+- `EXPO_PUBLIC_FIREBASE_PROJECT_ID=kkprofiling-c42b4`
+- `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=kkprofiling-c42b4.firebasestorage.app`
+- `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=227327975687`
+- `EXPO_PUBLIC_FIREBASE_APP_ID=1:227327975687:web:a4cdea992aa1844062e5a2`
+
+Recommended EAS CLI commands once logged in:
+
+```bash
+eas env:create --name EXPO_PUBLIC_API_URL --value http://localhost:4000/api --environment development --visibility plaintext
+eas env:create --name EXPO_PUBLIC_API_URL --value https://kk-buting-admin-panel.onrender.com/api --environment preview --visibility plaintext
+eas env:create --name EXPO_PUBLIC_API_URL --value https://kk-buting-admin-panel.onrender.com/api --environment production --visibility plaintext
+```
+
+Repeat the same pattern for each Firebase public variable.
+
+Current blocker observed on this machine:
+
+- `eas` CLI is installed
+- Expo account login is not active yet (`eas whoami` returns `Not logged in`)
+- EAS env creation cannot be completed until `eas login` succeeds or `EXPO_TOKEN` is provided
   - admin rejection now creates a youth notification that links back to `/verification/upload`
   - the youth digital ID page no longer treats `rejected` as "under review" and instead shows the rejection reason/note plus a `Retry Submission` CTA
   - the dedicated verification status screen also shows the rejection feedback and lets the user resubmit immediately

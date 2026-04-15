@@ -1,5 +1,6 @@
+import axios from 'axios'
 import { useEffect } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onIdTokenChanged } from 'firebase/auth'
 
 import { auth } from '../lib/firebase'
 import { getCurrentMerchant } from '../services/auth.service'
@@ -17,15 +18,17 @@ export function useAuth() {
   }, [hydrate])
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
         await logout()
         return
       }
 
+      const existingUser = useAuthStore.getState().user
+
       try {
         setLoading(true)
-        const token = await firebaseUser.getIdToken(true)
+        const token = await firebaseUser.getIdToken()
         setToken(token)
         const payload = await getCurrentMerchant()
 
@@ -42,8 +45,12 @@ export function useAuth() {
           role: String(payload.role ?? 'merchant') as 'merchant' | 'admin' | 'youth',
           createdAt: payload.createdAt ? String(payload.createdAt) : undefined,
         })
-      } catch {
-        await logout()
+      } catch (error) {
+        const status = axios.isAxiosError(error) ? error.response?.status : undefined
+
+        if (status === 401 || status === 403 || !existingUser) {
+          await logout()
+        }
       } finally {
         setLoading(false)
       }

@@ -11,6 +11,7 @@ const decodedPrivateKey = process.env.FIREBASE_PRIVATE_KEY_BASE64
   : rawPrivateKey;
 
 export const ENV = {
+  HOST: process.env.HOST || "0.0.0.0",
   PORT: process.env.PORT || 4000,
   FIREBASE_PROJECT_ID:
     process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
