@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 import Modal from '@/components/ui/Modal'
 import AlertModal from '@/components/ui/AlertModal'
@@ -142,6 +143,7 @@ function ClaimSuccessModal({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function VouchersPage() {
+  const router = useRouter()
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('available')
@@ -205,29 +207,26 @@ export default function VouchersPage() {
 
     setClaiming(voucher.id)
     try {
-      // BUG 1 FIX: store the full response and confirm success via voucherId presence
       const res = await api.post(`/vouchers/${voucher.id}/claim`)
       console.log('[claim response]', res.data)
 
       const { voucherId, claimedAt } = res.data as { voucherId?: string; claimedAt?: string }
 
       if (!voucherId) {
-        // Response came back 2xx but without expected fields — treat as unexpected
         showErrorAlert('Unexpected Response', 'The server did not confirm the claim. Please try again.')
         return
       }
 
-      // BUG 2 FIX: re-fetch full list so claimedByMe flag updates and tabs recompute
+      // Re-fetch full list so claimedByMe flag updates and tabs recompute
       await Promise.all([loadVouchers(), refreshPoints?.()])
 
-      // ADDITIONAL: show claim success modal with reference code
+      // Show claim success modal with reference code
       setClaimResult({
         voucherId,
         voucherTitle: voucher.title,
         claimedAt: claimedAt ?? new Date().toISOString(),
       })
     } catch (err: any) {
-      // BUG 1 FIX: catch ONLY fires on actual HTTP errors (4xx/5xx) with axios
       const msg = String(err?.response?.data?.error || err?.message || 'Something went wrong.')
       showErrorAlert('Could Not Claim', msg)
     } finally {
@@ -335,6 +334,7 @@ export default function VouchersPage() {
                 eligTag={buildEligibilityTag(voucher.eligibilityConditions)}
                 isClaiming={claiming === voucher.id}
                 onClaim={() => void handleClaim(voucher)}
+                onViewDetail={voucher.claimedByMe ? () => router.push(`/vouchers/${voucher.id}`) : undefined}
               />
             ))}
           </div>
@@ -366,11 +366,13 @@ function VoucherCard({
   eligTag,
   isClaiming,
   onClaim,
+  onViewDetail,
 }: {
   voucher: Voucher
   eligTag: string | null
   isClaiming: boolean
   onClaim: () => void
+  onViewDetail?: () => void
 }) {
   const isFree      = Number(voucher.pointsCost) === 0
   const expiryStr   = formatDate(voucher.expiresAt)
@@ -462,10 +464,14 @@ function VoucherCard({
 
         {/* Action area */}
         {isClaimed ? (
-          <div className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-50 py-3 text-sm font-black text-emerald-700">
+          <button
+            type="button"
+            onClick={onViewDetail}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-50 py-3 text-sm font-black text-emerald-700 hover:bg-emerald-100 active:scale-[0.98] transition"
+          >
             <CheckIcon className="h-4 w-4" />
-            Voucher Claimed
-          </div>
+            View Claim Code
+          </button>
         ) : isExpired ? (
           <div className="mt-4 flex w-full items-center justify-center rounded-2xl bg-gray-100 py-3 text-sm font-black text-gray-400">
             Voucher Expired

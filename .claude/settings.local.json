@@ -3,7 +3,12 @@
     "allow": [
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(Vouchers\" button that switches the tab to Claimed.:*)",
+      "Bash(npm install:*)",
+      "Bash(ls:*)",
+      "Bash(ls apps/youth-pwa/src/app/\\\\\\(main\\\\\\)/vouchers/)",
+      "Bash(grep -r export apps/admin-panel/src/components/ui/Spinner*)"
     ]
   }
 }

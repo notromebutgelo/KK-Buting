@@ -2,6 +2,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 import { db } from "../../config/firebase";
 import { createNotification } from "../notifications/notifications.service";
+import { generateUniqueToken } from "./vouchers.tokens";
 
 type AnyRecord = Record<string, any>;
 
@@ -124,7 +125,6 @@ export async function claimVoucher(uid: string, voucherId: string) {
   const pointsRef = db.collection("points").doc(uid);
   const profileRef = db.collection("kkProfiling").doc(uid);
   const userRef = db.collection("users").doc(uid);
-  const claimedAt = new Date().toISOString();
 
   let voucherTitle = "";
 
@@ -229,14 +229,212 @@ export async function claimVoucher(uid: string, voucherId: string) {
     voucherTitle = String(v.title || "voucher");
   });
 
+  // Generate a unique claim token and write the voucherClaims record
+  const token = await generateUniqueToken();
+  const claimRef = db.collection("voucherClaims").doc();
+  await claimRef.set({
+    claimId: claimRef.id,
+    uid,
+    voucherId,
+    voucherTitle,
+    token,
+    status: "claimed",
+    claimedAt: FieldValue.serverTimestamp(),
+    redeemedAt: null,
+    redeemedBy: null,
+  });
+
   await createNotification({
     recipientUid: uid,
     audience: "youth",
     type: "success",
     title: "Voucher Claimed",
-    body: `You successfully claimed the voucher: ${voucherTitle}.`,
+    body: `You successfully claimed the voucher: ${voucherTitle}. Your claim code is ${token}.`,
     link: "/vouchers",
   });
 
-  return { voucherId, claimedAt, message: "Voucher claimed successfully" };
+  return { claimId: claimRef.id, token, voucherId, voucherTitle };
+}
+
+// ─── GET MY CLAIM (youth) ─────────────────────────────────────────────────────
+
+export async function getMyVoucherClaim(uid: string, voucherId: string) {
+  const snap = await db
+    .collection("voucherClaims")
+    .where("uid", "==", uid)
+    .where("voucherId", "==", voucherId)
+    .limit(1)
+    .get();
+
+  if (!snap.empty) {
+    const data = serializeRecord({ id: snap.docs[0].id, ...snap.docs[0].data() }) as AnyRecord;
+    return {
+      claimId: data.claimId || data.id,
+      token: String(data.token || ""),
+      voucherId: String(data.voucherId || ""),
+      voucherTitle: String(data.voucherTitle || ""),
+      status: String(data.status || "claimed"),
+      claimedAt: data.claimedAt ? String(data.claimedAt) : null,
+      redeemedAt: data.redeemedAt ? String(data.redeemedAt) : null,
+    };
+  }
+
+  // No claim doc found — check if the user is in the voucher's claimedBy array
+  // (happens when the voucher was claimed before the token system was deployed)
+  const voucherSnap = await db.collection("vouchers").doc(voucherId).get();
+  if (!voucherSnap.exists) return null;
+
+  const v = serializeRecord({ id: voucherSnap.id, ...voucherSnap.data() }) as AnyRecord;
+  const alreadyClaimed = Array.isArray(v.claimedBy) && v.claimedBy.includes(uid);
+  if (!alreadyClaimed) return null;
+
+  // Backfill: generate a token and create the missing voucherClaims document
+  const token = await generateUniqueToken();
+  const claimRef = db.collection("voucherClaims").doc();
+  const claimData = {
+    claimId: claimRef.id,
+    uid,
+    voucherId,
+    voucherTitle: String(v.title || ""),
+    token,
+    status: "claimed",
+    claimedAt: FieldValue.serverTimestamp(),
+    redeemedAt: null,
+    redeemedBy: null,
+  };
+  await claimRef.set(claimData);
+
+  return {
+    claimId: claimRef.id,
+    token,
+    voucherId,
+    voucherTitle: String(v.title || ""),
+    status: "claimed",
+    claimedAt: null,
+    redeemedAt: null,
+  };
+}
+
+// ─── REDEEM PREVIEW (admin/superadmin) ───────────────────────────────────────
+
+function makeError(message: string, status: number): Error {
+  const err = new Error(message) as any;
+  err.status = status;
+  return err;
+}
+
+export async function redeemVoucherPreview(token: string) {
+  const normalized = token.trim().toUpperCase();
+  const snap = await db
+    .collection("voucherClaims")
+    .where("token", "==", normalized)
+    .limit(1)
+    .get();
+
+  if (snap.empty) throw makeError("No voucher found with this code. Please check and try again.", 404);
+
+  const claim = serializeRecord({ id: snap.docs[0].id, ...snap.docs[0].data() }) as AnyRecord;
+
+  if (claim.status === "redeemed") throw makeError("This voucher was already redeemed. No action needed.", 409);
+  if (claim.status === "expired") throw makeError("This claim code has expired.", 410);
+
+  const [userSnap, voucherSnap] = await Promise.all([
+    db.collection("users").doc(claim.uid).get(),
+    db.collection("vouchers").doc(claim.voucherId).get(),
+  ]);
+
+  const user = userSnap.data() || {};
+  const voucher = voucherSnap.data() || {};
+
+  return {
+    claimId: claim.claimId || claim.id,
+    token: normalized,
+    voucherId: String(claim.voucherId || ""),
+    voucherTitle: String(claim.voucherTitle || voucher.title || ""),
+    youthName: String(user.UserName || user.displayName || ""),
+    youthEmail: String(user.email || ""),
+    claimedAt: claim.claimedAt ? String(claim.claimedAt) : null,
+    status: String(claim.status || "claimed"),
+  };
+}
+
+// ─── REDEEM CONFIRM (admin/superadmin) ────────────────────────────────────────
+
+export async function redeemVoucherConfirm(token: string, adminUid: string) {
+  const normalized = token.trim().toUpperCase();
+  const snap = await db
+    .collection("voucherClaims")
+    .where("token", "==", normalized)
+    .limit(1)
+    .get();
+
+  if (snap.empty) throw makeError("No voucher found with this code.", 404);
+
+  const claim = serializeRecord({ id: snap.docs[0].id, ...snap.docs[0].data() }) as AnyRecord;
+
+  if (claim.status === "redeemed") throw makeError("This voucher was already redeemed.", 409);
+  if (claim.status === "expired") throw makeError("This claim code has expired.", 410);
+
+  await db.collection("voucherClaims").doc(snap.docs[0].id).set(
+    {
+      status: "redeemed",
+      redeemedAt: FieldValue.serverTimestamp(),
+      redeemedBy: adminUid,
+    },
+    { merge: true }
+  );
+
+  await createNotification({
+    recipientUid: claim.uid,
+    audience: "youth",
+    type: "success",
+    title: "Voucher Redeemed",
+    body: `Your voucher "${claim.voucherTitle}" has been redeemed successfully.`,
+    link: "/vouchers",
+  });
+
+  return { success: true };
+}
+
+// ─── GET VOUCHER CLAIMS (superadmin) ─────────────────────────────────────────
+
+export async function getVoucherClaims(voucherId: string) {
+  const snap = await db
+    .collection("voucherClaims")
+    .where("voucherId", "==", voucherId)
+    .get();
+
+  const claims = snap.docs.map((doc) =>
+    serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord
+  );
+
+  // Sort by claimedAt desc
+  claims.sort((a, b) =>
+    String(b.claimedAt || "").localeCompare(String(a.claimedAt || ""))
+  );
+
+  // Join with users
+  const uids = [...new Set(claims.map((c) => String(c.uid || "")))].filter(Boolean);
+  const userDocs = await Promise.all(uids.map((uid) => db.collection("users").doc(uid).get()));
+  const userMap: Record<string, AnyRecord> = {};
+  for (const doc of userDocs) {
+    if (doc.exists) userMap[doc.id] = doc.data() as AnyRecord;
+  }
+
+  return claims.map((c) => {
+    const user = userMap[String(c.uid || "")] || {};
+    return {
+      claimId: String(c.claimId || c.id),
+      token: String(c.token || ""),
+      uid: String(c.uid || ""),
+      youthName: String(user.UserName || user.displayName || ""),
+      youthEmail: String(user.email || ""),
+      voucherId: String(c.voucherId || ""),
+      voucherTitle: String(c.voucherTitle || ""),
+      status: String(c.status || "claimed"),
+      claimedAt: c.claimedAt ? String(c.claimedAt) : null,
+      redeemedAt: c.redeemedAt ? String(c.redeemedAt) : null,
+      redeemedBy: c.redeemedBy ? String(c.redeemedBy) : null,
+    };
+  });
 }

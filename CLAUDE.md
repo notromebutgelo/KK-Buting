@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-04-17
+Last updated: 2026-04-18
 
 ## What This Repository Is
 
@@ -545,9 +545,48 @@ A full Voucher & Promotions feature was implemented across all four apps.
 - Promotion submitted → all admin/superadmin users notified
 - Promotion approved/rejected → merchant owner notified
 
+## Voucher Claim Token System (completed 2026-04-18)
+
+A full claim token and QR redemption flow was added on top of the voucher system.
+
+### New Firestore Collection
+
+- `voucherClaims` — one document per youth claim
+  - Fields: claimId, uid, voucherId, voucherTitle, token (KKB-XXXXXX format), status (claimed/redeemed/expired), claimedAt, redeemedAt, redeemedBy
+
+### Token Format
+
+- Prefix: `KKB-` followed by 6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`
+- Excludes visually ambiguous characters (0, O, I, 1, L)
+- Example: `KKB-A3F9QZ`
+- QR code encodes the raw token string directly (no URL wrapping)
+
+### New Backend Endpoints
+
+- `GET /api/vouchers/:id/my-claim` — returns the youth's own claim record including token (youth only)
+- `POST /api/vouchers/redeem` — preview step: validates token, returns youth name/email/voucherTitle/claimedAt (admin/superadmin)
+- `POST /api/vouchers/redeem/confirm` — marks claim as redeemed, writes youth notification (admin/superadmin)
+- `GET /api/vouchers/:id/claims` — all claims for a voucher with youth name/email join (superadmin only)
+
+### Youth PWA Changes
+
+- `/vouchers/[id]` claim detail page: shows QR code (qrcode.react), large monospace token, "Show this to an SK official" helper text, and redeemed state dimming
+
+### Admin Panel Changes
+
+- "Redeem Voucher" tab added to the Vouchers Management page
+  - QR scanner using html5-qrcode with camera fallback error state
+  - Manual entry field (KKB- prefix locked, 6-char suffix, uppercase enforced)
+  - Preview card shows youth name/email, voucher title, claimed date
+  - "Confirm & Mark as Given" → calls confirm endpoint → success state with reset
+  - Error states for 404 (invalid code), 409 (already redeemed), 410 (expired)
+- "Claims" button per voucher row in the table → inline ClaimsPanel below the table
+  - Table columns: Youth Name, Email, Token, Claimed At, Status, Redeemed At
+  - Status badges: Claimed (yellow), Redeemed (green), Expired (grey)
+
 ### Known Gaps
 
-- No admin UI to view which users claimed a specific voucher (claimedBy array is in Firestore but not surfaced in the panel)
+- No admin UI to view which users claimed a specific voucher via the claimedBy array directly (the new Claims panel uses voucherClaims collection instead, which is more accurate)
 - Merchant promotion forms use text input for date (`YYYY-MM-DD`) rather than a native date picker (Expo DateTimePicker not yet integrated for this flow)
 - The youth vouchers page does not yet show a "My Claimed Vouchers" history view
 
