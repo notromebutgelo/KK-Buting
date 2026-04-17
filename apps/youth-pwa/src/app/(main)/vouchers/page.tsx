@@ -235,10 +235,10 @@ export default function VouchersPage() {
     }
   }
 
-  // BUG 2 FIX: filter conditions match exact field names from backend
-  const available = vouchers.filter((v) => v.status === 'active' && v.claimedByMe === false)
-  const claimed   = vouchers.filter((v) => v.claimedByMe === true)
-  const expired   = vouchers.filter((v) => v.status === 'expired' && v.claimedByMe === false)
+  // claimedByMe may be absent on older responses — treat missing/falsy as "not claimed"
+  const available = vouchers.filter((v) => v.status === 'active' && !v.claimedByMe)
+  const claimed   = vouchers.filter((v) => Boolean(v.claimedByMe))
+  const expired   = vouchers.filter((v) => v.status === 'expired' && !v.claimedByMe)
 
   const tabList: { key: Tab; label: string; count: number }[] = [
     { key: 'available', label: 'Available', count: available.length },
