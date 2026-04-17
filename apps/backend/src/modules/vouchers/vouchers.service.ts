@@ -158,7 +158,9 @@ export async function claimVoucher(uid: string, voucherId: string) {
         String(profile.status || "").toLowerCase() === "verified" ||
         String(user.verificationStatus || "").toLowerCase() === "verified";
       if (!isVerified) {
-        throw new Error("You must be a verified KK member to claim this voucher");
+        throw new Error(
+          `DEBUG — profile.verified=${JSON.stringify(profile.verified)}, profile.status=${JSON.stringify(profile.status)}, user.verificationStatus=${JSON.stringify(user.verificationStatus)}, profileExists=${profileSnap.exists}, userExists=${userSnap.exists}`
+        );
       }
     }
 
