@@ -153,8 +153,11 @@ export async function claimVoucher(uid: string, voucherId: string) {
     const user = userSnap.data() || {};
 
     if (cond.isVerified) {
-      const verificationStatus = String(user.verificationStatus || profile.verificationStatus || "").toLowerCase();
-      if (verificationStatus !== "verified") {
+      const isVerified =
+        Boolean(profile.verified) ||
+        String(profile.status || "").toLowerCase() === "verified" ||
+        String(user.verificationStatus || "").toLowerCase() === "verified";
+      if (!isVerified) {
         throw new Error("You must be a verified KK member to claim this voucher");
       }
     }
