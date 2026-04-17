@@ -7,6 +7,7 @@ import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
 import { usePoints } from '@/hooks/usePoints'
 import api from '@/lib/api'
+import { getVerificationStatus } from '@/services/verification.service'
 import { cn } from '@/utils/cn'
 import { formatPoints } from '@/utils/formatPoints'
 
@@ -62,10 +63,14 @@ export default function VouchersPage() {
   const [alertTitle, setAlertTitle] = useState('')
   const [alertMessage, setAlertMessage] = useState('')
   const [showAlert, setShowAlert] = useState(false)
+  const [verificationStatus, setVerificationStatus] = useState<string>('')
   const { data: pointsData, isLoading: isPointsLoading, refresh: refreshPoints } = usePoints()
 
   useEffect(() => {
     loadVouchers()
+    getVerificationStatus()
+      .then((data) => setVerificationStatus(String(data?.status || data?.verificationStatus || '')))
+      .catch(() => {})
   }, [])
 
   async function loadVouchers() {
@@ -81,6 +86,27 @@ export default function VouchersPage() {
   }
 
   async function handleClaim(voucher: Voucher) {
+    const cond = voucher.eligibilityConditions
+
+    // Pre-flight eligibility check — give specific feedback before hitting the API
+    if (cond?.isVerified && verificationStatus.toLowerCase() !== 'verified') {
+      setAlertTitle('Verification Required')
+      setAlertMessage('Your account is not yet verified. Please complete your KK verification before claiming this voucher.')
+      setShowAlert(true)
+      return
+    }
+
+    const pointsCost = Number(voucher.pointsCost ?? 0)
+    if (pointsCost > 0) {
+      const balance = Number(pointsData?.balance ?? 0)
+      if (balance < pointsCost) {
+        setAlertTitle('Insufficient Points')
+        setAlertMessage(`You need ${formatPoints(pointsCost)} pts to claim this voucher but only have ${formatPoints(balance)} pts.`)
+        setShowAlert(true)
+        return
+      }
+    }
+
     setClaming(voucher.id)
     try {
       await api.post(`/vouchers/${voucher.id}/claim`)

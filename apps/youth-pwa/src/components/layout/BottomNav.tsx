@@ -39,30 +39,9 @@ const sideItems: NavItem[] = [
     ),
   },
   {
-    href: '/rewards',
-    label: 'Rewards',
-    isActive: (pathname) => pathname.startsWith('/rewards'),
-    icon: (active) => (
-      <svg
-        className={cn('h-6 w-6')}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.8}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="m12 3 2.4 4.8 5.3.8-3.9 3.8.9 5.3-4.7-2.5-4.7 2.5.9-5.3L4.3 8.6l5.3-.8L12 3Z"
-          className={active ? 'text-[#FCB315]' : 'text-white'}
-        />
-      </svg>
-    ),
-  },
-  {
     href: '/vouchers',
-    label: 'Vouchers',
-    isActive: (pathname) => pathname.startsWith('/vouchers'),
+    label: 'Promos',
+    isActive: (pathname) => pathname.startsWith('/vouchers') || pathname.startsWith('/rewards'),
     icon: (active) => (
       <svg
         className={cn('h-6 w-6')}
@@ -141,8 +120,8 @@ export default function BottomNav({ onNavigate }: BottomNavProps) {
   const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(true)
   const lastScrollYRef = useRef(0)
-  const leftItems = sideItems.slice(0, 3)
-  const rightItems = sideItems.slice(3)
+  const leftItems = sideItems.slice(0, 2)
+  const rightItems = sideItems.slice(2)
   const isScannerActive = pathname === '/scanner'
 
   useEffect(() => {
