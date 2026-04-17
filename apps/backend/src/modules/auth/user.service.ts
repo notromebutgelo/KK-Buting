@@ -3,6 +3,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { createNotification } from "../notifications/notifications.service";
 
 export async function createUser(uid: string, data: { UserName: string; email: string }) {
+  await auth.setCustomUserClaims(uid, { role: "youth" });
+
   await db.collection("users").doc(uid).set({
     uid,
     UserName: data.UserName,
