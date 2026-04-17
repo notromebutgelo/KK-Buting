@@ -12,6 +12,16 @@ import type { Reward } from '@/types/rewards'
 
 type DetailTab = 'discounts' | 'terms'
 
+interface ActivePromotion {
+  id: string
+  title: string
+  description?: string
+  type?: string
+  value?: number
+  minPurchaseAmount?: number
+  expiresAt?: string | null
+}
+
 function getMerchantBanner(merchant: Merchant) {
   return merchant.bannerUrl || merchant.imageUrl || merchant.logoUrl || ''
 }
@@ -51,6 +61,7 @@ export default function MerchantDetailPage() {
   const { merchantId } = useParams<{ merchantId: string }>()
   const [merchant, setMerchant] = useState<Merchant | null>(null)
   const [merchantRewards, setMerchantRewards] = useState<Reward[]>([])
+  const [activePromotions, setActivePromotions] = useState<ActivePromotion[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<DetailTab>('discounts')
 
@@ -90,6 +101,25 @@ export default function MerchantDetailPage() {
       .catch(() => {
         if (!active) return
         setMerchantRewards([])
+      })
+
+    return () => {
+      active = false
+    }
+  }, [merchantId])
+
+  useEffect(() => {
+    let active = true
+
+    void api
+      .get(`/promotions/by-merchant/${merchantId}`)
+      .then((response) => {
+        if (!active) return
+        setActivePromotions(response.data.promotions || [])
+      })
+      .catch(() => {
+        if (!active) return
+        setActivePromotions([])
       })
 
     return () => {
@@ -267,6 +297,45 @@ export default function MerchantDetailPage() {
                         </span>
                       ) : null}
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {activePromotions.length > 0 ? (
+          <section className="mt-4 rounded-[28px] bg-white px-4 py-5 shadow-[0_14px_30px_rgba(4,60,121,0.12)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-[#0d4f92]">Active Promotions</h3>
+                <p className="mt-0.5 text-xs text-[#6a86a4]">Special offers from this merchant right now.</p>
+              </div>
+              <span className="text-xs font-semibold text-[#839cb8]">{activePromotions.length} active</span>
+            </div>
+            <div className="mt-3 space-y-3">
+              {activePromotions.map((promo) => (
+                <div key={promo.id} className="rounded-[20px] border border-[#dce7f3] bg-[#f4f8ff] px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black text-[#0d4f92]">{promo.title}</p>
+                      {promo.description ? (
+                        <p className="mt-1 text-xs leading-5 text-[#6480a0]">{promo.description}</p>
+                      ) : null}
+                      {typeof promo.minPurchaseAmount === 'number' && promo.minPurchaseAmount > 0 ? (
+                        <p className="mt-1 text-xs text-[#8aa5c0]">Min purchase: ₱{promo.minPurchaseAmount.toLocaleString()}</p>
+                      ) : null}
+                      {promo.expiresAt ? (
+                        <p className="mt-1 text-xs text-[#8aa5c0]">
+                          Until {new Date(promo.expiresAt).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      ) : null}
+                    </div>
+                    {typeof promo.value === 'number' && promo.value > 0 ? (
+                      <span className="shrink-0 rounded-full bg-[#fff4d9] px-3 py-1 text-[11px] font-black text-[#f19b08]">
+                        {promo.type === 'points_multiplier' ? `${promo.value}× pts` : promo.type === 'discount' ? `${promo.value}% off` : 'Freebie'}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               ))}

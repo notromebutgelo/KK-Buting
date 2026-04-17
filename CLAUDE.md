@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-04-15
+Last updated: 2026-04-17
 
 ## What This Repository Is
 
@@ -266,11 +266,6 @@ The current live points default in code is now:
   - production and preview builds now require a real public `EXPO_PUBLIC_API_URL` instead of silently falling back to localhost
   - request auth now refreshes Firebase ID tokens from `auth.currentUser.getIdToken()` before backend calls
   - auth session sync now uses `onIdTokenChanged`, so long-lived merchant APK sessions refresh more reliably instead of depending only on the initial login token
-- the Expo merchant app should currently be run with Node 20, not Node 22
-  - Expo SDK 54 documents a minimum Node.js version of `20.19.x`
-  - this repo now advertises `>=20.19.0 <21` in the root `package.json` and `apps/merchant-app/package.json`
-  - root `.nvmrc` and `.node-version` were added with `20.19.4` so local toolchains can switch consistently
-  - on Windows, `nvm-windows` may install successfully but still miss `NVM_HOME` / `NVM_SYMLINK`; if `nvm` is not found after install, set those user env vars to `C:\Users\hp\AppData\Local\nvm` and `C:\Users\hp\nodejs`, then reopen the terminal
 - merchant APK deployment target is currently the existing Render backend hosted at `https://kk-buting-admin-panel.onrender.com`
   - for the merchant app, the API base URL should be `https://kk-buting-admin-panel.onrender.com/api`
   - despite the Render service name, this is currently being treated as the backend deployment
@@ -491,6 +486,70 @@ If we describe the project in plain terms today:
 - the youth home and merchant discovery surfaces now avoid sample storefront data and fall back to honest empty states instead
 - the youth PWA production build is now clean again after the auth and scanner search-param routes were moved behind `Suspense`-safe wrappers
 - the remaining work is mostly about tightening product completeness, removing leftover presentation fallbacks, and adding confidence through testing
+
+## Voucher & Promotions System (completed 2026-04-17)
+
+A full Voucher & Promotions feature was implemented across all four apps.
+
+### New Firestore Collections
+
+- `vouchers` — superadmin-created vouchers with eligibility conditions, points cost, stock, and claim tracking
+  - Fields: id, title, description, type, pointsCost, eligibilityConditions (minAge/maxAge/ageGroup/isVerified), stock, claimedBy (array), status, createdBy, createdAt, expiresAt
+- `promotions` — merchant-submitted promotions requiring superadmin approval
+  - Fields: id, merchantId, title, description, type (points_multiplier/discount/freebie), value, minPurchaseAmount, status (pending/approved/rejected/active/expired), submittedAt, reviewedBy, reviewedAt, reviewNote, expiresAt
+
+### New Backend Routes
+
+- `GET /api/vouchers` — list active vouchers (all authenticated roles); superadmin sees all statuses
+- `GET /api/vouchers/:id` — get single voucher
+- `POST /api/vouchers` — create voucher (superadmin only)
+- `PATCH /api/vouchers/:id` — update/expire voucher (superadmin only)
+- `POST /api/vouchers/:id/claim` — claim a voucher (youth only); deducts points if pointsCost > 0, enforces eligibility and stock, prevents duplicate claims
+- `GET /api/promotions` — list promotions (role-scoped: superadmin sees all, merchant sees own, youth sees active only)
+- `GET /api/promotions/by-merchant/:merchantId` — list active promotions for a specific merchant (used on youth merchant detail page)
+- `GET /api/promotions/:id` — get single promotion
+- `POST /api/promotions` — merchant creates a promotion (status: pending)
+- `PATCH /api/promotions/:id` — merchant edits a pending promotion
+- `DELETE /api/promotions/:id` — merchant deletes a pending promotion
+- `PATCH /api/promotions/:id/review` — superadmin approves or rejects (sets reviewedBy, reviewedAt, reviewNote)
+
+### Admin Panel Pages Added
+
+- `/vouchers` — Vouchers Management page (superadmin only)
+  - Active Vouchers tab: table with Title, Type, Points Cost, Stock, Claimed Count, Status, Expires, Edit/Expire actions
+  - Create/Edit form with eligibility condition builder (minAge, maxAge, ageGroup, isVerified)
+  - Sidebar entry added (superadmin only)
+- `/promotions` — Promotions Review page (superadmin only)
+  - Filter tabs: Pending, Approved, Rejected, Expired, All
+  - Detail panel with Approve/Reject buttons; reject requires a review note
+  - Sidebar entry added (superadmin only)
+
+### Merchant App Changes
+
+- `PromotionsScreen` fully replaced to use the new `/api/promotions` backend instead of the legacy merchantWorkspace local promotion CRUD
+- Status badges: Pending (yellow), Approved (green), Active (blue), Rejected (red), Expired (gray)
+- Rejected promotions surface the `reviewNote` so merchants understand why
+- Edit/delete restricted to `pending` status promotions only
+- Create form uses type chips: `points_multiplier`, `discount`, `freebie`
+
+### Youth PWA Changes
+
+- `/vouchers` page added: displays active voucher cards with title, description, points cost (or "Free"), stock, eligibility tag, expiry, and a Claim button
+- Claiming deducts points if required and shows success/failure feedback via AlertModal
+- Bottom nav updated: Vouchers tab added (ticket icon); nav now has 3 items left of the center scanner, 2 on the right
+- Merchant detail page: new "Active Promotions" section fetches approved promotions from `/api/promotions/by-merchant/:merchantId` and renders them below the discount/terms tabs
+
+### Notifications
+
+- Voucher claimed → youth user notified
+- Promotion submitted → all admin/superadmin users notified
+- Promotion approved/rejected → merchant owner notified
+
+### Known Gaps
+
+- No admin UI to view which users claimed a specific voucher (claimedBy array is in Firestore but not surfaced in the panel)
+- Merchant promotion forms use text input for date (`YYYY-MM-DD`) rather than a native date picker (Expo DateTimePicker not yet integrated for this flow)
+- The youth vouchers page does not yet show a "My Claimed Vouchers" history view
 
 ## What To Do Next
 

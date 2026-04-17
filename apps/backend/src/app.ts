@@ -11,6 +11,8 @@ import qrRoutes from "./modules/qr/qr.routes";
 import adminRoutes from "./modules/admin/admin.routes";
 import rewardsRoutes from "./modules/rewards/rewards.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
+import vouchersRoutes from "./modules/vouchers/vouchers.routes";
+import promotionsRoutes from "./modules/promotions/promotions.routes";
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use("/api/points", pointsRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/vouchers", vouchersRoutes);
+app.use("/api/promotions", promotionsRoutes);
 
 app.use(errorHandler);
 
