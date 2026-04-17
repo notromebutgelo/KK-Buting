@@ -8,7 +8,7 @@
     "apps/youth-pwa"
   ],
   "engines": {
-    "node": ">=20.19.0 <21"
+    "node": ">=20"
   },
   "scripts": {
     "dev:admin": "npm run dev --workspace admin-panel",
