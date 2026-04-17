@@ -98,7 +98,7 @@ export default function VouchersPage() {
 
     const pointsCost = Number(voucher.pointsCost ?? 0)
     if (pointsCost > 0) {
-      const balance = Number(pointsData?.balance ?? 0)
+      const balance = Number(pointsData?.totalPoints ?? 0)
       if (balance < pointsCost) {
         setAlertTitle('Insufficient Points')
         setAlertMessage(`You need ${formatPoints(pointsCost)} pts to claim this voucher but only have ${formatPoints(balance)} pts.`)
