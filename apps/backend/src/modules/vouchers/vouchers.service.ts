@@ -71,13 +71,18 @@ export async function createVoucher(createdBy: string, payload: AnyRecord) {
   return { id: ref.id, ...data };
 }
 
-// ─── LIST (all active, for authenticated users) ───────────────────────────────
+// ─── LIST for youth (active + expired, with claimedByMe flag) ────────────────
 
-export async function listActiveVouchers() {
+export async function listYouthVouchers(uid: string) {
   const snap = await db.collection("vouchers").get();
   return snap.docs
-    .map((doc) => normalizeVoucher({ id: doc.id, ...doc.data() }))
-    .filter((v) => v.status === "active");
+    .map((doc) => {
+      const data = { id: doc.id, ...doc.data() } as AnyRecord;
+      const claimedByMe = Array.isArray(data.claimedBy) && data.claimedBy.includes(uid);
+      const normalized = normalizeVoucher(data);
+      return { ...normalized, claimedByMe };
+    })
+    .filter((v) => v.status === "active" || v.status === "expired" || v.claimedByMe);
 }
 
 // ─── LIST ALL (for superadmin) ─────────────────────────────────────────────────
@@ -158,9 +163,7 @@ export async function claimVoucher(uid: string, voucherId: string) {
         String(profile.status || "").toLowerCase() === "verified" ||
         String(user.verificationStatus || "").toLowerCase() === "verified";
       if (!isVerified) {
-        throw new Error(
-          `DEBUG — profile.verified=${JSON.stringify(profile.verified)}, profile.status=${JSON.stringify(profile.status)}, user.verificationStatus=${JSON.stringify(user.verificationStatus)}, profileExists=${profileSnap.exists}, userExists=${userSnap.exists}`
-        );
+        throw new Error("You must be a verified KK member to claim this voucher");
       }
     }
 

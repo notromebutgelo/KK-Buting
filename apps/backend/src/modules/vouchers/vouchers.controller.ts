@@ -5,15 +5,16 @@ import {
   claimVoucher,
   createVoucher,
   getVoucher,
-  listActiveVouchers,
   listAllVouchers,
+  listYouthVouchers,
   updateVoucher,
 } from "./vouchers.service";
 
 export async function handleListVouchers(req: AuthRequest, res: Response) {
   try {
     const role = String(req.user?.role || "");
-    const vouchers = role === "superadmin" ? await listAllVouchers() : await listActiveVouchers();
+    const uid = req.user!.uid;
+    const vouchers = role === "superadmin" ? await listAllVouchers() : await listYouthVouchers(uid);
     return res.json({ vouchers });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

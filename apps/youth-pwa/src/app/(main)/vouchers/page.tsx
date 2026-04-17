@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 
 import AlertModal from '@/components/ui/AlertModal'
 import Spinner from '@/components/ui/Spinner'
@@ -27,14 +26,25 @@ interface Voucher {
   eligibilityConditions?: EligibilityConditions
   stock?: number | null
   claimedCount?: number
+  claimedByMe?: boolean
   status?: string
   expiresAt?: string | null
 }
+
+type Tab = 'available' | 'claimed' | 'expired'
 
 function VoucherIcon({ className = 'h-7 w-7' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+    </svg>
+  )
+}
+
+function CheckIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   )
 }
@@ -59,7 +69,8 @@ function buildEligibilityTag(cond?: EligibilityConditions): string | null {
 export default function VouchersPage() {
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [claiming, setClaming] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('available')
+  const [claiming, setClaiming] = useState<string | null>(null)
   const [alertTitle, setAlertTitle] = useState('')
   const [alertMessage, setAlertMessage] = useState('')
   const [showAlert, setShowAlert] = useState(false)
@@ -88,7 +99,6 @@ export default function VouchersPage() {
   async function handleClaim(voucher: Voucher) {
     const cond = voucher.eligibilityConditions
 
-    // Pre-flight eligibility check — give specific feedback before hitting the API
     if (cond?.isVerified && verificationStatus.toLowerCase() !== 'verified') {
       setAlertTitle('Verification Required')
       setAlertMessage('Your account is not yet verified. Please complete your KK verification before claiming this voucher.')
@@ -107,7 +117,7 @@ export default function VouchersPage() {
       }
     }
 
-    setClaming(voucher.id)
+    setClaiming(voucher.id)
     try {
       await api.post(`/vouchers/${voucher.id}/claim`)
       setAlertTitle('Voucher Claimed!')
@@ -120,8 +130,26 @@ export default function VouchersPage() {
       setAlertMessage(msg)
       setShowAlert(true)
     } finally {
-      setClaming(null)
+      setClaiming(null)
     }
+  }
+
+  const available = vouchers.filter((v) => v.status === 'active' && !v.claimedByMe)
+  const claimed = vouchers.filter((v) => v.claimedByMe)
+  const expired = vouchers.filter((v) => v.status === 'expired' && !v.claimedByMe)
+
+  const tabList: { key: Tab; label: string; count: number }[] = [
+    { key: 'available', label: 'Available', count: available.length },
+    { key: 'claimed', label: 'Claimed', count: claimed.length },
+    { key: 'expired', label: 'Expired', count: expired.length },
+  ]
+
+  const displayed = activeTab === 'available' ? available : activeTab === 'claimed' ? claimed : expired
+
+  const emptyMessages: Record<Tab, { title: string; body: string }> = {
+    available: { title: 'No vouchers available', body: 'Check back soon for new SK youth vouchers.' },
+    claimed: { title: 'No claimed vouchers yet', body: 'Vouchers you claim will appear here.' },
+    expired: { title: 'No expired vouchers', body: 'Expired unclaimed vouchers will appear here.' },
   }
 
   return (
@@ -153,28 +181,49 @@ export default function VouchersPage() {
           </p>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-2 rounded-2xl bg-[#0d4f92]/40 p-1">
+          {tabList.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-[12px] font-black transition',
+                activeTab === tab.key
+                  ? 'bg-white text-[#0d4f92] shadow-sm'
+                  : 'text-white/70 hover:text-white'
+              )}
+            >
+              {tab.label}
+              {tab.count > 0 && (
+                <span className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none',
+                  activeTab === tab.key ? 'bg-[#0d4f92] text-white' : 'bg-white/20 text-white'
+                )}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Voucher list */}
         {isLoading ? (
           <div className="flex justify-center py-20">
             <Spinner size="lg" />
           </div>
-        ) : vouchers.length === 0 ? (
+        ) : displayed.length === 0 ? (
           <div className="rounded-[28px] bg-white px-6 py-12 text-center shadow-[0_14px_30px_rgba(4,60,121,0.2)]">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f8ff] text-[#0d4f92]">
               <VoucherIcon />
             </div>
-            <p className="mt-4 text-lg font-black text-[#0d4f92]">No vouchers available</p>
-            <p className="mt-2 text-sm text-[#6d87a4]">Check back soon for new SK youth vouchers.</p>
+            <p className="mt-4 text-lg font-black text-[#0d4f92]">{emptyMessages[activeTab].title}</p>
+            <p className="mt-2 text-sm text-[#6d87a4]">{emptyMessages[activeTab].body}</p>
           </div>
         ) : (
           <div className="space-y-4">
-            <h2 className="text-base font-black text-white">
-              Available Vouchers
-              <span className="ml-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">
-                {vouchers.length} available
-              </span>
-            </h2>
-            {vouchers.map((voucher) => {
+            {displayed.map((voucher) => {
               const eligTag = buildEligibilityTag(voucher.eligibilityConditions)
               const isClaiming = claiming === voucher.id
               return (
@@ -214,18 +263,47 @@ function VoucherCard({
 }) {
   const isFree = Number(voucher.pointsCost) === 0
   const expiryStr = formatDate(voucher.expiresAt)
+  const isClaimed = Boolean(voucher.claimedByMe)
+  const isExpired = voucher.status === 'expired'
+  const isOutOfStock = !isClaimed && !isExpired && Number(voucher.stock) === 0
 
   return (
-    <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_14px_28px_rgba(4,60,121,0.18)]">
+    <div className={cn(
+      'overflow-hidden rounded-[24px] bg-white shadow-[0_14px_28px_rgba(4,60,121,0.18)]',
+      (isClaimed || isExpired) && 'opacity-80'
+    )}>
       {/* Colour bar */}
-      <div className="h-2 bg-[linear-gradient(90deg,#014384_0%,#0572dc_100%)]" />
+      <div className={cn(
+        'h-2',
+        isClaimed
+          ? 'bg-[linear-gradient(90deg,#16a34a_0%,#22c55e_100%)]'
+          : isExpired
+          ? 'bg-[linear-gradient(90deg,#9ca3af_0%,#d1d5db_100%)]'
+          : 'bg-[linear-gradient(90deg,#014384_0%,#0572dc_100%)]'
+      )} />
+
       <div className="px-5 py-5">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#eef4fb] text-[#014384]">
-            <VoucherIcon className="h-6 w-6" />
+          <div className={cn(
+            'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl',
+            isClaimed ? 'bg-emerald-50 text-emerald-600' : isExpired ? 'bg-gray-100 text-gray-400' : 'bg-[#eef4fb] text-[#014384]'
+          )}>
+            {isClaimed ? <CheckIcon className="h-6 w-6" /> : <VoucherIcon className="h-6 w-6" />}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-black uppercase tracking-[0.14em] text-[#f09000]">{voucher.type || 'Voucher'}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-[13px] font-black uppercase tracking-[0.14em] text-[#f09000]">{voucher.type || 'Voucher'}</p>
+              {isClaimed && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                  Claimed
+                </span>
+              )}
+              {isExpired && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-gray-500">
+                  Expired
+                </span>
+              )}
+            </div>
             <h3 className="mt-0.5 text-[18px] font-black leading-6 text-[#0d4f92]">{voucher.title}</h3>
             {voucher.description ? (
               <p className="mt-1 text-sm text-[#5b7896]">{voucher.description}</p>
@@ -243,7 +321,11 @@ function VoucherCard({
           <div className="rounded-2xl bg-[#f4f8ff] px-3 py-3">
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7d9ab5]">Stock</p>
             <p className="mt-1 text-[18px] font-black text-[#0d4f92]">
-              {voucher.stock == null ? 'Unlimited' : Number(voucher.stock) <= 0 ? <span className="text-red-500">Out of stock</span> : voucher.stock.toLocaleString()}
+              {voucher.stock == null
+                ? 'Unlimited'
+                : Number(voucher.stock) <= 0
+                ? <span className="text-red-500">Out of stock</span>
+                : voucher.stock.toLocaleString()}
             </p>
           </div>
         </div>
@@ -258,22 +340,36 @@ function VoucherCard({
         ) : null}
 
         {expiryStr ? (
-          <p className="mt-2 text-[11px] font-semibold text-[#8aa5c0]">Expires {expiryStr}</p>
+          <p className="mt-2 text-[11px] font-semibold text-[#8aa5c0]">
+            {isExpired ? 'Expired' : 'Expires'} {expiryStr}
+          </p>
         ) : null}
 
-        <button
-          type="button"
-          onClick={onClaim}
-          disabled={isClaiming || Number(voucher.stock) === 0}
-          className={cn(
-            'mt-4 w-full rounded-2xl py-3 text-sm font-black transition',
-            Number(voucher.stock) === 0
-              ? 'cursor-not-allowed bg-gray-100 text-gray-400'
-              : 'bg-[#014384] text-white hover:bg-[#013070] active:scale-[0.98] disabled:opacity-70'
-          )}
-        >
-          {isClaiming ? 'Claiming…' : isFree ? 'Claim Free Voucher' : `Claim for ${formatPoints(Number(voucher.pointsCost))} pts`}
-        </button>
+        {/* Claim button */}
+        {isClaimed ? (
+          <div className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-50 py-3 text-sm font-black text-emerald-700">
+            <CheckIcon className="h-4 w-4" />
+            Voucher Claimed
+          </div>
+        ) : isExpired ? (
+          <div className="mt-4 flex w-full items-center justify-center rounded-2xl bg-gray-100 py-3 text-sm font-black text-gray-400">
+            Voucher Expired
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onClaim}
+            disabled={isClaiming || isOutOfStock}
+            className={cn(
+              'mt-4 w-full rounded-2xl py-3 text-sm font-black transition',
+              isOutOfStock
+                ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+                : 'bg-[#014384] text-white hover:bg-[#013070] active:scale-[0.98] disabled:opacity-70'
+            )}
+          >
+            {isClaiming ? 'Claiming…' : isFree ? 'Claim Free Voucher' : `Claim for ${formatPoints(Number(voucher.pointsCost))} pts`}
+          </button>
+        )}
       </div>
     </div>
   )
