@@ -299,7 +299,7 @@ function formatValue(p: Promotion): string {
   if (p.type === 'discount') return `${p.value}% off`
   if (p.type === 'freebie') return 'Free item'
   return String(p.value || '—')
-}
+} 
 
 function DetailRow({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
   return (
