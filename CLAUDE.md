@@ -748,6 +748,13 @@ The next security tranche added backend request validation and safer default hea
 - `npm run build:youth` still passes after the new Next header configuration
 - `npm run build:admin` is still blocked locally by the same locked `.next/trace` file, so the admin build remains a local-process issue rather than a verified code regression
 
+## Favicon Refresh (completed 2026-05-01)
+
+- both `apps/admin-panel` and `apps/youth-pwa` now use the SK Buting logo as their App Router favicon via:
+  - `src/app/icon.png`
+  - `src/app/apple-icon.png`
+- the youth PWA manifest was already pointing at the same logo in `public/images/SKButingLogo.png`, so the installed-app icon and browser favicon are now aligned visually
+
 ## What To Do Next
 
 1. Add storefront-specific admin controls if admins should review or override merchant-facing copy such as `pointsPolicy`, banners, and descriptions.
@@ -755,6 +762,6 @@ The next security tranche added backend request validation and safer default hea
 3. Standardize any future admin analytics widgets on the same shadcn chart primitives added for the reports page.
 4. Add a true Firebase Emulator test layer when Firebase CLI/tooling is available, then extend toward end-to-end client flow coverage for notifications, points conversion, merchant storefront payloads, QR awarding logic, and reward redemption flows.
 5. Add deployment-aware CI later for things like EAS preview builds, Vercel/Render env validation, and smoke checks against hosted environments.
-6. Finish deployment polish for the youth PWA by adding a real favicon, verifying `NEXT_PUBLIC_API_URL` includes `/api`, and ensuring Firebase Authorized Domains include the live Vercel hostname.
+6. Finish deployment polish for the youth PWA by verifying `NEXT_PUBLIC_API_URL` includes `/api` and ensuring Firebase Authorized Domains include the live Vercel hostname.
    - the youth `.env.local.example` file now matches the real Firebase public config and storage bucket instead of older placeholder values
 7. Expand the root workspace scripts further if you want one-command flows for more checks, previews, or deployment tasks.
