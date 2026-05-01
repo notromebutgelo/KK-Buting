@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import api from '@/lib/api'
-import Spinner from '@/components/ui/Spinner'
 import { cn } from '@/utils/cn'
 
 interface Summary {
@@ -227,7 +226,7 @@ export default function PointsTransactionsPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
-        <Spinner size="lg" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
       </div>
     )
   }
@@ -237,7 +236,7 @@ export default function PointsTransactionsPage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Points & Transactions</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
+          <p className="mt-0.5 text-sm" style={{ color: 'var(--muted)' }}>
             Monitor every QR transaction, points movement, and barangay-wide balance summary.
           </p>
         </div>
@@ -274,11 +273,11 @@ export default function PointsTransactionsPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
-        <div className="rounded-[28px] border border-[color:var(--kk-border)] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+        <div className="admin-panel">
           <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-lg font-black text-gray-900">Transaction Log</h2>
-              <p className="text-sm text-gray-500">Filter QR scan events by merchant, user, status, date, and points range.</p>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Filter QR scan events by merchant, user, status, date, and points range.</p>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -340,14 +339,16 @@ export default function PointsTransactionsPage() {
                 <button
                   type="button"
                   onClick={handleApplyFilters}
-                  className="flex-1 rounded-2xl bg-[#014384] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#035db7]"
+                  className="flex-1 rounded-2xl px-4 py-3 text-sm font-semibold text-white transition"
+                  style={{ background: 'var(--accent)' }}
                 >
                   Apply Filters
                 </button>
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="rounded-2xl border border-[color:var(--kk-border)] px-4 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
+                  className="rounded-2xl border px-4 py-3 text-sm font-semibold transition hover:bg-[color:var(--accent-soft)]"
+                  style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)', background: 'var(--card)' }}
                 >
                   Reset
                 </button>
@@ -355,32 +356,32 @@ export default function PointsTransactionsPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-3xl border border-[color:var(--kk-border)]">
+          <div className="mt-5 overflow-hidden rounded-[var(--radius-lg)] border" style={{ borderColor: 'var(--stroke)', background: 'var(--card)' }}>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[color:var(--kk-border)] text-sm">
-                <thead className="bg-[#F8FAFC] text-left text-xs uppercase tracking-[0.16em] text-gray-500">
+              <table className="min-w-full divide-y divide-[color:var(--stroke)] text-sm">
+                <thead className="bg-[color:var(--accent-soft)] text-left text-xs uppercase tracking-[0.16em]">
                   <tr>
-                    <th className="px-4 py-3 font-bold">User</th>
-                    <th className="px-4 py-3 font-bold">Merchant</th>
-                    <th className="px-4 py-3 font-bold">Amount</th>
-                    <th className="px-4 py-3 font-bold">Points</th>
-                    <th className="px-4 py-3 font-bold">Status</th>
-                    <th className="px-4 py-3 font-bold">Timestamp</th>
+                    <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>User</th>
+                    <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Merchant</th>
+                    <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Amount</th>
+                    <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Points</th>
+                    <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Status</th>
+                    <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Timestamp</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[color:var(--kk-border)] bg-white">
+                <tbody className="divide-y divide-[color:var(--stroke)] bg-white">
                   {data.transactionLog.length ? (
                     data.transactionLog.map((transaction) => (
-                      <tr key={transaction.id} className="align-top">
+                      <tr key={transaction.id} className="align-top hover:bg-[color:var(--accent-soft)]">
                         <td className="px-4 py-3">
                           <p className="font-semibold text-gray-900">{transaction.userName}</p>
-                          <p className="text-xs text-gray-500">{transaction.userEmail || 'No email'}</p>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>{transaction.userEmail || 'No email'}</p>
                         </td>
                         <td className="px-4 py-3 text-gray-700">{transaction.merchantName}</td>
                         <td className="px-4 py-3 text-gray-700">
                           {typeof transaction.amountSpent === 'number' ? `PHP ${transaction.amountSpent.toFixed(2)}` : 'N/A'}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-[#014384]">{formatPoints(transaction.pointsAwarded)}</td>
+                        <td className="px-4 py-3 font-semibold" style={{ color: 'var(--accent-strong)' }}>{formatPoints(transaction.pointsAwarded)}</td>
                         <td className="px-4 py-3">
                           <span
                             className={cn(
@@ -393,12 +394,12 @@ export default function PointsTransactionsPage() {
                             {transaction.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-500">{formatDateTime(transaction.timestamp)}</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--muted)' }}>{formatDateTime(transaction.timestamp)}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">
+                      <td colSpan={6} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--muted)' }}>
                         No transactions matched the current filters.
                       </td>
                     </tr>
@@ -410,15 +411,15 @@ export default function PointsTransactionsPage() {
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-[28px] border border-[color:var(--kk-border)] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+          <section className="admin-panel">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-black text-gray-900">Conversion Rate Settings</h2>
-                <p className="text-sm text-gray-500">Adjust the barangay-wide PHP to point conversion.</p>
+                <p className="text-sm" style={{ color: 'var(--muted)' }}>Adjust the barangay-wide PHP to point conversion.</p>
               </div>
               <span className={cn(
                 'rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.14em]',
-                isSuperadmin ? 'bg-[#E8F1FF] text-[#014384]' : 'bg-gray-100 text-gray-500'
+                isSuperadmin ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]' : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
               )}>
                 {isSuperadmin ? 'Superadmin' : 'View only'}
               </span>
@@ -433,7 +434,7 @@ export default function PointsTransactionsPage() {
                   value={conversionRateInput}
                   onChange={(event) => setConversionRateInput(event.target.value)}
                   disabled={!isSuperadmin || isSaving}
-                  className="mt-2 w-full rounded-2xl border border-[color:var(--kk-border)] bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-[#014384] disabled:cursor-not-allowed disabled:bg-gray-50"
+                  className="surface-input mt-2 w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30 disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </label>
               <div className="rounded-2xl bg-[#F8FAFC] px-4 py-3 text-sm text-gray-600">
@@ -451,35 +452,35 @@ export default function PointsTransactionsPage() {
             </div>
           </section>
 
-          <section className="rounded-[28px] border border-[color:var(--kk-border)] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+          <section className="admin-panel">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-black text-gray-900">Points Leaderboard</h2>
-                <p className="text-sm text-gray-500">Top point earners in the barangay.</p>
+                <p className="text-sm" style={{ color: 'var(--muted)' }}>Top point earners in the barangay.</p>
               </div>
-              <span className="rounded-full bg-[#E8F1FF] px-3 py-1 text-xs font-bold text-[#014384]">Top 10</span>
+              <span className="rounded-full px-3 py-1 text-xs font-bold bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]">Top 10</span>
             </div>
             <div className="mt-4 space-y-3">
               {filteredLeaderboard.length ? (
                 filteredLeaderboard.map((entry, index) => (
-                  <div key={entry.userId} className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--kk-border)] px-4 py-3">
+                  <div key={entry.userId} className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: 'var(--stroke)' }}>
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#014384] text-sm font-black text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white" style={{ background: 'var(--accent)' }}>
                         #{index + 1}
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900">{entry.userName}</p>
-                        <p className="text-xs text-gray-500">{entry.userEmail || 'No email'}</p>
+                        <p className="text-xs" style={{ color: 'var(--muted)' }}>{entry.userEmail || 'No email'}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-[#014384]">{formatPoints(entry.totalPoints)}</p>
-                      <p className="text-xs text-gray-500">Earned {formatPoints(entry.earnedPoints)}</p>
+                      <p className="font-black" style={{ color: 'var(--accent-strong)' }}>{formatPoints(entry.totalPoints)}</p>
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>Earned {formatPoints(entry.earnedPoints)}</p>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-[color:var(--kk-border)] px-4 py-8 text-center text-sm text-gray-500">
+                <div className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm" style={{ borderColor: 'var(--stroke)', color: 'var(--muted)' }}>
                   No leaderboard records yet.
                 </div>
               )}
@@ -488,32 +489,32 @@ export default function PointsTransactionsPage() {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-[color:var(--kk-border)] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+      <section className="admin-panel">
         <div className="mb-4">
           <h2 className="text-lg font-black text-gray-900">Manual Adjustment Log</h2>
-          <p className="text-sm text-gray-500">Every admin-triggered point addition or deduction with reason and admin attribution.</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Every admin-triggered point addition or deduction with reason and admin attribution.</p>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-[color:var(--kk-border)]">
+        <div className="overflow-hidden rounded-[var(--radius-lg)] border" style={{ borderColor: 'var(--stroke)', background: 'var(--card)' }}>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[color:var(--kk-border)] text-sm">
-              <thead className="bg-[#F8FAFC] text-left text-xs uppercase tracking-[0.16em] text-gray-500">
+            <table className="min-w-full divide-y divide-[color:var(--stroke)] text-sm">
+              <thead className="bg-[color:var(--accent-soft)] text-left text-xs uppercase tracking-[0.16em]">
                 <tr>
-                  <th className="px-4 py-3 font-bold">User</th>
-                  <th className="px-4 py-3 font-bold">Direction</th>
-                  <th className="px-4 py-3 font-bold">Points</th>
-                  <th className="px-4 py-3 font-bold">Reason</th>
-                  <th className="px-4 py-3 font-bold">Admin</th>
-                  <th className="px-4 py-3 font-bold">Timestamp</th>
+                  <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>User</th>
+                  <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Direction</th>
+                  <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Points</th>
+                  <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Reason</th>
+                  <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Admin</th>
+                  <th className="px-4 py-3 font-bold" style={{ color: 'var(--muted)' }}>Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[color:var(--kk-border)] bg-white">
+              <tbody className="divide-y divide-[color:var(--stroke)] bg-white">
                 {data.manualAdjustments.length ? (
                   data.manualAdjustments.map((adjustment) => (
-                    <tr key={adjustment.id}>
+                    <tr key={adjustment.id} className="hover:bg-[color:var(--accent-soft)]">
                       <td className="px-4 py-3">
                         <p className="font-semibold text-gray-900">{adjustment.userName}</p>
-                        <p className="text-xs text-gray-500">{adjustment.userEmail || 'No email'}</p>
+                        <p className="text-xs" style={{ color: 'var(--muted)' }}>{adjustment.userEmail || 'No email'}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -527,15 +528,15 @@ export default function PointsTransactionsPage() {
                           {adjustment.direction}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-[#014384]">{formatPoints(adjustment.pointsAwarded)}</td>
+                      <td className="px-4 py-3 font-semibold" style={{ color: 'var(--accent-strong)' }}>{formatPoints(adjustment.pointsAwarded)}</td>
                       <td className="px-4 py-3 text-gray-700">{adjustment.reason || 'No reason provided'}</td>
                       <td className="px-4 py-3 text-gray-700">{adjustment.adminName || 'System'}</td>
-                      <td className="px-4 py-3 text-gray-500">{formatDateTime(adjustment.timestamp)}</td>
+                      <td className="px-4 py-3" style={{ color: 'var(--muted)' }}>{formatDateTime(adjustment.timestamp)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--muted)' }}>
                       No manual point adjustments have been recorded yet.
                     </td>
                   </tr>
@@ -563,9 +564,9 @@ function SummaryCard({
   return (
     <div className={cn('overflow-hidden rounded-[28px] p-[1px] shadow-[0_18px_40px_rgba(15,23,42,0.08)]', accent)}>
       <div className="rounded-[27px] bg-white/96 p-5 backdrop-blur">
-        <p className="text-sm font-semibold text-gray-500">{title}</p>
+        <p className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>{title}</p>
         <p className="mt-3 text-3xl font-black text-gray-900">{value}</p>
-        <p className="mt-2 text-sm text-gray-500">{detail}</p>
+        <p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>{detail}</p>
       </div>
     </div>
   )
@@ -592,7 +593,7 @@ function FilterInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="mt-2 w-full rounded-2xl border border-[color:var(--kk-border)] bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-[#014384]"
+        className="surface-input mt-2 w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
       />
     </label>
   )
@@ -615,7 +616,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-2xl border border-[color:var(--kk-border)] bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-[#014384]"
+        className="surface-input bg-transparent mt-2 w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

@@ -3,6 +3,16 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 import { db } from "../../config/firebase";
 import { createNotification } from "../notifications/notifications.service";
+import {
+  buildMerchantImage,
+  buildMerchantName,
+  buildRewardImage,
+  computeVoucherExpiry,
+  normalizeString,
+  resolveRewardExpiryDate,
+  resolveRewardRedemptionStatus,
+  resolveRewardStatus,
+} from "./rewards.helpers";
 
 type AnyRecord = Record<string, any>;
 
@@ -31,46 +41,6 @@ function serializeRecord<T extends AnyRecord>(record: T): T {
   }
 
   return next;
-}
-
-function normalizeString(value: unknown) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function buildMerchantName(merchant: AnyRecord | null | undefined) {
-  if (!merchant) return "Unknown Merchant";
-  return String(merchant.businessName || merchant.name || "Unknown Merchant");
-}
-
-function buildMerchantImage(merchant: AnyRecord | null | undefined) {
-  if (!merchant) return "";
-  return String(merchant.logoUrl || merchant.imageUrl || merchant.bannerUrl || "");
-}
-
-function buildRewardImage(reward: AnyRecord, merchant: AnyRecord | null | undefined) {
-  return String(reward.imageUrl || merchant?.bannerUrl || merchant?.imageUrl || merchant?.logoUrl || "");
-}
-
-function resolveRewardExpiryDate(reward: AnyRecord) {
-  const value = reward.expiryDate || reward.expiresAt || null;
-  return value ? String(value) : null;
-}
-
-function isRewardExpired(expiryDate: string | null) {
-  if (!expiryDate) return false;
-  const time = new Date(expiryDate).getTime();
-  return !Number.isNaN(time) && time < Date.now();
-}
-
-function resolveRewardStatus(reward: AnyRecord) {
-  const expiryDate = resolveRewardExpiryDate(reward);
-  const stock = reward.unlimitedStock ? null : Number(reward.stock ?? reward.remainingStock ?? 0);
-  const isActive = reward.isActive !== false;
-
-  if (isRewardExpired(expiryDate)) return "expired";
-  if (!isActive) return "inactive";
-  if (!reward.unlimitedStock && stock != null && stock <= 0) return "inactive";
-  return "active";
 }
 
 function normalizeReward(record: AnyRecord, merchant?: AnyRecord | null) {
@@ -113,20 +83,6 @@ async function getYouthMemberId(uid: string) {
   const profile = profileSnap.data() || {};
   const user = userSnap.data() || {};
   return String(profile.idNumber || profile.memberId || profile.digitalIdNumber || user.memberId || uid);
-}
-
-function computeVoucherExpiry(reward: AnyRecord, redeemedAt: Date) {
-  const validDays = Math.max(1, Number(reward.validDays || 30));
-  const voucherExpiry = new Date(redeemedAt);
-  voucherExpiry.setDate(voucherExpiry.getDate() + validDays);
-
-  const rewardExpiry = resolveRewardExpiryDate(reward);
-  if (!rewardExpiry) return voucherExpiry.toISOString();
-
-  const rewardExpiryTime = new Date(rewardExpiry).getTime();
-  if (Number.isNaN(rewardExpiryTime)) return voucherExpiry.toISOString();
-
-  return new Date(Math.min(voucherExpiry.getTime(), rewardExpiryTime)).toISOString();
 }
 
 function buildRedemptionCode() {
@@ -332,14 +288,7 @@ export async function listMyRewardRedemptions(uid: string, statusFilter?: string
       const merchant =
         merchantMap.get(String(transaction.merchantId || "")) ||
         merchantMap.get(String(reward?.merchantId || ""));
-      const expiresAt = String(transaction.expiresAt || computeVoucherExpiry(reward || {}, new Date(transaction.createdAt || Date.now())));
-      const expiresAtTime = new Date(expiresAt).getTime();
-      const computedStatus =
-        String(transaction.redemptionStatus || "").toLowerCase() === "claimed"
-          ? "claimed"
-          : !Number.isNaN(expiresAtTime) && expiresAtTime < Date.now()
-            ? "expired"
-            : "active";
+      const { status, expiresAt } = resolveRewardRedemptionStatus(transaction, reward || {});
 
       return {
         id: String(transaction.id),
@@ -349,7 +298,7 @@ export async function listMyRewardRedemptions(uid: string, statusFilter?: string
         merchantName: String(transaction.merchantName || buildMerchantName(merchant)),
         imageUrl: String(transaction.rewardImageUrl || buildRewardImage(reward || {}, merchant)),
         pointsCost: Math.abs(Number(transaction.points || 0)),
-        status: computedStatus,
+        status,
         code: String(transaction.redemptionCode || ""),
         redeemedAt: String(toIso(transaction.createdAt) || transaction.createdAt || ""),
         expiresAt,

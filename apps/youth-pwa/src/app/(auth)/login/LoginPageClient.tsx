@@ -8,6 +8,7 @@ import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { signIn, signInWithGoogle } from "@/services/auth.service";
 import { getPostAuthRedirect } from "@/services/profiling.service";
 import { useAuthStore } from "@/store/authStore";
+import { persistYouthSession } from "@/lib/session";
 
 export default function LoginPageClient() {
   const router = useRouter();
@@ -29,10 +30,12 @@ export default function LoginPageClient() {
 
     try {
       const { user, token } = await signIn(email, password);
+      await persistYouthSession({
+        token,
+        maxAgeSeconds: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24,
+      });
       setUser(user);
       setToken(token);
-
-      document.cookie = `auth-token=${token}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
 
       const requestedRedirect = searchParams.get("redirect") || "/home";
       const redirect = await getPostAuthRedirect(requestedRedirect);
@@ -63,9 +66,9 @@ export default function LoginPageClient() {
 
     try {
       const { user, token } = await signInWithGoogle();
+      await persistYouthSession({ token, maxAgeSeconds: 60 * 60 * 24 * 30 });
       setUser(user);
       setToken(token);
-      document.cookie = `auth-token=${token}; path=/; max-age=${60 * 60 * 24 * 30}`;
       router.push(await getPostAuthRedirect("/home"));
     } catch (err: any) {
       setError(err?.message || "Google sign-in failed. Please try again.");

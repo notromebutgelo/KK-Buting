@@ -1,11 +1,10 @@
 import axios from 'axios'
 import { auth } from './firebase'
+import { signOut as firebaseSignOut } from 'firebase/auth'
+import { resolveApiBaseUrl } from './api-base-url'
 
 function normalizeApiBaseUrl(url?: string) {
-  const fallback = 'http://localhost:4000/api'
-  const value = (url || fallback).trim()
-
-  return value.replace(/\/+$/, '')
+  return resolveApiBaseUrl(url)
 }
 
 const api = axios.create({
@@ -14,6 +13,8 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+let isHandlingUnauthorized = false
 
 async function waitForAuthReady() {
   if (typeof auth.authStateReady === 'function') {
@@ -45,10 +46,16 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
+    if (error.response?.status === 401 && typeof window !== 'undefined' && !isHandlingUnauthorized) {
+      isHandlingUnauthorized = true
+      void (async () => {
+        await firebaseSignOut(auth).catch(() => undefined)
+        await fetch('/api/session', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+        }).catch(() => undefined)
         window.location.href = '/login'
-      }
+      })()
     }
     return Promise.reject(error)
   }

@@ -11,20 +11,21 @@ const SUPERADMIN_ONLY_ROUTES = [
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const token = request.cookies.get('admin-token')?.value
+  const role = request.cookies.get('admin-role')?.value
 
   if (pathname.startsWith('/login')) {
+    if (token && role) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
     return NextResponse.next()
   }
 
-  const token = request.cookies.get('admin-token')?.value
-
-  if (!token) {
+  if (!token || !role) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
   }
-
-  const role = request.cookies.get('admin-role')?.value
   const isSuperadminOnlyRoute = SUPERADMIN_ONLY_ROUTES.some((route) =>
     pathname === route || pathname.startsWith(route + '/')
   )

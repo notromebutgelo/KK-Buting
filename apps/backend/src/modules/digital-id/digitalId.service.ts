@@ -47,6 +47,18 @@ function normalizeYouthAgeGroup(ageGroup?: string) {
   return value;
 }
 
+function normalizeOptionalString(value: any) {
+  return String(value || "").trim();
+}
+
+function hasCompleteEmergencyContact(profile: Record<string, any>) {
+  return Boolean(
+    normalizeOptionalString(profile.digitalIdEmergencyContactName) &&
+      normalizeOptionalString(profile.digitalIdEmergencyContactRelationship) &&
+      normalizeOptionalString(profile.digitalIdEmergencyContactPhone)
+  );
+}
+
 function getRequiredDocumentTypes(ageGroup?: string) {
   const normalizedAgeGroup = normalizeYouthAgeGroup(ageGroup);
 
@@ -127,6 +139,12 @@ export async function getDigitalId(uid: string) {
     photoUrl: photoDocument?.fileUrl || null,
     verifiedAt: data.verifiedAt,
     digitalIdStatus: data.digitalIdStatus,
+    digitalIdEmergencyContactName: normalizeOptionalString(data.digitalIdEmergencyContactName),
+    digitalIdEmergencyContactRelationship: normalizeOptionalString(
+      data.digitalIdEmergencyContactRelationship
+    ),
+    digitalIdEmergencyContactPhone: normalizeOptionalString(data.digitalIdEmergencyContactPhone),
+    digitalIdEmergencyContactComplete: hasCompleteEmergencyContact(data),
   };
 }
 
@@ -212,6 +230,16 @@ export async function getMyVerificationStatus(uid: string) {
     educationalBackground: profile.educationalBackground || "",
     youthClassification: profile.youthClassification || "",
     workStatus: profile.workStatus || "",
+    digitalIdEmergencyContactName: normalizeOptionalString(
+      profile.digitalIdEmergencyContactName
+    ),
+    digitalIdEmergencyContactRelationship: normalizeOptionalString(
+      profile.digitalIdEmergencyContactRelationship
+    ),
+    digitalIdEmergencyContactPhone: normalizeOptionalString(
+      profile.digitalIdEmergencyContactPhone
+    ),
+    digitalIdEmergencyContactComplete: hasCompleteEmergencyContact(profile),
     registeredSkVoter: profile.registeredSkVoter,
     votedLastSkElections: profile.votedLastSkElections,
     registeredNationalVoter: profile.registeredNationalVoter,

@@ -5,6 +5,10 @@ import { createNotification } from "../notifications/notifications.service";
 import { generateUniqueToken } from "./vouchers.tokens";
 
 type AnyRecord = Record<string, any>;
+type YouthVoucherSummary = AnyRecord & {
+  status: string;
+  claimedByMe: boolean;
+};
 
 function toIso(value: any): string | undefined {
   if (!value) return undefined;
@@ -76,14 +80,22 @@ export async function createVoucher(createdBy: string, payload: AnyRecord) {
 
 export async function listYouthVouchers(uid: string) {
   const snap = await db.collection("vouchers").get();
-  return snap.docs
+  const vouchers: YouthVoucherSummary[] = snap.docs
     .map((doc) => {
       const data = { id: doc.id, ...doc.data() } as AnyRecord;
       const claimedByMe = Array.isArray(data.claimedBy) && data.claimedBy.includes(uid);
       const normalized = normalizeVoucher(data);
-      return { ...normalized, claimedByMe };
-    })
-    .filter((v) => v.status === "active" || v.status === "expired" || v.claimedByMe);
+      return {
+        ...(normalized as AnyRecord),
+        status: String(normalized.status || "active"),
+        claimedByMe,
+      };
+    });
+
+  return vouchers.filter(
+    (voucher) =>
+      voucher.status === "active" || voucher.status === "expired" || voucher.claimedByMe
+  );
 }
 
 // ─── LIST ALL (for superadmin) ─────────────────────────────────────────────────

@@ -5,7 +5,6 @@ import Link from 'next/link'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import api from '@/lib/api'
-import Spinner from '@/components/ui/Spinner'
 import { cn } from '@/utils/cn'
 
 interface YouthMember {
@@ -363,8 +362,8 @@ export default function YouthPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-[color:var(--kk-primary)]">Youth Management</h1>
-          <p className="mt-1 text-sm text-[color:var(--kk-muted)]">
+          <h1 className="text-2xl font-black" style={{ color: 'var(--ink)' }}>Youth Management</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
             Search, review, export, and maintain youth member records without leaving the admin
             workflow.
           </p>
@@ -374,7 +373,8 @@ export default function YouthPage() {
             type="button"
             onClick={exportCsv}
             disabled={isExporting}
-            className="rounded-xl border border-[color:var(--kk-border)] bg-white px-4 py-2.5 text-sm font-semibold text-[color:var(--kk-primary)] shadow-sm hover:bg-[#eef5fd] disabled:opacity-60"
+            className="rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-[color:var(--accent-soft)] disabled:opacity-60"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
           >
             {isExporting ? 'Preparing export...' : `Export ${selectedIds.length > 0 ? 'Selected' : 'Filtered'} CSV`}
           </button>
@@ -382,14 +382,15 @@ export default function YouthPage() {
             type="button"
             onClick={exportPdf}
             disabled={isExporting}
-            className="rounded-xl bg-[linear-gradient(90deg,#014384_0%,#0572DC_100%)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+            style={{ background: 'var(--accent)' }}
           >
             Export PDF Report
           </button>
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-[color:var(--kk-border)] bg-white/95 p-5 shadow-[0_14px_34px_rgba(1,67,132,0.08)]">
+      <div className="admin-panel p-5">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SearchInput value={search} onChange={setSearch} />
           <FilterSelect label="Verification Status" value={verificationStatus} onChange={setVerificationStatus} options={['all', 'not_submitted', 'pending', 'verified', 'rejected']} />
@@ -417,41 +418,41 @@ export default function YouthPage() {
         <StatTile label="Archived" value={summary?.archived || 0} />
       </div>
 
-      <div className="overflow-hidden rounded-[28px] border border-[color:var(--kk-border)] bg-white shadow-[0_14px_34px_rgba(1,67,132,0.08)]">
+      <div className="overflow-hidden rounded-[var(--radius-lg)] border" style={{ borderColor: 'var(--stroke)', background: 'var(--card)' }}>
         {isLoading ? (
           <div className="flex justify-center py-20">
-            <Spinner size="lg" />
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1200px] w-full">
-              <thead className="bg-[#eef5fd]">
+              <thead className="bg-[color:var(--accent-soft)]">
                 <tr>
                   <th className="px-4 py-3 text-left">
                     <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} />
                   </th>
                   <SortableHeader label="Full Name" active={sortKey === 'fullName'} direction={sortDir} onClick={() => toggleSort('fullName')} />
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">KK ID</th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">Age</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>KK ID</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Age</th>
                   <SortableHeader label="Age Group" active={sortKey === 'ageGroup'} direction={sortDir} onClick={() => toggleSort('ageGroup')} />
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">Barangay</th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">Profiling</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Barangay</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Profiling</th>
                   <SortableHeader label="Verification" active={sortKey === 'verificationStatus'} direction={sortDir} onClick={() => toggleSort('verificationStatus')} />
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">Points</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Points</th>
                   <SortableHeader label="Registered" active={sortKey === 'createdAt'} direction={sortDir} onClick={() => toggleSort('createdAt')} />
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#eef2f7]">
+              <tbody className="divide-y divide-[color:var(--stroke)]">
                 {members.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-5 py-14 text-center text-sm text-[color:var(--kk-muted)]">
+                    <td colSpan={11} className="px-5 py-14 text-center text-sm" style={{ color: 'var(--muted)' }}>
                       No youth members found with the current filters.
                     </td>
                   </tr>
                 ) : (
                   members.map((member) => (
-                    <tr key={member.uid} className="hover:bg-[#fffaf0]">
+                    <tr key={member.uid} className="hover:bg-[color:var(--accent-soft)]">
                       <td className="px-4 py-4">
                         <input
                           type="checkbox"
@@ -461,26 +462,26 @@ export default function YouthPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div>
-                          <p className="font-semibold text-[color:var(--kk-primary)]">
+                          <p className="font-semibold" style={{ color: 'var(--ink)' }}>
                             {member.fullName || member.UserName}
                           </p>
-                          <p className="text-xs text-[color:var(--kk-muted)]">
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
                             {member.email || 'No email'} | {member.contactNumber || 'No contact'}
                           </p>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-[color:var(--kk-ink)]">
+                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
                         {member.idNumber || '-'}
                       </td>
-                      <td className="px-5 py-4 text-sm text-[color:var(--kk-ink)]">
+                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
                         {member.age ?? '-'}
                       </td>
-                      <td className="px-5 py-4 text-sm text-[color:var(--kk-ink)]">
+                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
                         {member.ageGroup || '-'}
                       </td>
-                      <td className="px-5 py-4 text-sm text-[color:var(--kk-ink)]">
+                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
                         <div>{member.barangay || '-'}</div>
-                        <div className="text-xs text-[color:var(--kk-muted)]">{member.purok || 'No purok'}</div>
+                        <div className="text-xs" style={{ color: 'var(--muted)' }}>{member.purok || 'No purok'}</div>
                       </td>
                       <td className="px-5 py-4">
                         <StatusBadge
@@ -494,16 +495,16 @@ export default function YouthPage() {
                           tone={member.verificationStatus || 'pending'}
                         />
                       </td>
-                      <td className="px-5 py-4 text-sm font-semibold text-[color:var(--kk-primary)]">
+                      <td className="px-5 py-4 text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
                         {(member.points?.totalPoints || 0).toLocaleString()}
                       </td>
-                      <td className="px-5 py-4 text-sm text-[color:var(--kk-muted)]">
+                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--muted)' }}>
                         {member.createdAt ? new Date(member.createdAt).toLocaleDateString('en-PH') : '-'}
                       </td>
                       <td className="px-5 py-4 text-right">
                         <Link
                           href={`/youth/${member.uid}`}
-                          className="font-semibold text-[color:var(--kk-primary-2)] hover:text-[color:var(--kk-primary)]"
+                          className="font-semibold text-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
                         >
                           View Profile
                         </Link>
@@ -517,8 +518,8 @@ export default function YouthPage() {
         )}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-[24px] border border-[color:var(--kk-border)] bg-white px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-[color:var(--kk-muted)]">
+      <div className="admin-card flex flex-col gap-3 px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>
           Showing {members.length === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1}-
           {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} members
         </p>
@@ -527,18 +528,20 @@ export default function YouthPage() {
             type="button"
             onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
             disabled={pagination.page === 1}
-            className="rounded-lg border border-[color:var(--kk-border)] px-3 py-2 text-sm text-[color:var(--kk-primary)] disabled:opacity-40"
+            className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
           >
             Previous
           </button>
-          <span className="px-2 text-sm font-semibold text-[color:var(--kk-primary)]">
+          <span className="px-2 text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
             Page {pagination.page} of {pagination.totalPages}
           </span>
           <button
             type="button"
             onClick={() => setCurrentPage((page) => Math.min(pagination.totalPages, page + 1))}
             disabled={pagination.page === pagination.totalPages}
-            className="rounded-lg border border-[color:var(--kk-border)] px-3 py-2 text-sm text-[color:var(--kk-primary)] disabled:opacity-40"
+            className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
           >
             Next
           </button>
@@ -551,7 +554,7 @@ export default function YouthPage() {
 function SearchInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <div className="md:col-span-2">
-      <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">
+      <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
         Search
       </label>
       <input
@@ -559,7 +562,7 @@ function SearchInput({ value, onChange }: { value: string; onChange: (value: str
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Name, email, contact number, or KK ID"
-        className="w-full rounded-xl border border-[color:var(--kk-border)] px-4 py-2.5 text-sm text-[color:var(--kk-ink)] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[color:var(--kk-primary-2)]"
+        className="surface-input w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
       />
     </div>
   )
@@ -578,13 +581,13 @@ function FilterSelect({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">
+      <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
         {label}
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-[color:var(--kk-border)] bg-white px-4 py-2.5 text-sm text-[color:var(--kk-ink)] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[color:var(--kk-primary-2)]"
+        className="surface-input w-full rounded-xl bg-transparent px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -607,14 +610,14 @@ function DateInput({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">
+      <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
         {label}
       </label>
       <input
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-[color:var(--kk-border)] px-4 py-2.5 text-sm text-[color:var(--kk-ink)] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[color:var(--kk-primary-2)]"
+        className="surface-input w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
       />
     </div>
   )
@@ -633,14 +636,15 @@ function SortableHeader({
 }) {
   return (
     <th
-      className="cursor-pointer px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)] hover:text-[color:var(--kk-primary)]"
+      className="cursor-pointer px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] hover:text-[color:var(--accent-strong)]"
+      style={{ color: 'var(--muted)' }}
       onClick={onClick}
     >
       {label}
       <span
         className={cn(
           'ml-2 inline-block text-[11px]',
-          active ? 'text-[color:var(--kk-primary)]' : 'text-transparent'
+          active ? 'text-[color:var(--accent-strong)]' : 'text-transparent'
         )}
       >
         {direction === 'asc' ? '^' : 'v'}
@@ -658,16 +662,16 @@ function StatusBadge({
 }) {
   const className =
     tone === 'verified'
-      ? 'bg-[#eef5fd] text-[color:var(--kk-primary)]'
+      ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
       : tone === 'pending'
-        ? 'bg-[#fff3cf] text-[#9b6500]'
+        ? 'bg-amber-50 text-amber-700'
         : tone === 'not_submitted'
-          ? 'bg-slate-100 text-slate-700'
+          ? 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
         : tone === 'rejected'
           ? 'bg-red-100 text-red-700'
           : tone === 'complete'
-            ? 'bg-[#eef5fd] text-[color:var(--kk-primary)]'
-            : 'bg-slate-100 text-slate-600'
+            ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
+            : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
 
   return (
     <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize', className)}>
@@ -678,9 +682,9 @@ function StatusBadge({
 
 function StatTile({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[22px] border border-[color:var(--kk-border)] bg-white px-4 py-4 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">{label}</p>
-      <p className="mt-2 text-2xl font-black text-[color:var(--kk-primary)]">{value.toLocaleString()}</p>
+    <div className="admin-card px-4 py-4">
+      <p className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>{label}</p>
+      <p className="mt-2 text-2xl font-black" style={{ color: 'var(--ink)' }}>{value.toLocaleString()}</p>
     </div>
   )
 }

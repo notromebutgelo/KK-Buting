@@ -1,35 +1,11 @@
 import { FieldValue } from "firebase-admin/firestore";
 
 import { db } from "../../config/firebase";
-
-type NotificationAudience = "youth" | "merchant" | "admin" | "system";
-type NotificationType =
-  | "info"
-  | "success"
-  | "warning"
-  | "error"
-  | "system"
-  | "account"
-  | "transaction"
-  | "promotion";
-
-type NotificationInput = {
-  recipientUid: string;
-  audience?: NotificationAudience;
-  type?: NotificationType;
-  title: string;
-  body: string;
-  link?: string | null;
-  metadata?: Record<string, unknown> | null;
-};
-
-function toIso(value: any): string | undefined {
-  if (!value) return undefined;
-  if (typeof value?.toDate === "function") return value.toDate().toISOString();
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === "string") return value;
-  return undefined;
-}
+import {
+  NotificationInput,
+  normalizeNotificationRecord,
+  sortNotificationsNewestFirst,
+} from "./notifications.helpers";
 
 export async function createNotification({
   recipientUid,
@@ -61,24 +37,9 @@ export async function createNotification({
 export async function listNotificationsForUser(uid: string) {
   const snap = await db.collection("notifications").where("recipientUid", "==", uid).get();
 
-  return snap.docs
-    .map((doc) => {
-      const data = doc.data() || {};
-      return {
-        id: doc.id,
-        recipientUid: String(data.recipientUid || ""),
-        audience: String(data.audience || "system"),
-        type: String(data.type || "info"),
-        title: String(data.title || "Notification"),
-        body: String(data.body || ""),
-        link: data.link ? String(data.link) : null,
-        metadata: data.metadata || null,
-        read: Boolean(data.readAt),
-        readAt: toIso(data.readAt) || null,
-        createdAt: toIso(data.createdAt) || new Date().toISOString(),
-      };
-    })
-    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  return sortNotificationsNewestFirst(
+    snap.docs.map((doc) => normalizeNotificationRecord(doc.id, doc.data() || {}))
+  );
 }
 
 export async function markAllNotificationsRead(uid: string) {

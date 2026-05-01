@@ -1,6 +1,8 @@
 import express from "express";
 import { corsOptions } from "./config/cors";
+import { ENV } from "./config/env";
 import { errorHandler } from "./middleware/errorHandle";
+import { securityHeaders } from "./middleware/securityHeaders";
 import authRoutes from "./modules/auth/auth.routes";
 import usersRoutes from "./modules/users/users.routes";
 import profilingRoutes from "./modules/profiling/profiling.routes";
@@ -16,8 +18,11 @@ import promotionsRoutes from "./modules/promotions/promotions.routes";
 
 const app = express();
 
+app.disable("x-powered-by");
+app.set("trust proxy", ENV.TRUST_PROXY_HOPS);
+app.use(securityHeaders);
 app.use(corsOptions);
-app.use(express.json({ limit: "12mb" }));
+app.use(express.json({ limit: ENV.JSON_BODY_LIMIT }));
 
 app.get("/health", (_, res) => res.json({ status: "ok" }));
 

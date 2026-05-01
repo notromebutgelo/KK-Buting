@@ -2,6 +2,7 @@ import { db, auth } from "../../config/firebase";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { generateIdNumber } from "../../../utils/generateIdNumber";
 import { setUserRole } from "../auth/user.service";
+import { createMerchantTemporaryPasswordPolicy } from "../auth/merchantPasswordPolicy.service";
 import { getMerchantById } from "../merchants/merhcants.service";
 import { createNotification } from "../notifications/notifications.service";
 
@@ -73,6 +74,10 @@ function normalizeString(value: any) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeOptionalString(value: any) {
+  return String(value || "").trim();
+}
+
 function normalizeYouthAgeGroup(ageGroup?: string) {
   const value = String(ageGroup || "").trim();
 
@@ -89,6 +94,24 @@ function normalizeYouthAgeGroup(ageGroup?: string) {
   }
 
   return value;
+}
+
+function hasCompleteEmergencyContact(profile: AnyRecord) {
+  return Boolean(
+    normalizeOptionalString(profile?.digitalIdEmergencyContactName) &&
+      normalizeOptionalString(profile?.digitalIdEmergencyContactRelationship) &&
+      normalizeOptionalString(profile?.digitalIdEmergencyContactPhone)
+  );
+}
+
+function assertCompleteEmergencyContact(profile: AnyRecord) {
+  if (hasCompleteEmergencyContact(profile)) {
+    return;
+  }
+
+  throw new Error(
+    "Emergency contact is required before generating or activating a digital ID."
+  );
 }
 
 function sanitizeProfilePayload(data: Record<string, unknown>) {
@@ -117,6 +140,9 @@ function sanitizeProfilePayload(data: Record<string, unknown>) {
     "registeredNationalVoter",
     "attendedKkAssembly",
     "kkAssemblyTimesAttended",
+    "digitalIdEmergencyContactName",
+    "digitalIdEmergencyContactRelationship",
+    "digitalIdEmergencyContactPhone",
   ];
 
   return Object.fromEntries(
@@ -1721,6 +1747,7 @@ export async function getDigitalIdMembers(filters: {
         digitalIdApprovedAt: member.profile?.digitalIdApprovedAt,
         digitalIdDeactivatedAt: member.profile?.digitalIdDeactivatedAt,
         hasDigitalId: digitalIdStatus === "active",
+        emergencyContactComplete: hasCompleteEmergencyContact(member.profile || {}),
         profilePhotoUrl:
           member.profile?.photoUrl ||
           member.profile?.idPhotoUrl ||
@@ -1781,6 +1808,7 @@ export async function getDigitalIdMember(userId: string) {
 
   return {
     ...member,
+    emergencyContactComplete: hasCompleteEmergencyContact(profile),
     profile: serializeRecord({ userId, ...profile }),
     photoUrl:
       documents.find((document) => String(document.documentType || "") === "id_photo")?.fileUrl ||
@@ -1801,6 +1829,7 @@ export async function generateDigitalIdDraft(userId: string, adminEmail: string)
   if (profile.status !== "verified" && profile.verified !== true) {
     throw new Error("Only verified profiles can receive a digital ID");
   }
+  assertCompleteEmergencyContact(profile);
 
   const memberId = profile.idNumber || generateIdNumber(userId);
   await profileRef.set(
@@ -1818,7 +1847,17 @@ export async function generateDigitalIdDraft(userId: string, adminEmail: string)
 }
 
 export async function submitDigitalIdForApproval(userId: string, adminEmail: string) {
-  await db.collection("kkProfiling").doc(userId).set(
+  const profileRef = db.collection("kkProfiling").doc(userId);
+  const profileSnap = await profileRef.get();
+
+  if (!profileSnap.exists) {
+    throw new Error("Profile not found");
+  }
+
+  const profile = profileSnap.data() as AnyRecord;
+  assertCompleteEmergencyContact(profile);
+
+  await profileRef.set(
     {
       digitalIdStatus: "pending_approval",
       digitalIdApprovalRequestedAt: FieldValue.serverTimestamp(),
@@ -1829,7 +1868,17 @@ export async function submitDigitalIdForApproval(userId: string, adminEmail: str
 }
 
 export async function approveDigitalId(userId: string, adminEmail: string) {
-  await db.collection("kkProfiling").doc(userId).set(
+  const profileRef = db.collection("kkProfiling").doc(userId);
+  const profileSnap = await profileRef.get();
+
+  if (!profileSnap.exists) {
+    throw new Error("Profile not found");
+  }
+
+  const profile = profileSnap.data() as AnyRecord;
+  assertCompleteEmergencyContact(profile);
+
+  await profileRef.set(
     {
       digitalIdStatus: "active",
       digitalIdApprovedAt: FieldValue.serverTimestamp(),
@@ -1862,6 +1911,7 @@ export async function regenerateDigitalId(userId: string, adminEmail: string) {
   }
 
   const profile = profileSnap.data() as AnyRecord;
+  assertCompleteEmergencyContact(profile);
   const nextRevision = Number(profile.digitalIdRevision || 1) + 1;
   const memberId = generateIdNumber(`${userId}-${nextRevision}`);
 
@@ -1969,6 +2019,8 @@ export async function createMerchantAccount(data: {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
+  await createMerchantTemporaryPasswordPolicy(uid, data.password);
+
   // 4. Create merchant record (pre-approved since superadmin is creating it directly)
   const merchantRef = await db.collection("merchants").add({
     name: data.name,
@@ -1994,7 +2046,7 @@ export async function createMerchantAccount(data: {
     audience: "merchant",
     type: "account",
     title: "Merchant account created",
-    body: "Your KK merchant account has been set up by the superadmin. Log in using the credentials provided to you.",
+    body: "Your KK merchant account has been set up by the superadmin. Log in using the provided credentials, then change the temporary password before using the merchant workspace.",
     link: "/shop",
   });
 

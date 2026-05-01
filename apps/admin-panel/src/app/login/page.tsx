@@ -1,151 +1,135 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { signInWithEmailAndPassword } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
-import api from '@/lib/api'
-import LoadingModal from '@/components/ui/LoadingModal'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { persistAdminSession } from '@/lib/session';
 
 export default function AdminLoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setIsLoading(true)
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const token = await userCredential.user.getIdToken()
-      const res = await api.post(
-        '/auth/login',
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      )
-      const role = res.data.user?.role
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const token = await userCredential.user.getIdToken();
+      const session = await persistAdminSession(token);
+      const role = session.user?.role;
       if (role !== 'admin' && role !== 'superadmin') {
-        await auth.signOut()
-        setError('Access denied. This portal is for admins only.')
-        setIsLoading(false)
-        return
+        await auth.signOut();
+        setError('Access denied. This portal is for admins only.');
+        setIsLoading(false);
+        return;
       }
-      window.localStorage.setItem('kk-admin-role', role)
-      window.localStorage.setItem('kk-admin-email', res.data.user?.email || email)
-      document.cookie = `admin-token=${token}; path=/; max-age=${60 * 60 * 24 * 7}`
-      document.cookie = `admin-role=${role}; path=/; max-age=${60 * 60 * 24 * 7}`
-      router.push('/dashboard')
+      window.localStorage.setItem('kk-admin-role', role);
+      window.localStorage.setItem('kk-admin-email', session.user?.email || email);
+      router.push('/dashboard');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed'
+      const message = err instanceof Error ? err.message : 'Login failed';
       if (
         message.includes('wrong-password') ||
         message.includes('user-not-found') ||
         message.includes('invalid-credential')
       ) {
-        setError('Invalid email or password.')
+        setError('Invalid email or password.');
       } else {
-        setError('Login failed. Please try again.')
+        setError('Login failed. Please try again.');
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
-    <>
-      <LoadingModal
-        open={isLoading}
-        title="Signing in"
-        description="Verifying your credentials and preparing the admin workspace."
-      />
-      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(252,179,21,0.18),transparent_28%),linear-gradient(180deg,#eef5fd_0%,#f0f0f0_48%,#fffaf0_100%)] px-4">
-        <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-5 flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-full bg-white p-2 shadow-[0_16px_36px_rgba(1,67,132,0.14)]">
-            <img
-              src="/images/SKButingLogo.png"
-              alt="SK Buting logo"
-              className="h-[72px] w-[72px] object-contain"
-            />
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        {/* Logo + title */}
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <div
+            className="grid h-12 w-12 place-items-center rounded-2xl text-sm font-bold text-white shadow-sm"
+            style={{ background: 'var(--accent)' }}
+          >
+            KK
           </div>
-          <h1 className="text-3xl font-black text-[color:var(--kk-primary)]">Admin Panel</h1>
-          <p className="mt-1 text-[color:var(--kk-muted)]">
-            Kabataang Katipunan Management System
-          </p>
+          <div className="text-center">
+            <div className="text-xl font-bold" style={{ color: 'var(--ink)' }}>
+              KK Admin Panel
+            </div>
+            <div className="text-sm" style={{ color: 'var(--muted)' }}>
+              Kabataang Katipunan · Barangay Buting
+            </div>
+          </div>
         </div>
 
-        <div className="rounded-[28px] border border-[color:var(--kk-border)] bg-white/94 p-8 shadow-[0_24px_60px_rgba(1,67,132,0.12)] backdrop-blur">
-          <h2 className="mb-2 text-xl font-bold text-[color:var(--kk-primary)]">
+        {/* Card */}
+        <div className="admin-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '2rem' }}>
+          <h1 className="text-lg font-semibold mb-1" style={{ color: 'var(--ink)' }}>
             Administrator Login
-          </h2>
-          <p className="mb-6 text-sm text-[color:var(--kk-muted)]">
-            Sign in with your Firebase admin account to access approvals, reports, and
-            merchant management.
+          </h1>
+          <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
+            Use your admin credentials to access the dashboard.
           </p>
 
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-[color:var(--kk-ink)]">
-                Email Address
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>
+                Email
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-[color:var(--kk-border)] px-4 py-2.5 text-sm text-[color:var(--kk-ink)] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[color:var(--kk-primary-2)]"
                 placeholder="admin@kk.gov.ph"
                 required
+                className="surface-input rounded-xl px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
               />
             </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-[color:var(--kk-ink)]">
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>
                 Password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-[color:var(--kk-border)] px-4 py-2.5 text-sm text-[color:var(--kk-ink)] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[color:var(--kk-primary-2)]"
-                placeholder="........"
+                placeholder="••••••••"
                 required
+                className="surface-input rounded-xl px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
               />
             </div>
+
             <button
               type="submit"
               disabled={isLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] py-2.5 font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-60"
+              className="flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              style={{ background: 'var(--accent)' }}
             >
               {isLoading && (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               )}
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
         </div>
 
-        <div className="mt-6 flex flex-col items-center">
-          <img
-            src="/images/FOOTER.png"
-            alt="Sangguniang Kabataan Barangay Buting"
-            className="h-auto w-[230px] object-contain"
-          />
-          <p className="mt-3 text-center text-xs text-[color:var(--kk-muted)]">
-            Kabataang Katipunan &copy; {new Date().getFullYear()} • Admin Access Only
-          </p>
-        </div>
-        </div>
+        <p className="mt-6 text-center text-xs" style={{ color: 'var(--muted)' }}>
+          Kabataang Katipunan &copy; {new Date().getFullYear()} · Admin Access Only
+        </p>
       </div>
-    </>
-  )
+    </div>
+  );
 }

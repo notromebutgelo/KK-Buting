@@ -36,6 +36,7 @@ export default function DigitalIDPage() {
   }, [profile, user?.UserName])
 
   const isVerified = profile?.status === 'verified'
+  const emergencyContactComplete = hasCompleteEmergencyContact(profile)
   const queueStatus = profile?.verificationQueueStatus || (profile?.documentsSubmitted ? 'pending' : 'not_submitted')
   const isRejected = profile?.status === 'rejected' || queueStatus === 'rejected'
   const hasSubmittedDocuments = Boolean(
@@ -73,7 +74,7 @@ export default function DigitalIDPage() {
   }, [setProfile])
 
   useEffect(() => {
-    if (isProfileLoading || !isVerified) {
+    if (isProfileLoading || !isVerified || !emergencyContactComplete) {
       setIdData(null)
       setError('')
       setIsLoading(false)
@@ -85,7 +86,7 @@ export default function DigitalIDPage() {
       .then(setIdData)
       .catch(() => setError('Could not load your Digital ID right now.'))
       .finally(() => setIsLoading(false))
-  }, [isProfileLoading, isVerified])
+  }, [emergencyContactComplete, isProfileLoading, isVerified])
 
   return (
     <div className="min-h-screen w-full bg-[#f5f5f5] pb-28 text-[#014384]">
@@ -152,6 +153,46 @@ export default function DigitalIDPage() {
               className="mt-10 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
             >
               Continue Profiling
+            </Link>
+          </div>
+        ) : !emergencyContactComplete ? (
+          <div className="mx-auto flex max-w-[340px] flex-col items-center text-center">
+            <h2 className="text-[20px] font-extrabold text-[#014384]">
+              Add Emergency Contact to Complete Your Digital ID
+            </h2>
+
+            <div className="mt-10 flex items-center justify-center">
+              <Image
+                src="/images/VerifyYourIdentity.png"
+                alt="Add emergency contact"
+                width={150}
+                height={150}
+                className="h-auto w-[150px] object-contain"
+              />
+            </div>
+
+            <p className="mt-10 text-[17px] leading-[1.6] text-[#1e4f91]">
+              Add the emergency contact details for the back of your Digital ID before it can be generated or activated.
+            </p>
+
+            <p className="mt-4 max-w-[290px] text-[13px] leading-[1.6] text-[#6f87a8]">
+              {isVerified
+                ? 'Your verification is already complete. Once you save these details, your Digital ID can continue through the final admin approval flow.'
+                : 'You can add this now so your Digital ID will be ready to move forward as soon as your verification is completed.'}
+            </p>
+
+            <Link
+              href="/profile/edit"
+              className="mt-10 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
+            >
+              Add Emergency Contact
+            </Link>
+
+            <Link
+              href="/home"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-[#cbdcf0] bg-white px-6 py-4 text-[16px] font-semibold text-[#014384]"
+            >
+              Return Home
             </Link>
           </div>
         ) : needsResubmission ? (
@@ -338,4 +379,21 @@ function getInitials(value: string) {
     .map((part) => part[0])
     .join('')
     .toUpperCase()
+}
+
+function hasCompleteEmergencyContact(
+  profile:
+    | {
+        digitalIdEmergencyContactName?: string
+        digitalIdEmergencyContactRelationship?: string
+        digitalIdEmergencyContactPhone?: string
+      }
+    | null
+    | undefined
+) {
+  return Boolean(
+    String(profile?.digitalIdEmergencyContactName || '').trim() &&
+      String(profile?.digitalIdEmergencyContactRelationship || '').trim() &&
+      String(profile?.digitalIdEmergencyContactPhone || '').trim()
+  )
 }

@@ -4,6 +4,13 @@ import { storage } from "../../config/firebase";
 import { setUserRole } from "../auth/user.service";
 import { randomUUID } from "crypto";
 import { createNotification } from "../notifications/notifications.service";
+import {
+  buildMerchantPayload,
+  getInlineAssetLimit,
+  normalizeMerchant,
+  normalizeMerchantAssetType,
+  normalizeStringList,
+} from "./merchants.helpers";
 
 type AnyRecord = Record<string, any>;
 
@@ -26,28 +33,6 @@ function serializeRecord<T extends AnyRecord>(record: T): T {
   }
 
   return next;
-}
-
-function normalizeStringList(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.map((entry) => String(entry || "").trim()).filter(Boolean);
-}
-
-function normalizeMerchant(record: AnyRecord): AnyRecord {
-  const merchant = serializeRecord(record) as AnyRecord;
-  return {
-    ...merchant,
-    name: merchant.name || merchant.businessName || "Merchant",
-    businessName: merchant.businessName || merchant.name || "Merchant",
-    description: merchant.description || merchant.shortDescription || "",
-    shortDescription: merchant.shortDescription || merchant.description || "",
-    imageUrl: merchant.imageUrl || merchant.bannerUrl || merchant.logoUrl || "",
-    bannerUrl: merchant.bannerUrl || merchant.imageUrl || "",
-    pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 10),
-    pointsPolicy:
-      merchant.pointsPolicy ||
-      `Earn 10 points for every PHP 100 spent at this shop. Present your youth QR during checkout.`,
-  };
 }
 
 function normalizePromotion(record: AnyRecord): AnyRecord {
@@ -115,41 +100,6 @@ async function getMerchantPromotions(merchantId: string, publicOnly = false) {
     .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
 }
 
-function buildMerchantPayload(data: Record<string, unknown>) {
-  const payload: AnyRecord = {};
-  const allowedKeys = [
-    "name",
-    "businessName",
-    "description",
-    "shortDescription",
-    "category",
-    "address",
-    "imageUrl",
-    "bannerUrl",
-    "logoUrl",
-    "businessInfo",
-    "contactNumber",
-    "discountInfo",
-    "termsAndConditions",
-    "pointsPolicy",
-    "ownerName",
-    "ownerEmail",
-  ];
-
-  for (const [key, value] of Object.entries(data)) {
-    if (allowedKeys.includes(key) && value !== undefined) {
-      payload[key] = value;
-    }
-  }
-
-  if (!payload.name && payload.businessName) payload.name = payload.businessName;
-  if (!payload.businessName && payload.name) payload.businessName = payload.name;
-  if (!payload.description && payload.shortDescription) payload.description = payload.shortDescription;
-  if (!payload.shortDescription && payload.description) payload.shortDescription = payload.description;
-
-  return payload;
-}
-
 function buildPromotionPayload(data: Record<string, unknown>) {
   const payload: AnyRecord = {};
   const allowedKeys = [
@@ -212,10 +162,6 @@ function buildProductPayload(data: Record<string, unknown>) {
   return payload;
 }
 
-function normalizeMerchantAssetType(assetType: string) {
-  return assetType === "banner" ? "banner" : "logo";
-}
-
 function getMerchantAssetBucketCandidates() {
   const primaryBucketName = storage.bucket().name;
   const candidates = [primaryBucketName];
@@ -227,10 +173,6 @@ function getMerchantAssetBucketCandidates() {
   }
 
   return Array.from(new Set(candidates.filter(Boolean)));
-}
-
-function getInlineAssetLimit(assetType: "logo" | "banner") {
-  return assetType === "logo" ? 400_000 : 550_000;
 }
 
 async function uploadMerchantAssetFromBase64(
@@ -287,14 +229,14 @@ async function uploadMerchantAssetFromBase64(
 
 export async function getAllMerchants() {
   const snap = await db.collection("merchants").where("status", "==", "approved").get();
-  return snap.docs.map((doc) => normalizeMerchant({ id: doc.id, ...doc.data() }));
+  return snap.docs.map((doc) => normalizeMerchant(serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord));
 }
 
 export async function getMerchantById(id: string, options?: { includePrivate?: boolean }): Promise<AnyRecord | null> {
   const snap = await db.collection("merchants").doc(id).get();
   if (!snap.exists) return null;
 
-  const merchant = normalizeMerchant({ id: snap.id, ...snap.data() });
+  const merchant = normalizeMerchant(serializeRecord({ id: snap.id, ...snap.data() }) as AnyRecord);
   if (!options?.includePrivate && merchant.status !== "approved") {
     return null;
   }

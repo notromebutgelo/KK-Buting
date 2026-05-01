@@ -10,12 +10,13 @@ import Modal from '@/components/ui/Modal'
 import Spinner from '@/components/ui/Spinner'
 import { useAuthStore } from '@/store/authStore'
 import { useUserStore } from '@/store/userStore'
+import { clearYouthSession } from '@/lib/session'
 
 const menuItems = [
   {
     href: '/profile/edit',
     label: 'Edit Profile',
-    description: 'Update your account name and keep your personal details current.',
+    description: 'Update your account name and manage the emergency contact shown on your Digital ID.',
     icon: (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -126,13 +127,15 @@ export default function ProfilePage() {
     return parts.length > 0 ? parts.join(', ') : 'Not set'
   }, [profile])
 
+  const emergencyContactComplete = hasCompleteEmergencyContact(profile)
+
   const handleLogout = async () => {
     setIsSigningOut(true)
 
     try {
       await signOut()
     } finally {
-      document.cookie = 'auth-token=; path=/; max-age=0'
+      await clearYouthSession()
       setProfile(null)
       logout()
       setIsSigningOut(false)
@@ -255,6 +258,26 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {profile && !emergencyContactComplete ? (
+            <div className="mt-4 rounded-[24px] border border-[#ffe1a6] bg-[#fff8eb] px-5 py-4 shadow-[0_10px_22px_rgba(252,179,21,0.10)]">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#b88408]">
+                Digital ID Reminder
+              </p>
+              <h2 className="mt-2 text-[17px] font-extrabold text-[#014384]">
+                Add your emergency contact
+              </h2>
+              <p className="mt-2 text-[13px] leading-[1.6] text-[#6f5a1d]">
+                Your Digital ID cannot be generated or activated until the emergency contact on the back of the card is complete.
+              </p>
+              <Link
+                href="/profile/edit"
+                className="mt-4 inline-flex items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035db7_58%,#0a74de_100%)] px-4 py-3 text-[13px] font-bold text-white shadow-[0_10px_20px_rgba(1,67,132,0.16)]"
+              >
+                Update Emergency Contact
+              </Link>
+            </div>
+          ) : null}
+
           <div className="mt-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-[16px] font-extrabold text-[#014384]">Profile Tools</h2>
@@ -338,4 +361,21 @@ function getInitials(value: string) {
     .map((part) => part[0] || '')
     .join('')
     .toUpperCase()
+}
+
+function hasCompleteEmergencyContact(
+  profile:
+    | {
+        digitalIdEmergencyContactName?: string
+        digitalIdEmergencyContactRelationship?: string
+        digitalIdEmergencyContactPhone?: string
+      }
+    | null
+    | undefined
+) {
+  return Boolean(
+    String(profile?.digitalIdEmergencyContactName || '').trim() &&
+      String(profile?.digitalIdEmergencyContactRelationship || '').trim() &&
+      String(profile?.digitalIdEmergencyContactPhone || '').trim()
+  )
 }

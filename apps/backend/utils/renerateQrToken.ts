@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { ENV } from "../src/config/env";
 
 /**
  * Generates a signed QR token for a user that merchants can scan.
@@ -7,7 +8,7 @@ import crypto from "crypto";
 export function generateQrToken(userId: string, revision: number): string {
   const timestamp = Date.now();
   const payload = `${userId}:${revision}:${timestamp}`;
-  const hmac = crypto.createHmac("sha256", process.env.QR_SECRET || "kk-secret").update(payload).digest("hex");
+  const hmac = crypto.createHmac("sha256", ENV.QR_SECRET).update(payload).digest("hex");
   return Buffer.from(`${payload}:${hmac}`).toString("base64url");
 }
 
@@ -20,7 +21,7 @@ export function verifyQrToken(token: string): { userId: string; revision: number
     const revision = parseInt(revisionStr, 10);
     const timestamp = parseInt(tsStr, 10);
     const payload = `${userId}:${revisionStr}:${tsStr}`;
-    const expected = crypto.createHmac("sha256", process.env.QR_SECRET || "kk-secret").update(payload).digest("hex");
+    const expected = crypto.createHmac("sha256", ENV.QR_SECRET).update(payload).digest("hex");
     if (hmac !== expected) return null;
     if (Number.isNaN(revision)) return null;
     // Expire after 10 minutes

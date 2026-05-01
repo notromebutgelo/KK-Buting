@@ -8,7 +8,11 @@
       "Bash(npm install:*)",
       "Bash(ls:*)",
       "Bash(ls apps/youth-pwa/src/app/\\\\\\(main\\\\\\)/vouchers/)",
-      "Bash(grep -r export apps/admin-panel/src/components/ui/Spinner*)"
+      "Bash(grep -r export apps/admin-panel/src/components/ui/Spinner*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(wc:*)",
+      "Bash(find /c/Users/hp -maxdepth 4 -type d -name *admin*)"
     ]
   }
 }

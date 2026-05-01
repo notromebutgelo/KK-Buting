@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import api from '@/lib/api'
-import Spinner from '@/components/ui/Spinner'
 import LoadingModal from '@/components/ui/LoadingModal'
 import { cn } from '@/utils/cn'
 
@@ -192,13 +191,13 @@ export default function VerificationDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
-        <Spinner size="lg" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
       </div>
     )
   }
 
   if (!profile) {
-    return <div className="py-20 text-center text-[color:var(--kk-muted)]">Verification record not found.</div>
+    return <div className="py-20 text-center" style={{ color: 'var(--muted)' }}>Verification record not found.</div>
   }
 
   return (
@@ -209,11 +208,12 @@ export default function VerificationDetailPage() {
         description="Please wait while the review action is saved and the submission details are refreshed."
       />
       <div className="space-y-5">
-      <div className="flex flex-col gap-4 rounded-[28px] border border-[color:var(--kk-border)] bg-white/95 p-6 shadow-[0_14px_34px_rgba(1,67,132,0.08)] lg:flex-row lg:items-start lg:justify-between">
+      <div className="admin-panel flex flex-col gap-4 p-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
           <button
             onClick={() => router.back()}
-            className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[color:var(--kk-border)] text-[color:var(--kk-primary)] hover:bg-[#eef5fd]"
+            className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border hover:bg-[color:var(--accent-soft)]"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -221,13 +221,13 @@ export default function VerificationDetailPage() {
           </button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-black text-[color:var(--kk-primary)]">{profile.fullName}</h1>
+              <h1 className="text-2xl font-black" style={{ color: 'var(--ink)' }}>{profile.fullName}</h1>
               <QueueStatusBadge status={profile.queueStatus} />
             </div>
-            <p className="mt-1 text-sm text-[color:var(--kk-muted)]">
+            <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
               {profile.email || 'No email'} | {profile.contactNumber || 'No contact'}
             </p>
-            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">
+            <p className="mt-1 text-xs uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
               Submitted: {profile.submittedAt ? new Date(profile.submittedAt).toLocaleString('en-PH') : '-'}
             </p>
           </div>
@@ -244,7 +244,7 @@ export default function VerificationDetailPage() {
       </div>
 
       {message ? (
-        <div className="rounded-xl border border-[color:var(--kk-border)] bg-[#eef5fd] px-4 py-3 text-sm text-[color:var(--kk-primary)]">
+        <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--stroke)', background: 'var(--accent-soft)', color: 'var(--accent-strong)' }}>
           {message}
         </div>
       ) : null}
@@ -271,10 +271,10 @@ export default function VerificationDetailPage() {
           <Panel title="Required Document Checklist">
             <div className="space-y-3">
               {profile.requiredDocuments.map((document) => (
-                <div key={document.documentType} className="flex items-center justify-between rounded-2xl border border-[color:var(--kk-border)] bg-[#fffaf0] px-4 py-3">
+                <div key={document.documentType} className="flex items-center justify-between rounded-2xl border px-4 py-3" style={{ borderColor: 'var(--stroke)', background: 'var(--accent-soft)' }}>
                   <div>
-                    <p className="font-semibold text-[color:var(--kk-primary)]">{document.label}</p>
-                    <p className="text-xs text-[color:var(--kk-muted)]">
+                    <p className="font-semibold" style={{ color: 'var(--ink)' }}>{document.label}</p>
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
                       {document.present ? `Uploaded ${formatDate(document.uploadedAt)}` : 'Not uploaded yet'}
                     </p>
                   </div>
@@ -289,7 +289,7 @@ export default function VerificationDetailPage() {
           <Panel title="Document Review Panel">
             <div className="space-y-4">
               {groupedDocuments.map((document) => (
-                <div key={document.id} className="rounded-[24px] border border-[color:var(--kk-border)] bg-[#fdfefe] p-4">
+                <div key={document.id} className="admin-card p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -300,9 +300,9 @@ export default function VerificationDetailPage() {
                             onChange={() => toggleSelectedDoc(document.id)}
                           />
                         ) : null}
-                        <h3 className="font-bold text-[color:var(--kk-primary)]">{document.label}</h3>
+                        <h3 className="font-bold" style={{ color: 'var(--ink)' }}>{document.label}</h3>
                       </div>
-                      <p className="text-xs text-[color:var(--kk-muted)]">
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>
                         {document.required ? 'Required document' : 'Supplemental document'} | {formatDate(document.uploadedAt)}
                       </p>
                     </div>
@@ -310,7 +310,7 @@ export default function VerificationDetailPage() {
                   </div>
 
                   {document.fileUrl ? (
-                    <div className="mt-3 overflow-hidden rounded-2xl border border-[color:var(--kk-border)] bg-[#eef5fd]">
+                    <div className="mt-3 overflow-hidden rounded-2xl border bg-[color:var(--accent-soft)]" style={{ borderColor: 'var(--stroke)' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={document.fileUrl}
@@ -328,7 +328,8 @@ export default function VerificationDetailPage() {
                         <button
                           type="button"
                           onClick={() => setPreviewUrl(document.fileUrl || null)}
-                          className="rounded-lg border border-[color:var(--kk-border)] px-3 py-2 text-sm font-semibold text-[color:var(--kk-primary)] hover:bg-[#eef5fd]"
+                          className="rounded-lg border px-3 py-2 text-sm font-semibold transition-colors hover:bg-[color:var(--accent-soft)]"
+                          style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
                         >
                           Zoom / Fullscreen
                         </button>
@@ -336,7 +337,8 @@ export default function VerificationDetailPage() {
                           href={document.fileUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-lg border border-[color:var(--kk-border)] px-3 py-2 text-sm font-semibold text-[color:var(--kk-primary)] hover:bg-[#eef5fd]"
+                          className="rounded-lg border px-3 py-2 text-sm font-semibold transition-colors hover:bg-[color:var(--accent-soft)]"
+                          style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
                         >
                           Open Original
                         </a>
@@ -351,7 +353,7 @@ export default function VerificationDetailPage() {
                         onChange={(e) => setDocNotes((current) => ({ ...current, [document.id]: e.target.value }))}
                         rows={2}
                         placeholder="Per-document review note"
-                        className="mt-3 w-full rounded-xl border border-[color:var(--kk-border)] px-4 py-2.5 text-sm"
+                        className="surface-input mt-3 w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
                       />
                       <div className="mt-3 flex gap-2">
                         <button
@@ -393,7 +395,7 @@ export default function VerificationDetailPage() {
               ) : null}
 
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
                   Resubmission Message
                 </label>
                 <textarea
@@ -401,9 +403,9 @@ export default function VerificationDetailPage() {
                   onChange={(e) => setResubmissionMessage(e.target.value)}
                   rows={3}
                   placeholder="Tell the youth member what to re-upload and why."
-                  className="w-full rounded-xl border border-[color:var(--kk-border)] px-4 py-2.5 text-sm"
+                  className="surface-input w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
                 />
-                <p className="mt-1 text-xs text-[color:var(--kk-muted)]">
+                <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
                   Select the documents above that need to be re-uploaded.
                 </p>
               </div>
@@ -412,14 +414,15 @@ export default function VerificationDetailPage() {
                 type="button"
                 onClick={handleRequestResubmission}
                 disabled={isRequestingResubmission || selectedDocs.length === 0 || !resubmissionMessage.trim()}
-                className="w-full rounded-xl border border-[color:var(--kk-border)] bg-[#fffaf0] py-2.5 font-semibold text-[color:var(--kk-primary)] disabled:opacity-60"
+                className="w-full rounded-xl border py-2.5 font-semibold transition-colors hover:bg-[color:var(--accent-soft)] disabled:opacity-60"
+                style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
               >
                 {isRequestingResubmission ? 'Sending request...' : 'Request Resubmission'}
               </button>
 
-              <div className="rounded-2xl border border-[color:var(--kk-border)] bg-[#f8fbff] p-4">
-                <p className="text-sm font-semibold text-[color:var(--kk-primary)]">Final Verification</p>
-                <p className="mt-1 text-xs text-[color:var(--kk-muted)]">
+              <div className="admin-card p-4">
+                <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Final Verification</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
                   Only verify after every required document is present and approved.
                 </p>
                 <div className="mt-3 flex gap-2">
@@ -427,7 +430,8 @@ export default function VerificationDetailPage() {
                     type="button"
                     onClick={handleVerify}
                     disabled={!canVerify || isApproving}
-                    className="flex-1 rounded-xl bg-[linear-gradient(90deg,#014384_0%,#0572DC_100%)] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    style={{ background: 'var(--accent)' }}
                   >
                     {isApproving ? 'Verifying...' : 'Verify Submission'}
                   </button>
@@ -475,7 +479,8 @@ export default function VerificationDetailPage() {
             <button
               type="button"
               onClick={() => setPreviewUrl(null)}
-              className="absolute right-0 top-0 z-10 rounded-full bg-white/90 px-3 py-2 text-sm font-semibold text-[color:var(--kk-primary)]"
+              className="absolute right-0 top-0 z-10 rounded-full bg-white/90 px-3 py-2 text-sm font-semibold"
+              style={{ color: 'var(--accent-strong)' }}
             >
               Close
             </button>
@@ -491,8 +496,8 @@ export default function VerificationDetailPage() {
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-[28px] border border-[color:var(--kk-border)] bg-white p-5 shadow-[0_14px_34px_rgba(1,67,132,0.08)]">
-      <h2 className="text-lg font-black text-[color:var(--kk-primary)]">{title}</h2>
+    <div className="admin-panel p-5">
+      <h2 className="text-lg font-black" style={{ color: 'var(--ink)' }}>{title}</h2>
       <div className="mt-4">{children}</div>
     </div>
   )
@@ -500,18 +505,18 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 
 function ProfileField({ label, value }: { label: string; value?: string | number | null }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--kk-border)] bg-[#fffaf0] p-4">
-      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-[color:var(--kk-ink)]">{value || '-'}</p>
+    <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--accent-soft)' }}>
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>{label}</p>
+      <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{value || '-'}</p>
     </div>
   )
 }
 
 function SummaryMini({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-[#eef5fd] px-4 py-3 text-center">
-      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">{label}</p>
-      <p className="mt-2 text-2xl font-black text-[color:var(--kk-primary)]">{value.toLocaleString()}</p>
+    <div className="rounded-2xl bg-[color:var(--accent-soft)] px-4 py-3 text-center">
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>{label}</p>
+      <p className="mt-2 text-2xl font-black" style={{ color: 'var(--ink)' }}>{value.toLocaleString()}</p>
     </div>
   )
 }
@@ -519,12 +524,12 @@ function SummaryMini({ label, value }: { label: string; value: number }) {
 function QueueStatusBadge({ status }: { status: string }) {
   const className =
     status === 'pending'
-      ? 'bg-[#fff3cf] text-[#9b6500]'
+      ? 'bg-amber-50 text-amber-700'
       : status === 'in_review'
-        ? 'bg-[#eef5fd] text-[color:var(--kk-primary)]'
+        ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
         : status === 'resubmission_requested'
           ? 'bg-red-100 text-red-700'
-          : 'bg-slate-100 text-slate-700'
+          : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
 
   return (
     <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', className)}>
@@ -543,7 +548,7 @@ function DocumentStatusBadge({ status }: { status: string }) {
           ? 'bg-red-50 text-red-700'
           : status === 'missing'
             ? 'bg-slate-100 text-slate-600'
-            : 'bg-[#fff3cf] text-[#9b6500]'
+            : 'bg-amber-50 text-amber-700'
 
   return (
     <span className={cn('inline-flex rounded-full px-2 py-1 text-[11px] font-semibold', className)}>
@@ -554,7 +559,7 @@ function DocumentStatusBadge({ status }: { status: string }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[color:var(--kk-border)] bg-white px-4 py-10 text-center text-sm text-[color:var(--kk-muted)]">
+    <div className="rounded-2xl border border-dashed px-4 py-10 text-center text-sm" style={{ borderColor: 'var(--stroke)', color: 'var(--muted)' }}>
       {text}
     </div>
   )

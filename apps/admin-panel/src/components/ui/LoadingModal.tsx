@@ -16,13 +16,30 @@ export default function LoadingModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(252, 252, 252, 0.52)] px-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-[28px] border border-white/50 bg-white/96 p-7 text-center shadow-[0_28px_80px_rgba(1,67,132,0.24)]">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[radial-gradient(circle_at_top,#ffd978_0%,#fcb315_52%,#f4a107_100%)] shadow-[0_14px_34px_rgba(252,179,21,0.28)]">
-          <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-[rgba(1,67,132,0.18)] border-t-[color:var(--kk-primary)]" />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(240,240,240,0.52)] px-4 backdrop-blur-sm">
+      <div
+        className="w-full max-w-sm rounded-[28px] border p-7 text-center"
+        style={{
+          borderColor: 'color-mix(in srgb, var(--accent) 10%, white 90%)',
+          background: 'rgba(255, 255, 255, 0.96)',
+          boxShadow: '0 28px 80px rgba(1, 67, 132, 0.18)',
+        }}
+      >
+        <div
+          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
+          style={{
+            background: 'radial-gradient(circle at top, #ffe09a 0%, var(--accent-warm) 54%, var(--brand-gold-soft) 100%)',
+            boxShadow: '0 14px 34px rgba(252, 179, 21, 0.24)',
+          }}
+        >
+          <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-[rgba(1,67,132,0.18)] border-t-[color:var(--accent)]" />
         </div>
-        <h2 className="mt-5 text-xl font-black text-[color:var(--kk-primary)]">{title}</h2>
-        <p className="mt-2 text-sm leading-6 text-[color:var(--kk-muted)]">{description}</p>
+        <h2 className="mt-5 text-xl font-black" style={{ color: 'var(--accent)' }}>
+          {title}
+        </h2>
+        <p className="mt-2 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+          {description}
+        </p>
       </div>
     </div>
   )

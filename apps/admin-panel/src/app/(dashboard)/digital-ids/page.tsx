@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import jsPDF from 'jspdf'
 import JSZip from 'jszip'
-import QRCode from 'qrcode'
 import api from '@/lib/api'
-import Spinner from '@/components/ui/Spinner'
 import { cn } from '@/utils/cn'
 
 interface DigitalIdMember {
@@ -27,6 +25,7 @@ interface DigitalIdMember {
   digitalIdApprovedAt?: string
   digitalIdDeactivatedAt?: string
   hasDigitalId?: boolean
+  emergencyContactComplete?: boolean
   profilePhotoUrl?: string | null
 }
 
@@ -51,6 +50,9 @@ interface DigitalIdDetail extends DigitalIdMember {
     digitalIdApprovedAt?: string
     digitalIdApprovalRequestedAt?: string
     digitalIdRevision?: number
+    digitalIdEmergencyContactName?: string
+    digitalIdEmergencyContactRelationship?: string
+    digitalIdEmergencyContactPhone?: string
   }
 }
 
@@ -71,6 +73,12 @@ interface DigitalIdResponse {
 }
 
 const PAGE_SIZE = 10
+const DIGITAL_ID_TERMS_TEXT =
+  'This card is non-transferable and must be used only by the cardholder whose signature appears herein. Cardholder privileges remain subject to implementing guidelines approved by the Sangguniang Kabataan Council.'
+const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
+const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
+const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
+const DIGITAL_ID_SIGNATORY_OFFICE = ''
 
 export default function DigitalIdsPage() {
   const [members, setMembers] = useState<DigitalIdMember[]>([])
@@ -326,8 +334,8 @@ export default function DigitalIdsPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-[color:var(--kk-primary)]">Digital IDs</h1>
-          <p className="mt-1 text-sm text-[color:var(--kk-muted)]">
+          <h1 className="text-2xl font-black" style={{ color: 'var(--ink)' }}>Digital IDs</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
             Generate, review, activate, and print KK Digital IDs through the admin and superadmin workflow.
           </p>
         </div>
@@ -336,7 +344,8 @@ export default function DigitalIdsPage() {
             type="button"
             onClick={handleBatchDownload}
             disabled={!isSuperadmin || isBatchDownloading || selectedIds.length === 0}
-            className="rounded-xl border border-[color:var(--kk-border)] bg-white px-4 py-2.5 text-sm font-semibold text-[color:var(--kk-primary)] shadow-sm hover:bg-[#eef5fd] disabled:opacity-60"
+            className="rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-[color:var(--accent-soft)] disabled:opacity-60"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)', background: 'var(--card)' }}
           >
             {isBatchDownloading ? 'Preparing ZIP...' : 'Batch Download ZIP'}
           </button>
@@ -344,7 +353,7 @@ export default function DigitalIdsPage() {
       </div>
 
       {message ? (
-        <div className="rounded-xl border border-[color:var(--kk-border)] bg-[#eef5fd] px-4 py-3 text-sm text-[color:var(--kk-primary)]">
+        <div className="rounded-xl border px-4 py-3 text-sm bg-[color:var(--accent-soft)]" style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}>
           {message}
         </div>
       ) : null}
@@ -356,10 +365,10 @@ export default function DigitalIdsPage() {
         <SummaryTile label="Deactivated" value={summary.deactivated} tone="deactivated" />
       </div>
 
-      <div className="rounded-[28px] border border-[color:var(--kk-border)] bg-white/95 p-5 shadow-[0_14px_34px_rgba(1,67,132,0.08)]">
+      <div className="admin-panel">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="md:col-span-2">
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
               Search ID List
             </label>
             <input
@@ -367,17 +376,17 @@ export default function DigitalIdsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Name, email, or ID number"
-              className="w-full rounded-xl border border-[color:var(--kk-border)] px-4 py-2.5 text-sm text-[color:var(--kk-ink)] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[color:var(--kk-primary-2)]"
+              className="surface-input w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
               Status
             </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full rounded-xl border border-[color:var(--kk-border)] bg-white px-4 py-2.5 text-sm text-[color:var(--kk-ink)] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[color:var(--kk-primary-2)]"
+              className="surface-input bg-transparent w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
             >
               <option value="all">All</option>
               <option value="draft">Draft</option>
@@ -390,30 +399,30 @@ export default function DigitalIdsPage() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="overflow-hidden rounded-[28px] border border-[color:var(--kk-border)] bg-white shadow-[0_14px_34px_rgba(1,67,132,0.08)]">
+        <div className="overflow-hidden rounded-[var(--radius-lg)] border" style={{ borderColor: 'var(--stroke)', background: 'var(--card)' }}>
           {isLoading ? (
             <div className="flex justify-center py-20">
-              <Spinner size="lg" />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-[900px] w-full">
-                <thead className="bg-[#eef5fd]">
+                <thead className="bg-[color:var(--accent-soft)]">
                   <tr>
                     <th className="px-4 py-3 text-left">
                       <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} />
                     </th>
-                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">Member</th>
-                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">ID Number</th>
-                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">Status</th>
-                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">Verified</th>
-                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">Actions</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Member</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>ID Number</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Status</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Verified</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#eef2f7]">
+                <tbody className="divide-y divide-[color:var(--stroke)]">
                   {members.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-5 py-14 text-center text-sm text-[color:var(--kk-muted)]">
+                      <td colSpan={6} className="px-5 py-14 text-center text-sm" style={{ color: 'var(--muted)' }}>
                         No digital ID records matched the current filters.
                       </td>
                     </tr>
@@ -422,8 +431,8 @@ export default function DigitalIdsPage() {
                       <tr
                         key={member.uid}
                         className={cn(
-                          'cursor-pointer hover:bg-[#fffaf0]',
-                          selectedMemberId === member.uid ? 'bg-[#fffaf0]' : ''
+                          'cursor-pointer hover:bg-[color:var(--accent-soft)]',
+                          selectedMemberId === member.uid ? 'bg-[color:var(--accent-soft)]' : ''
                         )}
                         onClick={() => setSelectedMemberId(member.uid)}
                       >
@@ -436,30 +445,30 @@ export default function DigitalIdsPage() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-[#eef5fd]">
+                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-[color:var(--accent-soft)]">
                               {member.profilePhotoUrl ? (
                                 <img src={member.profilePhotoUrl} alt={member.fullName} className="h-full w-full object-cover" />
                               ) : (
-                                <span className="text-sm font-bold text-[color:var(--kk-primary)]">
+                                <span className="text-sm font-bold" style={{ color: 'var(--accent-strong)' }}>
                                   {getInitials(member.fullName || member.UserName || '')}
                                 </span>
                               )}
                             </div>
                             <div>
-                              <p className="font-semibold text-[color:var(--kk-primary)]">
+                              <p className="font-semibold" style={{ color: 'var(--ink)' }}>
                                 {member.fullName || member.UserName || 'Youth Member'}
                               </p>
-                              <p className="text-xs text-[color:var(--kk-muted)]">{member.email || 'No email'}</p>
+                              <p className="text-xs" style={{ color: 'var(--muted)' }}>{member.email || 'No email'}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-4 text-sm font-semibold text-[color:var(--kk-primary)]">
+                        <td className="px-5 py-4 text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
                           {member.memberId || 'Not generated'}
                         </td>
                         <td className="px-5 py-4">
                           <StatusBadge status={member.digitalIdStatus} />
                         </td>
-                        <td className="px-5 py-4 text-sm text-[color:var(--kk-muted)]">
+                        <td className="px-5 py-4 text-sm" style={{ color: 'var(--muted)' }}>
                           {member.verifiedAt ? new Date(member.verifiedAt).toLocaleDateString('en-PH') : '-'}
                         </td>
                         <td className="px-5 py-4">
@@ -467,6 +476,7 @@ export default function DigitalIdsPage() {
                             {member.digitalIdStatus === 'draft' && !isSuperadmin ? (
                               <ActionChip
                                 label="Send for Approval"
+                                disabled={!member.emergencyContactComplete}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAction('submit', member)
@@ -476,6 +486,7 @@ export default function DigitalIdsPage() {
                             {member.digitalIdStatus === 'draft' && isSuperadmin ? (
                               <ActionChip
                                 label="Approve & Activate"
+                                disabled={!member.emergencyContactComplete}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAction('approve', member)
@@ -494,6 +505,7 @@ export default function DigitalIdsPage() {
                             {!member.memberId ? (
                               <ActionChip
                                 label={isSuperadmin ? 'Generate ID' : 'Generate Draft'}
+                                disabled={!member.emergencyContactComplete}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAction('generate', member)
@@ -511,34 +523,41 @@ export default function DigitalIdsPage() {
           )}
         </div>
 
-        <div className="rounded-[28px] border border-[color:var(--kk-border)] bg-white p-5 shadow-[0_14px_34px_rgba(1,67,132,0.08)]">
+        <div className="admin-panel">
           {isDetailLoading ? (
             <div className="flex min-h-[520px] items-center justify-center">
-              <Spinner size="lg" />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
             </div>
           ) : !selectedMember ? (
-            <div className="flex min-h-[520px] items-center justify-center text-center text-sm text-[color:var(--kk-muted)]">
+            <div className="flex min-h-[520px] items-center justify-center text-center text-sm" style={{ color: 'var(--muted)' }}>
               Select a member to preview the Digital ID card.
             </div>
           ) : (
             <div className="space-y-5">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">ID Preview</p>
-                <h2 className="mt-2 text-xl font-black text-[color:var(--kk-primary)]">
+                <p className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>ID Preview</p>
+                <h2 className="mt-2 text-xl font-black" style={{ color: 'var(--ink)' }}>
                   {selectedMember.fullName || 'Digital ID Draft'}
                 </h2>
-                <p className="mt-1 text-sm text-[color:var(--kk-muted)]">
+                <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
                   Review the card before approval and printing.
                 </p>
               </div>
 
               <DigitalIdPreviewCard member={selectedMember} />
 
-              <div className="rounded-2xl bg-[#f8fbff] p-4 text-sm text-[color:var(--kk-ink)]">
+              {!selectedMember.emergencyContactComplete ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  The youth member still needs to add a complete emergency contact before this Digital ID can be generated, submitted, approved, or regenerated.
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl bg-[color:var(--accent-soft)] p-4 text-sm" style={{ color: 'var(--ink)' }}>
                 <div className="grid gap-2">
                   <DetailRow label="ID Number" value={selectedMember.memberId || selectedMember.profile?.idNumber || 'Not generated'} />
                   <DetailRow label="Status" value={prettifyStatus(selectedMember.digitalIdStatus)} />
                   <DetailRow label="Revision" value={String(selectedMember.digitalIdRevision || selectedMember.profile?.digitalIdRevision || 1)} />
+                  <DetailRow label="Emergency Contact" value={getEmergencyContactSummary(selectedMember)} />
                   <DetailRow label="Verified On" value={formatDate(selectedMember.verifiedAt || selectedMember.profile?.verifiedAt)} />
                   <DetailRow label="Approval Requested" value={formatDate(selectedMember.profile?.digitalIdApprovalRequestedAt)} />
                   <DetailRow label="Approved On" value={formatDate(selectedMember.digitalIdApprovedAt || selectedMember.profile?.digitalIdApprovedAt)} />
@@ -547,12 +566,12 @@ export default function DigitalIdsPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                {!selectedMember.memberId ? <PrimaryButton label={isSuperadmin ? 'Generate ID' : 'Generate Draft ID'} disabled={isActionLoading} onClick={() => handleAction('generate', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'draft' && !isSuperadmin ? <PrimaryButton label="Send to Superadmin" disabled={isActionLoading} onClick={() => handleAction('submit', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading} onClick={() => handleAction('approve', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading} onClick={() => handleAction('approve', selectedMember)} /> : null}
+                {!selectedMember.memberId ? <PrimaryButton label={isSuperadmin ? 'Generate ID' : 'Generate Draft ID'} disabled={isActionLoading || !selectedMember.emergencyContactComplete} onClick={() => handleAction('generate', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'draft' && !isSuperadmin ? <PrimaryButton label="Send to Superadmin" disabled={isActionLoading || !selectedMember.emergencyContactComplete} onClick={() => handleAction('submit', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading || !selectedMember.emergencyContactComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading || !selectedMember.emergencyContactComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
                 {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label="Download PDF" onClick={() => handleDownloadPdf(selectedMember)} /> : null}
-                {selectedMember.memberId && isSuperadmin ? <SecondaryButton label="Regenerate ID" onClick={() => handleAction('regenerate', selectedMember)} disabled={isActionLoading} /> : null}
+                {selectedMember.memberId && isSuperadmin ? <SecondaryButton label="Regenerate ID" onClick={() => handleAction('regenerate', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete} /> : null}
                 {selectedMember.digitalIdStatus === 'active' && isSuperadmin ? <DangerButton label="Deactivate ID" onClick={() => handleAction('deactivate', selectedMember)} disabled={isActionLoading} /> : null}
               </div>
             </div>
@@ -560,17 +579,17 @@ export default function DigitalIdsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-[24px] border border-[color:var(--kk-border)] bg-white px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-[color:var(--kk-muted)]">
+      <div className="admin-card flex flex-col gap-3 px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>
           Showing {members.length === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1}-
           {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} IDs
         </p>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={pagination.page === 1} className="rounded-lg border border-[color:var(--kk-border)] px-3 py-2 text-sm text-[color:var(--kk-primary)] disabled:opacity-40">Previous</button>
-          <span className="px-2 text-sm font-semibold text-[color:var(--kk-primary)]">
+          <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={pagination.page === 1} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}>Previous</button>
+          <span className="px-2 text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
             Page {pagination.page} of {pagination.totalPages}
           </span>
-          <button type="button" onClick={() => setCurrentPage((page) => Math.min(pagination.totalPages, page + 1))} disabled={pagination.page === pagination.totalPages} className="rounded-lg border border-[color:var(--kk-border)] px-3 py-2 text-sm text-[color:var(--kk-primary)] disabled:opacity-40">Next</button>
+          <button type="button" onClick={() => setCurrentPage((page) => Math.min(pagination.totalPages, page + 1))} disabled={pagination.page === pagination.totalPages} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}>Next</button>
         </div>
       </div>
     </div>
@@ -588,17 +607,17 @@ function SummaryTile({
 }) {
   const bg =
     tone === 'draft'
-      ? 'bg-[#fff3cf]'
+      ? 'bg-amber-50'
       : tone === 'pending'
-        ? 'bg-[#eef5fd]'
+        ? 'bg-[color:var(--accent-soft)]'
         : tone === 'active'
           ? 'bg-green-50'
           : 'bg-red-50'
 
   return (
-    <div className={cn('rounded-[22px] border border-[color:var(--kk-border)] px-4 py-4 shadow-sm', bg)}>
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--kk-muted)]">{label}</p>
-      <p className="mt-2 text-2xl font-black text-[color:var(--kk-primary)]">{value.toLocaleString()}</p>
+    <div className={cn('admin-card px-4 py-4', bg)}>
+      <p className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>{label}</p>
+      <p className="mt-2 text-2xl font-black" style={{ color: 'var(--ink)' }}>{value.toLocaleString()}</p>
     </div>
   )
 }
@@ -606,9 +625,9 @@ function SummaryTile({
 function StatusBadge({ status }: { status: string }) {
   const className =
     status === 'draft'
-      ? 'bg-[#fff3cf] text-[#9b6500]'
+      ? 'bg-amber-50 text-amber-700'
       : status === 'pending_approval'
-        ? 'bg-[#eef5fd] text-[color:var(--kk-primary)]'
+        ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
         : status === 'active'
           ? 'bg-green-100 text-green-700'
           : 'bg-red-100 text-red-700'
@@ -623,15 +642,18 @@ function StatusBadge({ status }: { status: string }) {
 function ActionChip({
   label,
   onClick,
+  disabled,
 }: {
   label: string
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full bg-[#eef5fd] px-3 py-1.5 text-xs font-semibold text-[color:var(--kk-primary)] transition hover:bg-[#d9e9fb]"
+      disabled={disabled}
+      className="rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] hover:opacity-80"
     >
       {label}
     </button>
@@ -652,7 +674,8 @@ function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl bg-[linear-gradient(90deg,#014384_0%,#0572DC_100%)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+      className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+      style={{ background: 'var(--accent)' }}
     >
       {label}
     </button>
@@ -673,7 +696,8 @@ function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl border border-[color:var(--kk-border)] bg-white px-4 py-2.5 text-sm font-semibold text-[color:var(--kk-primary)] shadow-sm hover:bg-[#eef5fd] disabled:opacity-60"
+      className="rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-[color:var(--accent-soft)] disabled:opacity-60"
+      style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)', background: 'var(--card)' }}
     >
       {label}
     </button>
@@ -704,43 +728,23 @@ function DangerButton({
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <span className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--kk-muted)]">{label}</span>
-      <span className="text-right text-sm text-[color:var(--kk-primary)]">{value}</span>
+      <span className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted)' }}>{label}</span>
+      <span className="text-right text-sm" style={{ color: 'var(--accent-strong)' }}>{value}</span>
     </div>
   )
 }
 
 function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
-  const [qrDataUrl, setQrDataUrl] = useState('')
   const fullName = [member.profile?.firstName, member.profile?.middleName, member.profile?.lastName]
     .filter(Boolean)
     .join(' ')
     .toUpperCase() || member.fullName?.toUpperCase() || 'KABATAAN MEMBER'
   const photoUrl = member.photoUrl || member.profilePhotoUrl || null
   const address = buildAddress(member)
-
-  useEffect(() => {
-    let active = true
-
-    async function buildQr() {
-      const qrValue = `KK|${member.uid}|${member.memberId || member.profile?.idNumber || ''}|${member.digitalIdRevision || member.profile?.digitalIdRevision || 1}`
-      try {
-        const nextQr = await QRCode.toDataURL(qrValue, {
-          width: 180,
-          margin: 1,
-          color: { dark: '#014384', light: '#FFFFFF' },
-        })
-        if (active) setQrDataUrl(nextQr)
-      } catch {
-        if (active) setQrDataUrl('')
-      }
-    }
-
-    buildQr()
-    return () => {
-      active = false
-    }
-  }, [member.uid, member.memberId, member.profile?.idNumber, member.digitalIdRevision, member.profile?.digitalIdRevision])
+  const validThru = getDigitalIdValidThru(member)
+  const emergencyContactName = getEmergencyContactName(member)
+  const emergencyContactPhone = getEmergencyContactPhone(member)
+  const emergencyContactRelationship = getEmergencyContactRelationship(member)
 
   return (
     <div className="space-y-4">
@@ -749,13 +753,14 @@ function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
         <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[22.8%] text-[#0b2f5b]">
           <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
             <div className="flex flex-col">
-              <div className="flex h-[54%] items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
+              <div className="flex h-[49%] items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
                 {photoUrl ? <img src={photoUrl} alt={fullName} className="h-full w-full object-cover" /> : <span className="text-sm font-black text-[#014384]">{getInitials(fullName)}</span>}
               </div>
-              <div className="mt-[6.5%] border-t border-[#808080] pt-[4.5%] text-center">
+              <div className="mt-[5.4%] min-h-[10.5%]" />
+              <div className="border-t border-[#808080] pt-[3.8%] text-center">
                 <p className="text-[0.38rem] font-medium tracking-[0.07em] text-[#1a1a1a]">SIGNATURE</p>
               </div>
-              <p className="mt-[5%] break-all text-[0.42rem] font-bold leading-tight text-[#0b2f5b]">{member.memberId || member.profile?.idNumber || 'DRAFT'}</p>
+              <p className="mt-[4%] break-all text-[0.42rem] font-bold leading-tight text-[#0b2f5b]">{member.memberId || member.profile?.idNumber || 'DRAFT'}</p>
             </div>
 
             <div className="pt-[0.5%]">
@@ -771,23 +776,52 @@ function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
         </div>
       </div>
 
-      <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
-        <img src="/images/KK ID - Back BG.png" alt="KK ID back background" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="relative grid h-full grid-cols-[44%_1fr] gap-[5%] px-[7.5%] pb-[10%] pt-[22.8%] text-[#0b2f5b]">
-          <div className="flex flex-col justify-start">
-            <div className="max-w-[72%]">
-              <img src="/images/FOOTER.png" alt="SK Barangay Buting" className="h-auto w-full object-contain" />
-            </div>
-            <p className="mt-[6.5%] text-[0.49rem] font-bold leading-[1.35] text-[#20456f]">IN CASE OF EMERGENCY, PLEASE CONTACT:</p>
-            <p className="mt-[2%] text-[0.7rem] font-black uppercase leading-tight text-[#0b2f5b]">SHARRAINE KIZH V. CUETO</p>
-            <p className="mt-[5%] text-[0.49rem] font-bold uppercase leading-[1.3] text-[#1d5aa1]">Emergency Contact No:</p>
-            <p className="mt-[1%] text-[0.7rem] font-black text-[#0b2f5b]">09220422042</p>
-            <p className="mt-[6%] max-w-[94%] text-[0.52rem] italic leading-[1.4] text-[#4c6d95]">If found, please return to the Barangay Hall of Barangay Buting, Pasig City.</p>
+      <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
+        <div className="absolute inset-[3.6%] rounded-[18px] border-[1.5px] border-[#4e5650]/65" />
+        <div className="absolute inset-[6.2%] rounded-[14px] border border-[#838b85]/35" />
+        <div className="relative flex h-full flex-col px-[9.2%] pb-[14.2%] pt-[12.2%] text-[#2b312e]">
+          <div className="text-center">
+            <p className="text-[0.42rem] font-bold uppercase tracking-[0.09em] text-[#666d67]">
+              In case of emergency, please contact:
+            </p>
+            <p className="mt-[2.6%] text-[0.74rem] font-black uppercase leading-[1.05] tracking-[0.01em] text-[#1f2621]">
+              {emergencyContactName} - {emergencyContactPhone}
+            </p>
+            <p className="mt-[2.2%] text-[0.38rem] font-semibold uppercase tracking-[0.12em] text-[#6b726c]">
+              Relationship: {emergencyContactRelationship}
+            </p>
           </div>
 
-          <div className="flex items-start justify-center pt-[2%]">
-            <div className="w-full max-w-[162px] rounded-[14px] bg-white/92 p-[4%] shadow-md">
-              {qrDataUrl ? <img src={qrDataUrl} alt="QR code" className="h-auto w-full" /> : <div className="aspect-square w-full rounded-[10px] bg-[#eef5fd]" />}
+          <div className="mx-auto mt-[7.4%] max-w-[82%] text-center">
+            <p className="text-[0.42rem] font-bold uppercase tracking-[0.18em] text-[#767d78]">
+              Terms and Conditions
+            </p>
+            <p className="mt-[3%] text-[0.46rem] font-semibold leading-[1.38] text-[#424843]">
+              {DIGITAL_ID_TERMS_TEXT}
+            </p>
+          </div>
+
+          <div className="mt-auto flex justify-center pt-[2.4%]">
+            <div className="flex w-full max-w-[64%] flex-col items-center text-center">
+              <p className="text-[0.36rem] font-bold uppercase tracking-[0.16em] text-[#7a807b]">
+                Valid Thru
+              </p>
+              <p className="mt-[1.8%] text-[0.72rem] font-black text-[#222823]">{validThru}</p>
+              <p className="mt-[4.1%] text-[0.82rem] font-semibold italic tracking-[0.02em] text-[#444b45]">
+                {DIGITAL_ID_SIGNATURE_TEXT}
+              </p>
+              <div className="mt-[1.5%] h-px w-[58%] bg-[#4d544e]" />
+              <p className="mt-[1.9%] text-[0.34rem] font-black uppercase leading-none tracking-[0.08em] text-[#303731]">
+                {DIGITAL_ID_SIGNATORY_NAME}
+              </p>
+              <p className="mt-[1.1%] text-[0.33rem] font-black uppercase leading-none tracking-[0.12em] text-[#303731]">
+                {DIGITAL_ID_SIGNATORY_TITLE}
+              </p>
+              {DIGITAL_ID_SIGNATORY_OFFICE ? (
+                <p className="mt-[0.8%] text-[0.31rem] font-semibold uppercase leading-none tracking-[0.11em] text-[#656d67]">
+                  {DIGITAL_ID_SIGNATORY_OFFICE}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -812,41 +846,42 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
     format: [700, 460],
   })
 
-  const qrValue = `KK|${member.uid}|${member.memberId || member.profile?.idNumber || ''}|${member.digitalIdRevision || member.profile?.digitalIdRevision || 1}`
-  const [qrDataUrl, frontBg, backBg, footerLogo] = await Promise.all([
-    QRCode.toDataURL(qrValue, {
-      width: 220,
-      margin: 1,
-      color: { dark: '#014384', light: '#FFFFFF' },
-    }),
-    loadImageData('/images/KK ID - Front BG.png'),
-    loadImageData('/images/KK ID - Back BG.png'),
-    loadImageData('/images/FOOTER.png'),
-  ])
+  const frontBg = await loadImageData('/images/KK ID - Front BG.png')
   const photoData = member.photoUrl || member.profilePhotoUrl
     ? await loadImageData(member.photoUrl || member.profilePhotoUrl || '').catch(() => '')
     : ''
   const fullName = (member.fullName || buildFullName(member.profile || {})).toUpperCase()
   const address = buildAddress(member)
+  const validThru = getDigitalIdValidThru(member)
+  const emergencyContactName = getEmergencyContactName(member)
+  const emergencyContactPhone = getEmergencyContactPhone(member)
+  const emergencyContactRelationship = getEmergencyContactRelationship(member)
 
   doc.setFillColor(245, 249, 255)
   doc.rect(0, 0, 460, 700, 'F')
 
   doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
-  doc.addImage(backBg, 'PNG', 20, 330, 420, 266)
+  doc.setFillColor(244, 242, 236)
+  doc.roundedRect(20, 330, 420, 266, 24, 24, 'F')
+  doc.setDrawColor(80, 88, 82)
+  doc.setLineWidth(1.2)
+  doc.roundedRect(35, 345, 390, 236, 18, 18, 'S')
+  doc.setDrawColor(139, 147, 141)
+  doc.setLineWidth(0.6)
+  doc.roundedRect(45, 355, 370, 216, 14, 14, 'S')
 
   if (photoData) {
-    doc.addImage(photoData, 'JPEG', 53, 83, 72, 103)
+    doc.addImage(photoData, 'JPEG', 53, 83, 72, 94)
   } else {
     doc.setTextColor(1, 67, 132)
     doc.setFontSize(22)
-    doc.text(getInitials(fullName), 89, 142, { align: 'center' })
+    doc.text(getInitials(fullName), 89, 138, { align: 'center' })
   }
 
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(11, 47, 91)
   doc.setFontSize(6.5)
-  doc.text(member.memberId || member.profile?.idNumber || 'DRAFT', 52, 204)
+  doc.text(member.memberId || member.profile?.idNumber || 'DRAFT', 52, 213)
 
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(29, 90, 161)
@@ -866,26 +901,49 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   doc.text((member.profile?.gender || '-').toUpperCase(), 299, 184)
   doc.text(member.profile?.contactNumber || '-', 164, 232)
 
-  doc.addImage(footerLogo, 'PNG', 38, 392, 130, 28)
-  doc.setTextColor(32, 69, 111)
+  doc.setTextColor(96, 103, 98)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
-  doc.text('IN CASE OF EMERGENCY, PLEASE CONTACT:', 36, 442)
-  doc.setTextColor(11, 47, 91)
+  doc.text('IN CASE OF EMERGENCY, PLEASE CONTACT:', 230, 390, { align: 'center' })
+  doc.setTextColor(31, 38, 33)
   doc.setFontSize(13)
-  doc.text('SHARRAINE KIZH V. CUETO', 36, 460)
-  doc.setTextColor(29, 90, 161)
-  doc.setFontSize(8)
-  doc.text('EMERGENCY CONTACT NO:', 36, 495)
-  doc.setTextColor(11, 47, 91)
-  doc.setFontSize(13)
-  doc.text('09220422042', 36, 512)
-  doc.setTextColor(76, 109, 149)
-  doc.setFont('helvetica', 'italic')
-  doc.setFontSize(8.5)
-  doc.text('If found, please return to the Barangay Hall of Barangay Buting, Pasig City.', 36, 548, { maxWidth: 150 })
+  doc.text(`${emergencyContactName} - ${emergencyContactPhone}`, 230, 408, { align: 'center', maxWidth: 300 })
+  doc.setTextColor(107, 114, 108)
+  doc.setFontSize(7)
+  doc.text(`RELATIONSHIP: ${emergencyContactRelationship}`, 230, 421, { align: 'center', maxWidth: 260 })
 
-  doc.addImage(qrDataUrl, 'PNG', 256, 403, 148, 148)
+  doc.setTextColor(118, 125, 120)
+  doc.setFontSize(8)
+  doc.text('TERMS AND CONDITIONS', 230, 442, { align: 'center' })
+  doc.setTextColor(66, 72, 67)
+  doc.setFontSize(7.9)
+  doc.text(DIGITAL_ID_TERMS_TEXT, 230, 458, { align: 'center', maxWidth: 235, lineHeightFactor: 1.26 })
+
+  doc.setTextColor(122, 128, 123)
+  doc.setFontSize(7)
+  doc.text('VALID THRU', 230, 512, { align: 'center' })
+  doc.setTextColor(34, 40, 35)
+  doc.setFontSize(12)
+  doc.text(validThru, 230, 527, { align: 'center' })
+  doc.setTextColor(68, 75, 69)
+  doc.setFont('times', 'italic')
+  doc.setFontSize(15)
+  doc.text(DIGITAL_ID_SIGNATURE_TEXT, 230, 548, { align: 'center' })
+  doc.setDrawColor(77, 84, 78)
+  doc.setLineWidth(0.8)
+  doc.line(186, 553, 274, 553)
+  doc.setTextColor(48, 55, 49)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(6.2)
+  doc.text(DIGITAL_ID_SIGNATORY_NAME, 230, 564, { align: 'center' })
+  doc.setFontSize(6.4)
+  doc.text(DIGITAL_ID_SIGNATORY_TITLE, 230, 574, { align: 'center' })
+  doc.setTextColor(101, 109, 103)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(5.8)
+  if (DIGITAL_ID_SIGNATORY_OFFICE) {
+    doc.text(DIGITAL_ID_SIGNATORY_OFFICE, 230, 583, { align: 'center' })
+  }
 
   return doc
 }
@@ -948,4 +1006,54 @@ function extractYear(value?: string) {
 
 function buildFullName(profile: DigitalIdDetail['profile']) {
   return [profile?.firstName, profile?.middleName, profile?.lastName].filter(Boolean).join(' ')
+}
+
+function getEmergencyContactName(member: DigitalIdDetail) {
+  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactName, 'NOT PROVIDED YET')
+}
+
+function getEmergencyContactRelationship(member: DigitalIdDetail) {
+  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactRelationship, 'NOT PROVIDED YET')
+}
+
+function getEmergencyContactPhone(member: DigitalIdDetail) {
+  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactPhone, 'NOT PROVIDED YET')
+}
+
+function getEmergencyContactSummary(member: DigitalIdDetail) {
+  if (!member.emergencyContactComplete) {
+    return 'Not provided yet'
+  }
+
+  return `${getEmergencyContactName(member)} (${getEmergencyContactRelationship(member)})`
+}
+
+function formatEmergencyContactField(value: string | undefined, fallback: string) {
+  const nextValue = String(value || '').trim()
+  return nextValue || fallback
+}
+
+function getDigitalIdValidThru(member: DigitalIdDetail) {
+  const baseValue =
+    member.digitalIdApprovedAt ||
+    member.profile?.digitalIdApprovedAt ||
+    member.verifiedAt ||
+    member.profile?.verifiedAt ||
+    member.digitalIdGeneratedAt ||
+    member.profile?.digitalIdGeneratedAt ||
+    new Date().toISOString()
+
+  const date = new Date(baseValue)
+
+  if (Number.isNaN(date.getTime())) {
+    return '-'
+  }
+
+  date.setFullYear(date.getFullYear() + 5)
+
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  })
 }

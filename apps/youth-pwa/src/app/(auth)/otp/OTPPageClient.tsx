@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { refreshVerifiedUser, resendVerificationEmail } from '@/services/auth.service'
 import { getPostAuthRedirect } from '@/services/profiling.service'
 import { useAuthStore } from '@/store/authStore'
+import { persistYouthSession } from '@/lib/session'
 
 const RESEND_SECONDS = 60
 
@@ -40,9 +41,9 @@ export default function OTPPageClient() {
 
     try {
       const { user, token } = await refreshVerifiedUser()
+      await persistYouthSession({ token, maxAgeSeconds: 60 * 60 * 24 * 7 })
       setUser(user)
       setToken(token)
-      document.cookie = `auth-token=${token}; path=/; max-age=${60 * 60 * 24 * 7}`
       router.push(await getPostAuthRedirect(nextPath))
     } catch (err: any) {
       setError(err?.message || 'Your email is not verified yet.')

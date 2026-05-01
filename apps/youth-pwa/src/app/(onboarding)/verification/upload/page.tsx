@@ -225,6 +225,35 @@ export default function VerificationUploadPage() {
 
         <div className="relative z-10 px-4 pb-24 pt-10">
           <div className="mx-auto w-full max-w-[360px]">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="inline-flex items-center gap-2 rounded-full bg-white/86 px-4 py-2 text-[13px] font-semibold text-[#014384] shadow-[0_10px_24px_rgba(1,67,132,0.12)] backdrop-blur-[4px]"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+                Back
+              </button>
+
+              <Link
+                href="/home"
+                className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_10px_24px_rgba(5,114,220,0.2)]"
+              >
+                Return to Home
+              </Link>
+            </div>
+
             <div className="rounded-[28px] bg-white px-5 pb-5 pt-6 shadow-[0_24px_60px_rgba(1,67,132,0.18)]">
               <div className="mb-5 text-center">
                 <p className="mx-auto max-w-[250px] text-[13px] leading-[1.5] text-[#4f6f9b]">
@@ -331,10 +360,10 @@ export default function VerificationUploadPage() {
               <div className="mt-4 flex items-center justify-between">
                 {currentStep === 0 ? (
                   <Link
-                    href="/scanner/digital-id"
-                    className="text-[18px] font-medium italic text-[#1e4f91]"
+                    href="/home"
+                    className="text-[16px] font-semibold italic text-[#1e4f91]"
                   >
-                    Cancel
+                    Return to Home
                   </Link>
                 ) : (
                   <button

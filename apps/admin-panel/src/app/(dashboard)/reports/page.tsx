@@ -10,12 +10,10 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 
-import Spinner from '@/components/ui/Spinner'
 import {
   ChartContainer,
   ChartLegend,
@@ -24,6 +22,16 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
+import {
+  AdminEmptyState,
+  AdminNotice,
+  AdminPageIntro,
+  AdminStatCard,
+  AdminStatGrid,
+  AdminSurface,
+  AdminSurfaceHeader,
+} from '@/components/admin/workspace'
+import { DashboardMiniStat, DashboardPill } from '@/components/dashboard/primitives'
 import api from '@/lib/api'
 
 interface ReportDatum {
@@ -39,37 +47,45 @@ interface ReportData {
   monthlySummary?: { month: string; registered: number; verified: number }[]
 }
 
-const chartPalette = ['#0f6cbd', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#2563eb']
+const chartPalette = [
+  'var(--accent)',
+  'var(--accent-strong)',
+  'var(--accent-warm)',
+  'var(--accent-warm-soft)',
+  'rgba(1, 67, 132, 0.42)',
+  'rgba(5, 114, 220, 0.34)',
+  'rgba(252, 179, 21, 0.34)',
+]
 
 const monthlyConfig = {
   registered: {
     label: 'Registered',
-    color: '#0f6cbd',
+    color: 'var(--accent)',
   },
   verified: {
     label: 'Verified',
-    color: '#14b8a6',
+    color: 'var(--accent-strong)',
   },
 } satisfies ChartConfig
 
 const ageConfig = {
   value: {
     label: 'Members',
-    color: '#0f6cbd',
+    color: 'var(--accent)',
   },
 } satisfies ChartConfig
 
 const classificationConfig = {
   value: {
     label: 'Members',
-    color: '#f59e0b',
+    color: 'var(--accent)',
   },
 } satisfies ChartConfig
 
 const educationConfig = {
   value: {
     label: 'Members',
-    color: '#8b5cf6',
+    color: 'var(--accent)',
   },
 } satisfies ChartConfig
 
@@ -117,6 +133,8 @@ export default function ReportsPage() {
         totalVerified: 0,
         pendingOrOther: 0,
         classifications: 0,
+        topAgeGroup: 'No age group data yet',
+        topEducation: 'No education data yet',
       }
     }
 
@@ -130,11 +148,16 @@ export default function ReportsPage() {
     const totalVerified =
       data.byStatus.find((item) => item.name.toLowerCase() === 'verified')?.value || 0
 
+    const topAgeGroup = [...data.byAgeGroup].sort((a, b) => b.value - a.value)[0]
+    const topEducation = [...data.byEducation].sort((a, b) => b.value - a.value)[0]
+
     return {
       totalProfiles,
       totalVerified,
       pendingOrOther: Math.max(totalProfiles - totalVerified, 0),
       classifications: data.byClassification.length,
+      topAgeGroup: topAgeGroup ? `${topAgeGroup.name} leads the registry.` : 'No age group data yet',
+      topEducation: topEducation ? `${topEducation.name} is the strongest education segment.` : 'No education data yet',
     }
   }, [data])
 
@@ -152,53 +175,117 @@ export default function ReportsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-20">
-        <Spinner size="lg" />
+      <div className="grid gap-6">
+        <AdminSurface>
+          <div className="h-28 animate-pulse rounded-3xl" style={{ background: 'var(--surface-muted)' }} />
+        </AdminSurface>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="admin-panel h-36 animate-pulse"
+              style={{ background: 'color-mix(in srgb, var(--card) 90%, transparent)' }}
+            />
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-[28px] bg-gradient-to-r from-[#0f3f73] via-[#0f6cbd] to-[#14b8a6] p-6 text-white shadow-lg">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/70">Admin analytics</p>
-        <h1 className="mt-2 text-3xl font-black">Reports</h1>
-        <p className="mt-2 max-w-2xl text-sm text-white/80">
-          Live KK youth analytics sourced from the backend. These charts are now rendered using the shadcn chart pattern on top of Recharts for cleaner theming and easier reuse.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <AdminPageIntro
+        eyebrow="Analytics workspace"
+        title="Track the registry with calmer charts, clearer comparisons, and fewer distractions."
+        description="This page is meant to answer leadership questions quickly: how many members are in the system, which segments dominate, and where verification and registration activity are moving."
+        pills={[
+          <DashboardPill key="live" tone="soft">
+            Live backend data
+          </DashboardPill>,
+          <DashboardPill key="scope" tone="default">
+            Superadmin reporting
+          </DashboardPill>,
+        ]}
+        aside={
+          <div className="grid grid-cols-2 gap-3">
+            <DashboardMiniStat
+              label="Verified"
+              value={summary.totalVerified.toLocaleString()}
+              meta="Members cleared in the system"
+              tone="soft"
+            />
+            <DashboardMiniStat
+              label="Pending / other"
+              value={summary.pendingOrOther.toLocaleString()}
+              meta="Still moving through the funnel"
+              tone="neutral"
+            />
+          </div>
+        }
+      />
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-          <h2 className="font-bold text-red-900">Reports are unavailable right now</h2>
-          <p className="mt-1 text-sm text-red-700">{error}</p>
-          <button
-            type="button"
-            onClick={() => void loadReports()}
-            className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-bold text-red-700 shadow-sm"
-          >
-            Retry
-          </button>
-        </div>
+        <AdminNotice tone="danger">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">Reports are unavailable right now.</p>
+              <p>{error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadReports()}
+              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold"
+              style={{ color: '#b91c1c' }}
+            >
+              Retry
+            </button>
+          </div>
+        </AdminNotice>
       ) : null}
 
       {!error && !hasChartData ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-bold text-slate-900">No report data yet</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Live analytics will appear here once member profiling and verification records are available.
-          </p>
-        </div>
+        <AdminSurface>
+          <AdminSurfaceHeader
+            title="No report data yet"
+            description="Live analytics will appear here once member profiling and verification records are available."
+          />
+          <div className="mt-5">
+            <AdminEmptyState
+              title="Waiting for analytics"
+              description="As soon as the registry has enough live member data, the charts and summary cards will populate here."
+            />
+          </div>
+        </AdminSurface>
       ) : null}
 
       {!error && hasChartData ? (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard label="Total profiles" value={summary.totalProfiles} accent="bg-[#0f6cbd]" />
-            <SummaryCard label="Verified youth" value={summary.totalVerified} accent="bg-[#14b8a6]" />
-            <SummaryCard label="Pending or other" value={summary.pendingOrOther} accent="bg-[#f59e0b]" />
-            <SummaryCard label="Classification groups" value={summary.classifications} accent="bg-[#8b5cf6]" />
-          </div>
+          <AdminStatGrid>
+            <AdminStatCard
+              label="Total profiles"
+              value={summary.totalProfiles.toLocaleString()}
+              meta="All profiles represented across the live report data."
+              accent="var(--accent)"
+            />
+            <AdminStatCard
+              label="Verified youth"
+              value={summary.totalVerified.toLocaleString()}
+              meta="Members that have completed enough steps to be counted as verified."
+              accent="var(--accent-strong)"
+            />
+            <AdminStatCard
+              label="Pending or other"
+              value={summary.pendingOrOther.toLocaleString()}
+              meta="Profiles still in progress, pending, or outside the verified state."
+              accent="var(--accent-warm)"
+            />
+            <AdminStatCard
+              label="Classification groups"
+              value={summary.classifications.toLocaleString()}
+              meta="Distinct youth classifications represented in the current dataset."
+              accent="rgba(1, 67, 132, 0.42)"
+            />
+          </AdminStatGrid>
 
           {data?.monthlySummary && data.monthlySummary.length > 0 ? (
             <ChartPanel
@@ -217,7 +304,7 @@ export default function ReportsPage() {
                     />
                     <YAxis tickLine={false} axisLine={false} width={36} />
                     <ChartTooltip
-                      cursor={{ fill: 'rgba(15, 108, 189, 0.08)' }}
+                      cursor={{ fill: 'rgba(22, 115, 79, 0.08)' }}
                       content={<ChartTooltipContent />}
                     />
                     <ChartLegend content={<ChartLegendContent />} />
@@ -233,6 +320,7 @@ export default function ReportsPage() {
             <ChartPanel
               title="Youth by age group"
               description="Shows which age bands are most represented in the registry."
+              insight={summary.topAgeGroup}
             >
               <ChartContainer config={ageConfig} className="min-h-[300px] w-full">
                 <ResponsiveContainer width="100%" height={300}>
@@ -319,6 +407,7 @@ export default function ReportsPage() {
             <ChartPanel
               title="Educational background"
               description="Highlights the strongest educational segments in the current dataset."
+              insight={summary.topEducation}
             >
               <ChartContainer config={educationConfig} className="min-h-[340px] w-full">
                 <ResponsiveContainer width="100%" height={340}>
@@ -347,40 +436,33 @@ export default function ReportsPage() {
   )
 }
 
-function SummaryCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string
-  value: number
-  accent: string
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className={`mb-4 h-2 w-16 rounded-full ${accent}`} />
-      <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-black text-slate-900">{value.toLocaleString()}</p>
-    </div>
-  )
-}
-
 function ChartPanel({
   title,
   description,
   children,
+  insight,
 }: {
   title: string
   description: string
   children: React.ReactNode
+  insight?: string
 }) {
   return (
-    <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4">
-        <h2 className="text-lg font-black text-slate-900">{title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
-      </div>
-      {children}
-    </section>
+    <AdminSurface>
+      <AdminSurfaceHeader title={title} description={description} />
+      <div className="mt-5">{children}</div>
+      {insight ? (
+        <div
+          className="mt-5 rounded-2xl border px-4 py-3 text-sm leading-6"
+          style={{
+            background: 'color-mix(in srgb, var(--surface-muted) 76%, transparent)',
+            borderColor: 'var(--stroke)',
+            color: 'var(--ink-soft)',
+          }}
+        >
+          {insight}
+        </div>
+      ) : null}
+    </AdminSurface>
   )
 }

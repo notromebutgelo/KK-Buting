@@ -1,8 +1,6 @@
 import api from '@/lib/api'
 import { auth } from '@/lib/firebase'
-import type { UserProfile } from '@/store/userStore'
-
-export type ProfilingData = Omit<UserProfile, 'userId' | 'status' | 'submittedAt' | 'verifiedAt' | 'verified'>
+export type ProfilingData = Record<string, unknown>
 
 async function waitForAuthReady() {
   if (typeof auth.authStateReady === 'function') {
@@ -18,6 +16,11 @@ export async function submitProfiling(data: ProfilingData) {
 export async function getProfiling() {
   await waitForAuthReady()
   const res = await api.get('/profiling/me')
+  return res.data
+}
+
+export async function updateProfiling(data: ProfilingData) {
+  const res = await api.patch('/profiling/me', data)
   return res.data
 }
 

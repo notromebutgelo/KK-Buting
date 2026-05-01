@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { ChevronLeft } from 'lucide-react'
 import api from '@/lib/api'
-import Spinner from '@/components/ui/Spinner'
 
 interface Merchant {
   id: string
@@ -72,46 +72,60 @@ export default function MerchantDetailPage() {
     }
   }
 
-  if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>
-  if (!merchant) return <div className="text-center py-20 text-gray-500">Merchant not found.</div>
+  if (isLoading) return (
+    <div className="flex justify-center py-20">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
+    </div>
+  )
+  if (!merchant) return (
+    <div className="py-20 text-center text-sm" style={{ color: 'var(--muted)' }}>Merchant not found.</div>
+  )
 
   const heroImage = merchant.bannerUrl || merchant.imageUrl
-  const statusClassName =
-    merchant.status === 'approved'
-      ? 'bg-green-100 text-green-700'
-      : merchant.status === 'pending'
-        ? 'bg-yellow-100 text-yellow-700'
-        : merchant.status === 'suspended'
-          ? 'bg-orange-100 text-orange-700'
-          : 'bg-red-100 text-red-600'
+  const statusClass =
+    merchant.status === 'approved' ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
+    : merchant.status === 'pending' ? 'bg-amber-50 text-amber-700'
+    : merchant.status === 'suspended' ? 'bg-orange-50 text-orange-700'
+    : 'bg-red-50 text-red-700'
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="mx-auto max-w-2xl flex flex-col gap-5">
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+        <button
+          onClick={() => router.back()}
+          className="grid h-9 w-9 place-items-center rounded-xl border transition-colors hover:bg-[color:var(--accent-soft)]"
+          style={{ borderColor: 'var(--stroke)', color: 'var(--muted)' }}
+        >
+          <ChevronLeft size={18} />
         </button>
-        <h1 className="text-xl font-black text-gray-900 flex-1">{merchant.businessName || merchant.name}</h1>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusClassName}`}>
+        <h1 className="flex-1 text-xl font-bold" style={{ color: 'var(--ink)' }}>
+          {merchant.businessName || merchant.name}
+        </h1>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusClass}`}>
           {merchant.status}
         </span>
       </div>
 
       {message && (
-        <div className={`p-3 rounded-lg text-sm ${message.includes('Failed') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+        <div
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={{
+            borderColor: message.includes('Failed') ? '#fecaca' : 'var(--stroke)',
+            background: message.includes('Failed') ? '#fef2f2' : 'var(--accent-soft)',
+            color: message.includes('Failed') ? '#dc2626' : 'var(--accent-strong)',
+          }}
+        >
           {message}
         </div>
       )}
 
       {heroImage && (
-        <div className="relative h-48 rounded-xl overflow-hidden bg-gray-100">
+        <div className="relative h-48 overflow-hidden rounded-[var(--radius-md)]" style={{ background: 'var(--surface-muted)' }}>
           <Image src={heroImage} alt={merchant.name} fill className="object-cover" />
         </div>
       )}
 
-      <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+      <div className="admin-panel flex flex-col gap-0">
         {[
           ['Name', merchant.businessName || merchant.name],
           ['Category', merchant.category],
@@ -121,62 +135,62 @@ export default function MerchantDetailPage() {
           ['Owner Email', merchant.ownerEmail],
           ['Points Rate', merchant.pointsRate ? `PHP ${merchant.pointsRate} per point` : null],
           ['Registered', new Date(merchant.createdAt).toLocaleDateString('en-PH')],
-        ].map(([label, value]) => (
-          <div key={label} className="flex items-start gap-4 py-1.5 border-b border-gray-50 last:border-0">
-            <span className="text-gray-500 text-sm w-36 flex-shrink-0">{label}</span>
-            <span className="text-gray-900 text-sm font-medium flex-1">{value || 'Not set'}</span>
+        ].map(([label, value], i, arr) => (
+          <div
+            key={label}
+            className={`flex items-start gap-4 py-2.5 ${i < arr.length - 1 ? 'border-b' : ''}`}
+            style={{ borderColor: 'var(--stroke)' }}
+          >
+            <span className="w-32 shrink-0 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{label}</span>
+            <span className="flex-1 text-sm font-medium" style={{ color: 'var(--ink)' }}>{value || 'Not set'}</span>
           </div>
         ))}
       </div>
 
       {(merchant.businessInfo || merchant.discountInfo || merchant.termsAndConditions) && (
-        <div className="grid gap-3">
+        <div className="flex flex-col gap-3">
           {merchant.businessInfo && (
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm font-semibold text-gray-500">Business Info</p>
-              <p className="mt-2 text-sm leading-6 text-gray-700">{merchant.businessInfo}</p>
+            <div className="admin-card">
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Business Info</p>
+              <p className="mt-2 text-sm leading-6" style={{ color: 'var(--ink-soft)' }}>{merchant.businessInfo}</p>
             </div>
           )}
           {merchant.discountInfo && (
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm font-semibold text-gray-500">Discount Info</p>
-              <p className="mt-2 text-sm leading-6 text-gray-700">{merchant.discountInfo}</p>
+            <div className="admin-card">
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Discount Info</p>
+              <p className="mt-2 text-sm leading-6" style={{ color: 'var(--ink-soft)' }}>{merchant.discountInfo}</p>
             </div>
           )}
           {merchant.termsAndConditions && (
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm font-semibold text-gray-500">Terms & Conditions</p>
-              <p className="mt-2 text-sm leading-6 text-gray-700">{merchant.termsAndConditions}</p>
+            <div className="admin-card">
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Terms & Conditions</p>
+              <p className="mt-2 text-sm leading-6" style={{ color: 'var(--ink-soft)' }}>{merchant.termsAndConditions}</p>
             </div>
           )}
         </div>
       )}
 
       {merchant.promotions && merchant.promotions.length > 0 && (
-        <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+        <div className="admin-panel flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-black text-gray-900">Promotions</h2>
-            <span className="text-sm text-gray-500">{merchant.promotions.length} live entries</span>
+            <h2 className="font-bold" style={{ color: 'var(--ink)' }}>Promotions</h2>
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>{merchant.promotions.length} live entries</span>
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {merchant.promotions.map((promotion) => (
-              <div key={promotion.id} className="rounded-xl border border-gray-100 p-4">
+              <div key={promotion.id} className="rounded-xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-gray-900">{promotion.title}</p>
-                    {promotion.shortTagline ? (
-                      <p className="mt-1 text-sm text-gray-500">{promotion.shortTagline}</p>
-                    ) : null}
+                    <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{promotion.title}</p>
+                    {promotion.shortTagline && <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>{promotion.shortTagline}</p>}
                   </div>
-                  {promotion.valueLabel ? (
-                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                      {promotion.valueLabel}
-                    </span>
-                  ) : null}
+                  {promotion.valueLabel && (
+                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{promotion.valueLabel}</span>
+                  )}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
-                  {promotion.startDate ? <span>Starts: {promotion.startDate}</span> : null}
-                  {promotion.endDate ? <span>Ends: {promotion.endDate}</span> : null}
+                <div className="mt-2 flex flex-wrap gap-3 text-xs" style={{ color: 'var(--muted)' }}>
+                  {promotion.startDate && <span>Starts: {promotion.startDate}</span>}
+                  {promotion.endDate && <span>Ends: {promotion.endDate}</span>}
                   <span>{promotion.isActive === false ? 'Paused' : 'Active'}</span>
                 </div>
               </div>
@@ -186,29 +200,25 @@ export default function MerchantDetailPage() {
       )}
 
       {merchant.products && merchant.products.length > 0 && (
-        <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+        <div className="admin-panel flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-black text-gray-900">Products & Menu</h2>
-            <span className="text-sm text-gray-500">{merchant.products.length} items</span>
+            <h2 className="font-bold" style={{ color: 'var(--ink)' }}>Products & Menu</h2>
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>{merchant.products.length} items</span>
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {merchant.products.map((product) => (
-              <div key={product.id} className="rounded-xl border border-gray-100 p-4">
+              <div key={product.id} className="rounded-xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-gray-900">{product.name}</p>
-                    {product.description ? (
-                      <p className="mt-1 text-sm text-gray-500">{product.description}</p>
-                    ) : null}
-                    {product.category ? (
-                      <p className="mt-2 text-xs font-medium uppercase tracking-wide text-gray-400">{product.category}</p>
-                    ) : null}
+                    <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{product.name}</p>
+                    {product.description && <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>{product.description}</p>}
+                    {product.category && <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{product.category}</p>}
                   </div>
-                  {typeof product.price === 'number' ? (
-                    <p className="text-sm font-semibold text-gray-900">PHP {product.price.toFixed(2)}</p>
-                  ) : null}
+                  {typeof product.price === 'number' && (
+                    <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>PHP {product.price.toFixed(2)}</p>
+                  )}
                 </div>
-                <p className="mt-3 text-xs text-gray-500">{product.isActive === false ? 'Hidden from youth app' : 'Visible in youth app'}</p>
+                <p className="mt-2 text-xs" style={{ color: 'var(--muted)' }}>{product.isActive === false ? 'Hidden from youth app' : 'Visible in youth app'}</p>
               </div>
             ))}
           </div>
@@ -216,13 +226,14 @@ export default function MerchantDetailPage() {
       )}
 
       {merchant.status === 'pending' && (
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className="admin-card">
           <button
             onClick={handleApprove}
             disabled={isApproving}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            style={{ background: 'var(--accent)' }}
           >
-            {isApproving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {isApproving && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
             Approve Merchant
           </button>
         </div>

@@ -2,6 +2,15 @@ import { db, auth } from "../../config/firebase";
 import { FieldValue } from "firebase-admin/firestore";
 import { createNotification } from "../notifications/notifications.service";
 
+export type UserRecord = Record<string, any> & {
+  id: string;
+  uid?: string;
+  email?: string;
+  role?: string;
+  UserName?: string;
+  createdAt?: unknown;
+};
+
 export async function createUser(uid: string, data: { UserName: string; email: string }) {
   await auth.setCustomUserClaims(uid, { role: "youth" });
 
@@ -23,10 +32,10 @@ export async function createUser(uid: string, data: { UserName: string; email: s
   });
 }
 
-export async function getUserById(uid: string) {
+export async function getUserById(uid: string): Promise<UserRecord | null> {
   const snap = await db.collection("users").doc(uid).get();
   if (!snap.exists) return null;
-  return { id: snap.id, ...snap.data() };
+  return { id: snap.id, ...(snap.data() || {}) };
 }
 
 export async function setUserRole(uid: string, role: string) {

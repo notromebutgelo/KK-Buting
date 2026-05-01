@@ -11,6 +11,10 @@ export interface UserProfile {
   birthday: string
   email: string
   contactNumber: string
+  digitalIdEmergencyContactName?: string
+  digitalIdEmergencyContactRelationship?: string
+  digitalIdEmergencyContactPhone?: string
+  digitalIdEmergencyContactComplete?: boolean
   region: string
   province: string
   city: string

@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-04-18
+Last updated: 2026-04-28
 
 ## What This Repository Is
 
@@ -83,7 +83,7 @@ This is the youth-facing product. It already contains:
 
 - auth pages for login, register, forgot password, reset password, and OTP screen
 - onboarding intro flow
-- a 9-step profiling flow plus review and success pages
+- a 9-step section-based profiling flow plus review and success pages
 - verification upload and verification status pages
 - main app routes for home, merchants, rewards, scanner, digital ID, and profile
 - backend-backed notifications page
@@ -102,6 +102,8 @@ This is the operations dashboard for admin and superadmin users. It includes:
 
 - login
 - dashboard landing page
+- shared dashboard-specific UI primitives for role-based KPI cards, chart cards, activity feeds, and status panels
+- shared admin workspace primitives for page intros, stat rows, filter bars, table shells, and detail panels
 - verification queue and detailed verification review
 - youth records and youth detail management
 - merchant management and merchant detail views
@@ -140,9 +142,9 @@ The KK ID modules PDF is useful as a business-flow reference, but the implementa
 
 ### What Has Expanded Beyond the PDF
 
-- the profiling flow is more detailed in code than in the PDF
-  - the PDF outlines a smaller profiling set
-  - the repo currently has `step-1` through `step-9`, plus review and success screens
+- the profiling flow now mirrors the 2026 Google Forms questionnaire in a PWA-friendly sectioned wizard
+  - the youth app still uses `step-1` through `step-9`, plus review and success screens
+  - those steps are now grouped sections of the 2026 questionnaire rather than the earlier smaller legacy profiling set
 - admin tooling is broader than the PDF summary
   - the admin panel includes youth lifecycle controls, points adjustments, conversion-rate updates, digital ID approval states, merchant transaction views, and reward redemption claiming
 - merchant tooling is more complete than a simple scan-only module
@@ -169,6 +171,47 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- the youth PWA KK profiling flow now uses the full 2026 Katipunan ng Kabataan profiling questionnaire from the provided Google Forms PDF
+  - the old hardcoded 9-page profiling wizard was replaced with a schema-driven section flow under `apps/youth-pwa/src/app/(onboarding)/profiling/`
+  - the new form covers consent, core demographics, education, employment, health, reproductive health, vaccines, civic engagement, security, disaster preparedness, urban mobility, and aspirations
+  - questionnaire wording, option sets, `Other:` follow-ups, checkbox vs dropdown vs single-choice input types, and the explicit address / in-school skip logic were preserved in the new config
+  - the youth app still renders the survey inside the existing profiling shell and review experience, but the route pages now act as thin wrappers over a shared step renderer instead of each page owning its own bespoke form logic
+  - a new `profiling-schema.ts` file now drives visible questions, review formatting, resume-path logic, and payload normalization
+  - submission now also derives the legacy profile fields that the current backend, digital ID, and admin surfaces still expect, including `birthday`, `youthAgeGroup`, `educationalBackground`, `youthClassification`, `workStatus`, and the older civic booleans such as `registeredSkVoter` and `attendedKkAssembly`
+  - the local draft key was versioned to `profiling-2026` so stale drafts from the earlier reduced profiling form do not collide with the new questionnaire structure
+  - the profiling shell now keeps the full page scrollable while the step dots and `Next` button stay fixed at the bottom of the viewport
+- the youth PWA and backend now support a dedicated Digital ID emergency-contact flow outside the main KK profiling questionnaire
+  - `kkProfiling` records now accept nullable `digitalIdEmergencyContactName`, `digitalIdEmergencyContactRelationship`, and `digitalIdEmergencyContactPhone` fields, and verification-status payloads expose those values plus an `digitalIdEmergencyContactComplete` flag
+  - the youth `Edit Profile` page now lets already-profiled members add or update those emergency-contact details without repeating the 2026 profiling questionnaire
+  - the youth `Digital ID` page now blocks the final ID view with an `Add Emergency Contact to Complete Your Digital ID` prompt whenever any of the three fields are missing
+  - backend digital ID draft generation, approval submission, activation, and regeneration now refuse to proceed until the emergency-contact fields are complete
+  - the youth profile page now also surfaces a reminder card when the Digital ID emergency contact is still missing
+- merchant accounts created by superadmin now carry a temporary-password policy that is enforced in the Expo merchant app
+  - account creation now stores a secure hash of the issued temporary password in a dedicated backend `merchantSecurity` record instead of relying on a client-only reminder
+  - merchant login now posts the entered password to `/api/auth/login` after Firebase sign-in so the backend can compare it against the stored temporary-password hash and decide whether `mustChangePassword` should stay on
+  - the merchant app auth state now persists `mustChangePassword`, and the root navigator blocks access to the merchant workspace until that flag is cleared
+  - a new forced password-change screen now reauthenticates the merchant, updates the Firebase password in-app, and notifies the backend to clear the temporary-password requirement for the current account
+  - if a merchant later signs in again using the original superadmin-issued password, the backend can detect that and re-enable the forced password-change flow
+- backend TypeScript build is clean again after the recent merchant-password rollout
+  - `apps/backend/src/modules/auth/user.service.ts` now returns a typed user record shape instead of an overly narrow `{ id: string }` inference, which keeps auth/login role handling build-safe
+  - `apps/backend/src/modules/vouchers/vouchers.service.ts` now gives the youth voucher list a typed `status` + `claimedByMe` summary shape so the backend build no longer fails on the voucher filter
+  - `npm run build:backend` now completes successfully again
+- the backend now has an initial no-dependency automated test foundation focused on the highest-risk shared business logic
+  - `apps/backend/package.json` now exposes a `test` script, and the repo root now exposes `npm run test:backend`
+  - shared pure helper modules were extracted for notifications, merchant storefront normalization, QR/points conversion, and reward status logic so those rules can be tested without booting Firebase
+  - `apps/backend/tests/backend.helpers.test.js` now covers notification mapping/sorting, merchant storefront payload shaping, QR token extraction, amount-to-points conversion, merchant status gating for QR awards, reward availability resolution, voucher expiry clamping, and reward redemption status calculation
+  - `apps/backend/tests/backend.services.test.js` now extends that baseline into mocked service-level coverage for `notifications.service`, `qr.service`, `merhcants.service`, and `rewards.service`
+  - `apps/backend/tests/backend.routes.test.js` now adds route-level contract coverage for `/notifications/me`, `/notifications/me/read-all`, `/qr/redeem`, `/rewards`, `/rewards/:rewardId/redeem`, and `/rewards/my-redemptions`
+  - `apps/backend/tests/fake-firestore.js` now provides an in-memory Firestore-style integration harness with collection queries, subcollections, transactions, batches, `serverTimestamp`, and `arrayUnion` support for backend tests
+  - `apps/backend/tests/backend.integration.test.js` now validates real stateful write flows for notifications, reward redemption, QR awarding, and merchant storefront updates against that harness
+  - `npm run test:backend` now runs helper, mocked service, route-level contract, and stateful integration suites after a fresh backend build
+  - a true Firebase Emulator suite plus end-to-end client flow tests still needs to be added later if deeper parity with Firebase runtime behavior is required
+- the repo now has a first GitHub Actions CI workflow for backend safety checks
+  - `.github/workflows/backend-ci.yml` installs the root workspace on Node `20.19.4`, runs `npm run build:backend`, and then runs `npm run test:backend`
+  - this gives the project an automatic backend build-and-test gate on pushes to `main` / `master` and on pull requests
+  - `.github/workflows/apps-ci.yml` now adds separate GitHub Actions jobs for `npm run build:admin`, `npm run build:youth`, and `npm run typecheck:merchant`
+  - the repo now has automatic backend, web-app, and merchant-typecheck safety checks on pushes to `main` / `master` and on pull requests
+  - deployment-specific checks such as real EAS builds, Render/Vercel env validation, and Firebase Emulator parity are still later steps
 - superadmin can now create merchant accounts directly from the admin panel
   - a "Create Merchant Account" tab appears in the Merchants page for superadmin only
   - the form collects: business name, category, address, owner name, login email, and password
@@ -187,10 +230,28 @@ The current live points default in code is now:
   - clicking outside the dropdown closes it
   - empty state and loading spinner are shown appropriately
   - the existing `/api/notifications/me` endpoint works for any Firebase-authenticated user including admin UIDs, so no backend changes were needed
-- the admin dashboard now renders two distinct views based on the logged-in role
-  - `admin` view: hero focuses on verification queue and profiling status; shows 4 summary cards (Registered, Verified, Pending, Rejected); no Points Activity or Merchants widgets; quick actions are "Review pending docs" and "View youth members" only; recent activity is filtered to registration, verification, and document events only
-  - `superadmin` view: full dashboard unchanged — all 5 summary cards, Points Activity, Merchants, all 3 quick actions, and unfiltered recent activity
-  - role is read from `localStorage` (`kk-admin-role`) on mount; the hero banner label also adapts ("Admin Dashboard" vs "Superadmin Dashboard")
+- the admin dashboard has been rebuilt around a shared dashboard component system with distinct admin and superadmin views
+  - `apps/admin-panel/src/app/(dashboard)/dashboard/page.tsx` now acts as a thin coordinator: it fetches `/api/admin/dashboard`, resolves the role from `localStorage` (`kk-admin-role`), shows loading skeletons, and renders either `AdminDashboardView` or `SuperadminDashboardView`
+  - reusable dashboard primitives now live under `apps/admin-panel/src/components/dashboard/`, including page intros, KPI cards, chart cards, status lists, activity feeds, legend grids, and dashboard-specific Recharts wrappers
+  - the `admin` dashboard is now intentionally operational: 4 KPI cards, verification lifecycle chart, a "Needs attention" stack, profiling completion, and a tighter activity feed limited to registration, verification, and document events
+  - the `superadmin` dashboard now behaves more like a control tower: platform-wide KPI cards, lifecycle overview, attention stack, points snapshot, merchant status snapshot, and a broader recent system activity feed
+- the broader admin-panel redesign now extends beyond `/dashboard`
+  - shared management-page primitives now live in `apps/admin-panel/src/components/admin/workspace.tsx`
+  - `/verification`, `/merchants`, `/promotions`, and `/reports` were refreshed to use the same calmer visual hierarchy: stronger page intros, summary stat rows, cleaner filter bars, better empty states, and more structured detail panels
+  - the redesign intentionally keeps dense operational data, but moves most of the visual weight into section framing and page rhythm instead of louder colors or more widgets
+- the admin and superadmin UI palette now uses the newer blue-gold system instead of the earlier green-led accent set
+  - core admin theme variables in `apps/admin-panel/src/app/globals.css` now center on `#014384`, `#0572DC`, `#FCB315`, `#FCBA2C`, and `#F0F0F0`
+  - shared dashboard/workspace primitives and the redesigned `/dashboard`, `/verification`, `/merchants`, `/promotions`, and `/reports` pages were updated so cards, charts, pills, notices, and primary actions follow the new palette consistently
+- the admin-panel Digital IDs screen now uses a more physical-card-inspired back design in both the live preview and exported PDF
+  - the back side now follows an off-white bordered layout with centered emergency contact details, terms and conditions copy, validity date, and signatory block inspired by the provided reference card
+  - the QR block was removed from the back side entirely so the card reads more like a traditional printed ID back instead of a mixed print-and-tech layout
+  - the signatory block now shows a signature-style line above the divider, then `HON. MARK JERVIN B. VENTURA`, then `SK CHAIRPERSON`; the optional third office line stays hidden when not needed
+  - emergency contact data on the Digital ID back is no longer hardcoded; the admin preview and exported PDF now read the member's saved Digital ID emergency-contact fields and warn admins when those fields are still incomplete
+  - the lower signatory stack spacing was tightened afterward so the printed name and `SK CHAIRPERSON` stay inside the back-card border in both the browser preview and PDF export
+  - the front-card photo and signature area now leaves more breathing room above the signature line so a future e-signature field can fit more naturally without crowding the photo block
+- the admin panel now has explicit Next App Router error boundaries and a safer dashboard stats normalizer
+  - `apps/admin-panel/src/app/error.tsx` and `apps/admin-panel/src/app/global-error.tsx` now provide visible recovery UIs instead of falling back to the generic Next dev refresh loop
+  - `apps/admin-panel/src/app/(dashboard)/dashboard/page.tsx` now normalizes partial `/api/admin/dashboard` responses before rendering, so missing nested fields no longer crash the dashboard view
 - admin panel now enforces role-based access at both the UI and routing levels
   - basic `admin` role sees only Dashboard, Verification, and Youth Members in the sidebar
   - Merchants, Rewards, Points & Transactions, Reports, and Digital IDs are restricted to `superadmin` only
@@ -247,6 +308,10 @@ The current live points default in code is now:
 - the youth PWA verification upload card now uses the dashed document area as the first interaction point
   - the dashed upload container is now clickable and acts as the trigger to reveal the upload source actions
   - the `Upload from Device` and `Use Camera` buttons stay hidden until the user taps the dashed container, reducing visual clutter and making the upload flow feel more intentional on mobile
+- the youth PWA verification upload screen now includes clearer escape routes back into the app
+  - a lightweight `Back` action now sits above the upload card
+  - a dedicated `Return to Home` button now lets users leave the verification upload flow and explore the app without getting stuck
+  - the first-step footer action was also updated from the old scanner-linked `Cancel` behavior to `Return to Home`
 - the youth PWA main profile tab was visually refreshed to match the stronger KK website/system language
   - the profile screen now uses the shared blue-to-sky gradient atmosphere, cream/yellow support accents, and rounded card treatment already present in the youth home and digital ID screens
   - profile information, account tools, and logout actions were regrouped into clearer dashboard-style sections so the tab feels like part of the same product family instead of a separate generic settings page
@@ -367,6 +432,8 @@ Current blocker observed on this machine:
 - `eas` CLI is installed
 - Expo account login is not active yet (`eas whoami` returns `Not logged in`)
 - EAS env creation cannot be completed until `eas login` succeeds or `EXPO_TOKEN` is provided
+- local `next build` verification for `apps/admin-panel` and `apps/youth-pwa` requires stopping the live dev servers on ports `3001` and `3000` first
+  - Windows is keeping each app's `.next/trace` file locked while those dev servers are running, so production build checks on this machine fail before app code is evaluated
   - admin rejection now creates a youth notification that links back to `/verification/upload`
   - the youth digital ID page no longer treats `rejected` as "under review" and instead shows the rejection reason/note plus a `Retry Submission` CTA
   - the dedicated verification status screen also shows the rejection feedback and lets the user resubmit immediately
@@ -419,6 +486,8 @@ Known incomplete or placeholder areas in the current youth app:
 
 The admin panel is already usable as an operations console for:
 
+- a balanced, role-specific dashboard experience for admin and superadmin users
+- a shared workspace-style UI across dashboard, verification, merchants, promotions, and reports
 - verification queue review
 - per-document review actions
 - bulk approval
@@ -468,7 +537,10 @@ Known partial area:
 
 ## Notable Gaps and Risks
 
-- There are currently no automated tests in the repository.
+- Automated coverage is still early-stage.
+  - there is now a backend helper + mocked service + route contract + in-memory Firestore integration suite, but there are still no true Firebase Emulator tests or end-to-end client flow tests
+- CI coverage is still partial.
+  - backend build/test automation plus web-build and merchant-typecheck CI now exist in GitHub Actions, but there are still no real mobile build jobs, deployment smoke checks, or Firebase Emulator jobs
 - Some features still use fallback presentation content instead of a fully curated backend-driven implementation.
 - The PDF and the codebase are no longer perfectly aligned; the repo reflects a newer and broader product scope than the original module document.
 
@@ -590,11 +662,99 @@ A full claim token and QR redemption flow was added on top of the voucher system
 - Merchant promotion forms use text input for date (`YYYY-MM-DD`) rather than a native date picker (Expo DateTimePicker not yet integrated for this flow)
 - The youth vouchers page does not yet show a "My Claimed Vouchers" history view
 
+## Security Hardening (completed 2026-04-30)
+
+The first deployment-security tranche is now in place across the backend, admin panel, and youth PWA.
+
+### Server-Set Web Sessions
+
+- `apps/admin-panel` and `apps/youth-pwa` no longer write auth cookies directly with `document.cookie`
+- both web apps now use internal `POST /api/session` and `DELETE /api/session` route handlers to set and clear cookies server-side
+- the new cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production
+- admin logout, youth logout, and backend `401` handling now clear those cookies through the server route instead of trying to mutate them from the browser
+- `apps/admin-panel/src/middleware.ts` now requires both the admin token and admin role cookie, and redirects authenticated admins away from `/login`
+
+### Backend Rate Limiting
+
+- the backend now has a shared in-memory rate limiter at `apps/backend/src/middleware/rateLimit.ts`
+- targeted throttling is now applied to:
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+  - `POST /api/auth/password-changed`
+  - `POST /api/qr/scan`
+  - `POST /api/qr/redeem`
+- rate-limit windows and limits are configurable through backend env vars so production can tune them without code changes
+
+### Stricter Runtime Config
+
+- backend env parsing in `apps/backend/src/config/env.ts` now:
+  - distinguishes development / test / production behavior
+  - requires `QR_SECRET` in production instead of silently falling back to `kk-secret`
+  - requires explicit web origins in production through `ADMIN_PANEL_URL`, `YOUTH_PWA_URL`, or `CORS_ALLOWED_ORIGINS`
+  - centralizes JSON body-limit and trust-proxy settings
+  - exposes auth and QR rate-limit env knobs
+- backend CORS now uses an allowlist callback instead of a hardcoded loose array
+- the admin and youth web apps now resolve `NEXT_PUBLIC_API_URL` through shared helpers and fail closed in production if that env var is missing
+
+### Verification Notes
+
+- `npm run test:backend` passed after the hardening changes
+- `npx tsc --noEmit -p apps/admin-panel/tsconfig.json` passed
+- `npx tsc --noEmit -p apps/youth-pwa/tsconfig.json` passed
+- `npm run build:youth` passed and now includes the new `app/api/session` route
+- `npm run build:admin` is still locally blocked by a locked `apps/admin-panel/.next/trace` file, which suggests an active dev process still has that build cache open on this machine
+
+## Validation & Header Hardening (completed 2026-05-01)
+
+The next security tranche added backend request validation and safer default headers without introducing new runtime dependencies.
+
+### Backend Request Validation
+
+- a shared validation middleware now lives at `apps/backend/src/middleware/validateRequest.ts`
+- the backend now rejects malformed JSON payloads before controller/service execution for the highest-risk mutation routes, including:
+  - auth login/register/password-changed
+  - merchant QR scan/redeem
+  - promotions create/update/review
+  - vouchers create/update/redeem preview/redeem confirm
+  - merchant self-service profile/assets/promotions/products
+  - admin merchant creation/status/profile updates
+  - admin reward create/update
+  - admin verification reject/document review/resubmission/bulk approve
+  - admin youth status/profile/archive/points adjustments
+  - admin points conversion updates
+  - admin digital ID deactivation
+- the validators are strict about required fields, enum values, numbers, and string arrays, but intentionally permissive about optional extra fields so the existing clients do not get broken by over-tight schemas
+
+### Security Headers
+
+- the Express backend now disables `X-Powered-By` and applies a shared security-header middleware from `apps/backend/src/middleware/securityHeaders.ts`
+- those backend headers now include:
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy` with camera/geolocation limited to self
+  - `Cross-Origin-Opener-Policy: same-origin-allow-popups`
+  - `Cross-Origin-Resource-Policy: same-site`
+  - `Origin-Agent-Cluster: ?1`
+  - `Strict-Transport-Security` in production
+  - `Cache-Control: no-store` on `/api/*`
+- both `apps/admin-panel/next.config.js` and `apps/youth-pwa/next.config.js` now disable Next's `poweredByHeader` and apply matching browser-facing security headers
+- the youth PWA intentionally keeps `same-origin-allow-popups` so Google/Facebook popup auth continues to work cleanly
+
+### Validation & Header Verification
+
+- `npm run test:backend` passed after adding the validation middleware and route contract checks
+- `apps/backend/tests/backend.routes.test.js` now also verifies malformed promotion and admin merchant-account payloads are rejected before controllers run
+- `npm run build:youth` still passes after the new Next header configuration
+- `npm run build:admin` is still blocked locally by the same locked `.next/trace` file, so the admin build remains a local-process issue rather than a verified code regression
+
 ## What To Do Next
 
 1. Add storefront-specific admin controls if admins should review or override merchant-facing copy such as `pointsPolicy`, banners, and descriptions.
 2. Extract reusable merchant-app UI primitives for branded headers, compact cards, and form sections so future screens stay visually consistent with less duplication.
 3. Standardize any future admin analytics widgets on the same shadcn chart primitives added for the reports page.
-4. Add automated tests for notifications, points conversion, merchant storefront payloads, QR awarding logic, and reward redemption flows.
-5. Finish deployment polish for the youth PWA by adding a real favicon, verifying `NEXT_PUBLIC_API_URL` includes `/api`, and ensuring Firebase Authorized Domains include the live Vercel hostname.
-6. Expand the root workspace scripts further if you want one-command flows for more checks, previews, or deployment tasks.
+4. Add a true Firebase Emulator test layer when Firebase CLI/tooling is available, then extend toward end-to-end client flow coverage for notifications, points conversion, merchant storefront payloads, QR awarding logic, and reward redemption flows.
+5. Add deployment-aware CI later for things like EAS preview builds, Vercel/Render env validation, and smoke checks against hosted environments.
+6. Finish deployment polish for the youth PWA by adding a real favicon, verifying `NEXT_PUBLIC_API_URL` includes `/api`, and ensuring Firebase Authorized Domains include the live Vercel hostname.
+   - the youth `.env.local.example` file now matches the real Firebase public config and storage bucket instead of older placeholder values
+7. Expand the root workspace scripts further if you want one-command flows for more checks, previews, or deployment tasks.

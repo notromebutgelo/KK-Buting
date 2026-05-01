@@ -1,169 +1,143 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import {
-  Legend as RechartsLegend,
-  Tooltip as RechartsTooltip,
-  type LegendProps,
-  type TooltipProps,
-} from 'recharts'
-
-import { cn } from '@/utils/cn'
+import type { ReactNode } from 'react';
+import { Legend as RechartsLegend, Tooltip as RechartsTooltip } from 'recharts';
 
 export type ChartConfig = Record<
   string,
   {
-    label?: React.ReactNode
-    color?: string
+    label: string;
+    color: string;
   }
->
+>;
 
-type ChartContextValue = {
-  config: ChartConfig
-}
-
-const ChartContext = React.createContext<ChartContextValue | null>(null)
-
-function useChart() {
-  const context = React.useContext(ChartContext)
-
-  if (!context) {
-    throw new Error('Chart components must be used inside a <ChartContainer />')
-  }
-
-  return context
-}
-
-function buildChartVars(config: ChartConfig) {
-  return Object.entries(config).reduce((styles, [key, value]) => {
-    if (value.color) {
-      ;(styles as Record<string, string>)[`--color-${key}`] = value.color
-    }
-
-    return styles
-  }, {} as React.CSSProperties)
-}
-
-export const ChartContainer = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & {
-    config: ChartConfig
-  }
->(({ children, className, config, style, ...props }, ref) => {
+export function ChartContainer({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  config?: ChartConfig;
+  className?: string;
+}) {
   return (
-    <ChartContext.Provider value={{ config }}>
-      <div
-        ref={ref}
-        className={cn(
-          'w-full rounded-2xl [&_.recharts-cartesian-grid_line[stroke="#ccc"]]:stroke-slate-200 [&_.recharts-legend-item-text]:text-slate-600 [&_.recharts-polar-grid_[stroke="#ccc"]]:stroke-slate-200 [&_.recharts-reference-line_[stroke="#ccc"]]:stroke-slate-200 [&_.recharts-sector:focus]:outline-none [&_.recharts-surface]:overflow-visible [&_.recharts-text]:fill-slate-500',
-          className
+    <div
+      className={`rounded-[var(--radius-md)] border p-4 ${className}`}
+      style={{
+        background: 'var(--card)',
+        borderColor: 'var(--stroke)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function ChartHeader({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          {title}
+        </div>
+        {description && (
+          <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+            {description}
+          </p>
         )}
-        style={{ ...buildChartVars(config), ...style }}
-        {...props}
-      >
-        {children}
       </div>
-    </ChartContext.Provider>
-  )
-})
-ChartContainer.displayName = 'ChartContainer'
-
-export const ChartTooltip = RechartsTooltip
-export const ChartLegend = RechartsLegend
-
-type PayloadItem = {
-  color?: string
-  dataKey?: string | number
-  name?: string | number
-  value?: string | number
-  payload?: Record<string, unknown>
+      {action}
+    </div>
+  );
 }
 
-function resolveConfigEntry(config: ChartConfig, item: PayloadItem | undefined) {
-  if (!item) return undefined
+export const chartTooltipStyle = {
+  background: 'var(--card-solid)',
+  border: '1px solid var(--stroke)',
+  borderRadius: 12,
+  boxShadow: 'var(--shadow-md)',
+  color: 'var(--ink)',
+  fontSize: 12,
+};
 
-  const lookupKeys = [
-    typeof item.dataKey === 'string' ? item.dataKey : undefined,
-    typeof item.name === 'string' ? item.name : undefined,
-  ].filter(Boolean) as string[]
+// Re-export recharts components for backward compatibility
+export const ChartTooltip = RechartsTooltip;
+export const ChartLegend = RechartsLegend;
 
-  for (const key of lookupKeys) {
-    if (config[key]) return { key, entry: config[key] }
-  }
-
-  return undefined
+// Simple legend content component for backward compatibility
+export function ChartLegendContent({
+  payload,
+  className = '',
+}: {
+  payload?: Array<{ value?: string; color?: string }>;
+  className?: string;
+}) {
+  if (!payload?.length) return null;
+  return (
+    <div className={`flex flex-wrap items-center gap-3 pt-2 text-xs ${className}`} style={{ color: 'var(--muted)' }}>
+      {payload.map((item, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+          {item.value}
+        </span>
+      ))}
+    </div>
+  );
 }
 
+// Simple tooltip content component for backward compatibility
 export function ChartTooltipContent({
   active,
   payload,
   label,
-  className,
   hideLabel = false,
   valueFormatter,
-}: TooltipProps<number, string> & {
-  className?: string
-  hideLabel?: boolean
-  valueFormatter?: (value: number | string, name: string) => React.ReactNode
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number | string; color?: string }>;
+  label?: string;
+  hideLabel?: boolean;
+  valueFormatter?: (value: number | string, name: string) => ReactNode;
 }) {
-  const { config } = useChart()
-  const items = (payload as PayloadItem[] | undefined)?.filter((item) => item.value != null) ?? []
-
-  if (!active || items.length === 0) return null
-
+  if (!active || !payload?.length) return null;
   return (
-    <div className={cn('min-w-[180px] rounded-xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur', className)}>
-      {!hideLabel && label != null ? (
-        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{String(label)}</div>
-      ) : null}
-
-      <div className="space-y-2">
-        {items.map((item, index) => {
-          const resolved = resolveConfigEntry(config, item)
-          const color = resolved?.entry.color || item.color || '#0f172a'
-          const name = String(resolved?.entry.label || item.name || item.dataKey || 'Value')
-          const value = valueFormatter ? valueFormatter(item.value ?? '', name) : item.value
-
+    <div
+      className="min-w-[140px] rounded-xl border p-3 text-xs"
+      style={{
+        background: 'var(--card-solid)',
+        borderColor: 'var(--stroke)',
+        boxShadow: 'var(--shadow-md)',
+        color: 'var(--ink)',
+      }}
+    >
+      {!hideLabel && label && (
+        <div className="mb-2 font-semibold" style={{ color: 'var(--muted)' }}>{label}</div>
+      )}
+      <div className="flex flex-col gap-1.5">
+        {payload.map((item, i) => {
+          const name = item.name ?? '';
+          const val = item.value ?? '';
           return (
-            <div key={`${name}-${index}`} className="flex items-center justify-between gap-3 text-sm">
-              <div className="flex items-center gap-2 text-slate-600">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                <span>{name}</span>
-              </div>
-              <span className="font-semibold text-slate-900">{value}</span>
+            <div key={i} className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5" style={{ color: 'var(--ink-soft)' }}>
+                <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+                {name}
+              </span>
+              <span className="font-semibold" style={{ color: 'var(--ink)' }}>
+                {valueFormatter ? valueFormatter(val, name) : val}
+              </span>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
-}
-
-export function ChartLegendContent({
-  payload,
-  className,
-}: LegendProps & {
-  className?: string
-}) {
-  const { config } = useChart()
-  const items = (payload as PayloadItem[] | undefined) ?? []
-
-  if (!items.length) return null
-
-  return (
-    <div className={cn('flex flex-wrap items-center gap-4 pt-3 text-sm', className)}>
-      {items.map((item, index) => {
-        const resolved = resolveConfigEntry(config, item)
-        const color = resolved?.entry.color || item.color || '#0f172a'
-        const label = String(resolved?.entry.label || item.value || item.name || item.dataKey || 'Value')
-
-        return (
-          <div key={`${label}-${index}`} className="flex items-center gap-2 text-slate-600">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-            <span>{label}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
+  );
 }

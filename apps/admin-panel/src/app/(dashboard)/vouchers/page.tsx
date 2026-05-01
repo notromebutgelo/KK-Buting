@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import api from '@/lib/api'
-import Spinner from '@/components/ui/Spinner'
 import { cn } from '@/utils/cn'
 
 type VoucherTab = 'list' | 'create' | 'redeem'
@@ -68,7 +68,9 @@ const emptyForm = {
   isVerified: false,
 }
 
-// ─── QR Scanner component (dynamically imports html5-qrcode) ─────────────────
+const inputClass = 'surface-input w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30'
+
+// ─── QR Scanner component ─────────────────────────────────────────────────────
 
 function QrScanner({ onScan }: { onScan: (text: string) => void }) {
   const scannerId = useRef(`kk-qr-${Math.random().toString(36).slice(2, 8)}`)
@@ -109,18 +111,18 @@ function QrScanner({ onScan }: { onScan: (text: string) => void }) {
 
   if (cameraError) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-center">
+      <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed px-4 py-8 text-center" style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}>
         <div>
           <p className="text-sm font-semibold text-red-600">Camera unavailable</p>
-          <p className="mt-1 text-xs text-gray-400">{cameraError}</p>
-          <p className="mt-2 text-xs text-gray-400">Use manual code entry below instead.</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>{cameraError}</p>
+          <p className="mt-2 text-xs" style={{ color: 'var(--muted)' }}>Use manual code entry below instead.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-black">
+    <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--stroke)', background: '#000' }}>
       <div id={scannerId.current} style={{ width: '100%' }} />
     </div>
   )
@@ -139,148 +141,98 @@ function RedeemPanel() {
 
   function handleManualInput(raw: string) {
     const upper = raw.toUpperCase()
-    if (!upper.startsWith('KKB-')) {
-      setManualToken('KKB-')
-      return
-    }
+    if (!upper.startsWith('KKB-')) { setManualToken('KKB-'); return }
     const suffix = upper.slice(4).replace(/[^A-Z0-9]/g, '').slice(0, 6)
     setManualToken(`KKB-${suffix}`)
   }
 
   async function lookupToken(token: string) {
     const t = token.trim().toUpperCase()
-    if (!/^KKB-[A-Z0-9]{6}$/.test(t)) {
-      setRedeemError('Invalid format. Expected KKB-XXXXXX (6 characters).')
-      return
-    }
-    setIsLookingUp(true)
-    setRedeemError('')
-    setPreview(null)
+    if (!/^KKB-[A-Z0-9]{6}$/.test(t)) { setRedeemError('Invalid format. Expected KKB-XXXXXX (6 characters).'); return }
+    setIsLookingUp(true); setRedeemError(''); setPreview(null)
     try {
       const res = await api.post('/vouchers/redeem', { token: t })
       setPreview(res.data)
     } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Something went wrong.'
-      setRedeemError(msg)
-    } finally {
-      setIsLookingUp(false)
-    }
+      setRedeemError(err?.response?.data?.error || 'Something went wrong.')
+    } finally { setIsLookingUp(false) }
   }
 
   async function confirmRedeem() {
     if (!preview) return
-    setIsConfirming(true)
-    setRedeemError('')
+    setIsConfirming(true); setRedeemError('')
     try {
       await api.post('/vouchers/redeem/confirm', { token: preview.token })
       setSuccessName(preview.youthName || preview.youthEmail)
-      setPreview(null)
-      setManualToken('KKB-')
-      setScannedOnce(false)
+      setPreview(null); setManualToken('KKB-'); setScannedOnce(false)
     } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Confirmation failed.'
-      setRedeemError(msg)
-    } finally {
-      setIsConfirming(false)
-    }
+      setRedeemError(err?.response?.data?.error || 'Confirmation failed.')
+    } finally { setIsConfirming(false) }
   }
 
   function handleScan(text: string) {
     if (scannedOnce) return
-    setScannedOnce(true)
-    setSuccessName('')
+    setScannedOnce(true); setSuccessName('')
     void lookupToken(text)
   }
 
   function reset() {
-    setManualToken('KKB-')
-    setPreview(null)
-    setRedeemError('')
-    setSuccessName('')
-    setScannedOnce(false)
+    setManualToken('KKB-'); setPreview(null); setRedeemError(''); setSuccessName(''); setScannedOnce(false)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-5">
       {successName ? (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-green-200 bg-green-50 px-6 py-10 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600">
+        <div className="flex flex-col items-center gap-4 rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-6 py-10 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
             <svg className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <div>
-            <p className="text-lg font-black text-green-800">Voucher redeemed!</p>
-            <p className="mt-1 text-sm text-green-700">
+            <p className="text-lg font-bold text-emerald-800">Voucher redeemed!</p>
+            <p className="mt-1 text-sm text-emerald-700">
               Voucher successfully marked as given to <span className="font-semibold">{successName}</span>.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={reset}
-            className="rounded-xl bg-green-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-green-700"
-          >
+          <button type="button" onClick={reset} className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
             Redeem Another
           </button>
         </div>
       ) : preview ? (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-5 py-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-500">Voucher Preview</p>
-            <h3 className="mt-2 text-lg font-black text-gray-900">{preview.voucherTitle}</h3>
-            <div className="mt-3 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
-              <div>
-                <span className="font-semibold text-gray-500">Youth name: </span>
-                {preview.youthName || '—'}
-              </div>
-              <div>
-                <span className="font-semibold text-gray-500">Email: </span>
-                {preview.youthEmail || '—'}
-              </div>
-              <div>
-                <span className="font-semibold text-gray-500">Claim token: </span>
-                <span className="font-mono font-bold">{preview.token}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-gray-500">Claimed at: </span>
-                {preview.claimedAt ? new Date(preview.claimedAt).toLocaleString('en-PH') : '—'}
-              </div>
+        <div className="flex flex-col gap-4">
+          <div className="rounded-[var(--radius-md)] border p-5" style={{ borderColor: 'var(--accent-soft)', background: 'var(--accent-soft)' }}>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--accent-strong)' }}>Voucher Preview</p>
+            <h3 className="mt-2 text-lg font-bold" style={{ color: 'var(--ink)' }}>{preview.voucherTitle}</h3>
+            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2" style={{ color: 'var(--ink-soft)' }}>
+              <div><span className="font-semibold" style={{ color: 'var(--muted)' }}>Youth name: </span>{preview.youthName || '—'}</div>
+              <div><span className="font-semibold" style={{ color: 'var(--muted)' }}>Email: </span>{preview.youthEmail || '—'}</div>
+              <div><span className="font-semibold" style={{ color: 'var(--muted)' }}>Claim token: </span><span className="font-mono font-bold">{preview.token}</span></div>
+              <div><span className="font-semibold" style={{ color: 'var(--muted)' }}>Claimed at: </span>{preview.claimedAt ? new Date(preview.claimedAt).toLocaleString('en-PH') : '—'}</div>
             </div>
           </div>
 
-          {redeemError && (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{redeemError}</p>
-          )}
+          {redeemError && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{redeemError}</p>}
 
           <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => void confirmRedeem()}
-              disabled={isConfirming}
-              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-            >
+            <button type="button" onClick={() => void confirmRedeem()} disabled={isConfirming} className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--accent)' }}>
               {isConfirming ? 'Confirming…' : 'Confirm & Mark as Given'}
             </button>
-            <button
-              type="button"
-              onClick={reset}
-              className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-            >
+            <button type="button" onClick={reset} className="rounded-xl border px-5 py-2.5 text-sm font-semibold" style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}>
               Cancel
             </button>
           </div>
         </div>
       ) : (
         <div className="grid gap-8 lg:grid-cols-2">
-          {/* QR Scanner */}
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             <div>
-              <p className="text-sm font-black text-gray-900">Scan QR Code</p>
-              <p className="mt-0.5 text-xs text-gray-400">Point the camera at a youth's voucher QR code.</p>
+              <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>Scan QR Code</p>
+              <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Point the camera at a youth's voucher QR code.</p>
             </div>
             {scannedOnce && isLookingUp ? (
-              <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-gray-200 bg-gray-50">
-                <Spinner size="lg" />
+              <div className="flex min-h-[240px] items-center justify-center rounded-2xl border" style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}>
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
               </div>
             ) : (
               <QrScanner onScan={handleScan} />
@@ -288,41 +240,39 @@ function RedeemPanel() {
             {scannedOnce && !isLookingUp && redeemError && (
               <div>
                 <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{redeemError}</p>
-                <button type="button" onClick={() => { setScannedOnce(false); setRedeemError('') }} className="mt-2 text-xs font-semibold text-blue-600 hover:underline">
+                <button type="button" onClick={() => { setScannedOnce(false); setRedeemError('') }} className="mt-2 text-xs font-semibold" style={{ color: 'var(--accent-strong)' }}>
                   Scan again
                 </button>
               </div>
             )}
           </div>
 
-          {/* Divider */}
           <div className="flex items-center gap-4 lg:hidden">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">or</span>
-            <div className="h-px flex-1 bg-gray-200" />
+            <div className="h-px flex-1" style={{ background: 'var(--stroke)' }} />
+            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>or</span>
+            <div className="h-px flex-1" style={{ background: 'var(--stroke)' }} />
           </div>
           <div className="hidden items-center lg:flex">
-            <div className="mx-auto h-full w-px bg-gray-200" />
+            <div className="mx-auto h-full w-px" style={{ background: 'var(--stroke)' }} />
           </div>
 
-          {/* Manual entry */}
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             <div>
-              <p className="text-sm font-black text-gray-900">Enter Code Manually</p>
-              <p className="mt-0.5 text-xs text-gray-400">Type the 10-character claim code from the youth's screen.</p>
+              <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>Enter Code Manually</p>
+              <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Type the 10-character claim code from the youth's screen.</p>
             </div>
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">Claim Code</label>
+                <label className="mb-1 block text-sm font-semibold" style={{ color: 'var(--ink)' }}>Claim Code</label>
                 <input
                   type="text"
                   value={manualToken}
                   onChange={(e) => handleManualInput(e.target.value)}
                   placeholder="KKB-XXXXXX"
                   maxLength={10}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm font-semibold uppercase text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="surface-input w-full rounded-xl px-3 py-2.5 font-mono text-sm font-semibold uppercase outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
                 />
-                <p className="mt-1 text-xs text-gray-400">Format: KKB- followed by 6 characters (e.g. KKB-A3F9QZ)</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>Format: KKB- followed by 6 characters (e.g. KKB-A3F9QZ)</p>
               </div>
 
               {redeemError && !scannedOnce && (
@@ -333,7 +283,8 @@ function RedeemPanel() {
                 type="button"
                 onClick={() => { setSuccessName(''); void lookupToken(manualToken) }}
                 disabled={isLookingUp || manualToken.length < 10}
-                className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: 'var(--accent)' }}
               >
                 {isLookingUp ? 'Looking up…' : 'Look Up'}
               </button>
@@ -353,10 +304,8 @@ function ClaimsPanel({ voucher, onClose }: { voucher: Voucher; onClose: () => vo
   const [error, setError] = useState('')
 
   useEffect(() => {
-    setIsLoading(true)
-    setError('')
-    api
-      .get(`/vouchers/${voucher.id}/claims`)
+    setIsLoading(true); setError('')
+    api.get(`/vouchers/${voucher.id}/claims`)
       .then((res) => setClaims(res.data.claims || []))
       .catch((err: any) => setError(err?.response?.data?.error || 'Failed to load claims'))
       .finally(() => setIsLoading(false))
@@ -370,55 +319,47 @@ function ClaimsPanel({ voucher, onClose }: { voucher: Voucher; onClose: () => vo
   }
 
   return (
-    <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="admin-panel flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-base font-black text-gray-900">Claims — {voucher.title}</h3>
-          <p className="mt-0.5 text-xs text-gray-400">All users who have claimed this voucher</p>
+          <h3 className="text-base font-bold" style={{ color: 'var(--ink)' }}>Claims — {voucher.title}</h3>
+          <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>All users who have claimed this voucher</p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+        <button type="button" onClick={onClose} className="rounded-lg p-1.5 transition-colors hover:bg-[color:var(--surface-muted)]" style={{ color: 'var(--muted)' }}>
+          <X size={16} />
         </button>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-12"><Spinner size="lg" /></div>
+        <div className="flex justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
+        </div>
       ) : error ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : claims.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center text-sm text-gray-400">
+        <div className="rounded-xl border border-dashed px-6 py-10 text-center text-sm" style={{ borderColor: 'var(--stroke)', color: 'var(--muted)' }}>
           No claims for this voucher yet.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-100">
+        <div className="overflow-hidden rounded-[var(--radius-md)] border" style={{ borderColor: 'var(--stroke)' }}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px]">
-              <thead className="bg-gray-50">
+              <thead style={{ background: 'var(--accent-soft)' }}>
                 <tr>
                   {['Youth Name', 'Email', 'Token', 'Claimed At', 'Status', 'Redeemed At'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
-                      {h}
-                    </th>
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y" style={{ borderColor: 'var(--stroke)' }}>
                 {claims.map((c) => (
-                  <tr key={c.claimId} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">{c.youthName || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{c.youthEmail || '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">{c.token}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{formatDate(c.claimedAt)}</td>
-                    <td className="px-4 py-3">
-                      <ClaimStatusPill status={c.status} />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{formatDate(c.redeemedAt)}</td>
+                  <tr key={c.claimId} className="transition-colors hover:bg-[color:var(--surface-muted)]">
+                    <td className="px-4 py-3 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{c.youthName || '—'}</td>
+                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--ink-soft)' }}>{c.youthEmail || '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: 'var(--accent-strong)' }}>{c.token}</td>
+                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--muted)' }}>{formatDate(c.claimedAt)}</td>
+                    <td className="px-4 py-3"><ClaimStatusPill status={c.status} /></td>
+                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--muted)' }}>{formatDate(c.redeemedAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -432,12 +373,12 @@ function ClaimsPanel({ voucher, onClose }: { voucher: Voucher; onClose: () => vo
 
 function ClaimStatusPill({ status }: { status: string }) {
   const tones: Record<string, string> = {
-    claimed: 'bg-yellow-100 text-yellow-700',
-    redeemed: 'bg-emerald-100 text-emerald-700',
-    expired: 'bg-gray-100 text-gray-500',
+    claimed: 'bg-amber-50 text-amber-700',
+    redeemed: 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]',
+    expired: 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]',
   }
   return (
-    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold capitalize', tones[status] || 'bg-gray-100 text-gray-600')}>
+    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold capitalize', tones[status] || 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]')}>
       {status}
     </span>
   )
@@ -457,9 +398,7 @@ export default function VouchersPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [claimsVoucher, setClaimsVoucher] = useState<Voucher | null>(null)
 
-  useEffect(() => {
-    loadVouchers()
-  }, [])
+  useEffect(() => { loadVouchers() }, [])
 
   async function loadVouchers() {
     setIsLoading(true)
@@ -473,23 +412,14 @@ export default function VouchersPage() {
     }
   }
 
-  const filtered = useMemo(() => {
-    return vouchers.filter((v) => {
-      const matchSearch =
-        !search ||
-        v.title.toLowerCase().includes(search.toLowerCase()) ||
-        String(v.type || '').toLowerCase().includes(search.toLowerCase())
-      const matchStatus = statusFilter === 'all' || v.status === statusFilter
-      return matchSearch && matchStatus
-    })
-  }, [vouchers, search, statusFilter])
+  const filtered = useMemo(() => vouchers.filter((v) => {
+    const matchSearch = !search || v.title.toLowerCase().includes(search.toLowerCase()) || String(v.type || '').toLowerCase().includes(search.toLowerCase())
+    const matchStatus = statusFilter === 'all' || v.status === statusFilter
+    return matchSearch && matchStatus
+  }), [vouchers, search, statusFilter])
 
   function openCreate() {
-    setEditId(null)
-    setForm(emptyForm)
-    setMessage('')
-    setClaimsVoucher(null)
-    setActiveTab('create')
+    setEditId(null); setForm(emptyForm); setMessage(''); setClaimsVoucher(null); setActiveTab('create')
   }
 
   function openEdit(v: Voucher) {
@@ -508,28 +438,22 @@ export default function VouchersPage() {
       ageGroup: v.eligibilityConditions?.ageGroup || '',
       isVerified: Boolean(v.eligibilityConditions?.isVerified),
     })
-    setMessage('')
-    setClaimsVoucher(null)
-    setActiveTab('create')
+    setMessage(''); setClaimsVoucher(null); setActiveTab('create')
   }
 
   async function handleExpire(v: Voucher) {
-    setIsSaving(true)
-    setMessage('')
+    setIsSaving(true); setMessage('')
     try {
       await api.patch(`/vouchers/${v.id}`, { status: 'expired' })
       setMessage('Voucher marked as expired.')
       await loadVouchers()
     } catch (err: any) {
       setMessage(err?.response?.data?.error || 'Failed to expire voucher.')
-    } finally {
-      setIsSaving(false)
-    }
+    } finally { setIsSaving(false) }
   }
 
   async function handleSubmit() {
-    setIsSaving(true)
-    setMessage('')
+    setIsSaving(true); setMessage('')
     try {
       const eligibilityConditions: EligibilityConditions = {}
       if (form.minAge) eligibilityConditions.minAge = Number(form.minAge)
@@ -555,15 +479,11 @@ export default function VouchersPage() {
         await api.post('/vouchers', payload)
         setMessage('Voucher created successfully.')
       }
-      setForm(emptyForm)
-      setEditId(null)
-      await loadVouchers()
-      setActiveTab('list')
+      setForm(emptyForm); setEditId(null)
+      await loadVouchers(); setActiveTab('list')
     } catch (err: any) {
       setMessage(err?.response?.data?.error || 'Failed to save voucher.')
-    } finally {
-      setIsSaving(false)
-    }
+    } finally { setIsSaving(false) }
   }
 
   const counts = {
@@ -579,18 +499,18 @@ export default function VouchersPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-gray-900">Vouchers Management</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--ink)' }}>Vouchers Management</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
             Create eligibility-based or points-redeemable vouchers for KK youth members.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <SummaryCard label="Active" value={counts.active} tone="blue" />
-          <SummaryCard label="Expired" value={counts.expired} tone="amber" />
-          <SummaryCard label="Draft" value={counts.draft} tone="slate" />
+          <MetricCard label="Active" value={counts.active} />
+          <MetricCard label="Expired" value={counts.expired} />
+          <MetricCard label="Draft" value={counts.draft} />
         </div>
       </div>
 
@@ -601,58 +521,42 @@ export default function VouchersPage() {
               key={tab.id}
               type="button"
               onClick={() => {
-                if (tab.id === 'list') {
-                  setEditId(null)
-                  setForm(emptyForm)
-                }
-                setClaimsVoucher(null)
-                setActiveTab(tab.id)
+                if (tab.id === 'list') { setEditId(null); setForm(emptyForm) }
+                setClaimsVoucher(null); setActiveTab(tab.id)
               }}
-              className={cn(
-                'rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors',
-                activeTab === tab.id
-                  ? 'bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.18)]'
-                  : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-              )}
+              className="rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
+              style={activeTab === tab.id
+                ? { background: 'var(--accent)', color: '#fff' }
+                : { border: '1px solid var(--stroke)', background: 'var(--card)', color: 'var(--ink-soft)' }}
             >
               {tab.label}
             </button>
           ))}
         </div>
-        {activeTab === 'list' ? (
-          <button
-            type="button"
-            onClick={openCreate}
-            className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-          >
+        {activeTab === 'list' && (
+          <button type="button" onClick={openCreate} className="rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
             + New Voucher
           </button>
-        ) : null}
+        )}
       </div>
 
-      {message ? (
-        <div
-          className={cn(
-            'rounded-xl border px-4 py-3 text-sm',
-            message.toLowerCase().includes('fail') || message.toLowerCase().includes('error')
-              ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-green-200 bg-green-50 text-green-700'
-          )}
-        >
+      {message && (
+        <div className={cn('rounded-xl border px-4 py-3 text-sm', message.toLowerCase().includes('fail') || message.toLowerCase().includes('error') ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700')}>
           {message}
         </div>
-      ) : null}
+      )}
 
       {activeTab === 'list' ? (
-        <div className="space-y-4">
-          <section className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <section className="admin-panel flex flex-col gap-4">
             <div className="grid gap-3 md:grid-cols-[1.5fr_0.7fr]">
-              <SearchField value={search} onChange={setSearch} placeholder="Search voucher title or type" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className={inputClass}
-              >
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search voucher title or type"
+                className="surface-input w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
+              />
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={inputClass}>
                 <option value="all">All statuses</option>
                 <option value="active">Active</option>
                 <option value="expired">Expired</option>
@@ -662,80 +566,68 @@ export default function VouchersPage() {
 
             {isLoading ? (
               <div className="flex justify-center py-16">
-                <Spinner size="lg" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
               </div>
             ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center text-sm text-gray-400">
+              <div className="rounded-xl border border-dashed px-6 py-16 text-center text-sm" style={{ borderColor: 'var(--stroke)', color: 'var(--muted)' }}>
                 No vouchers matched the current filters.
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-gray-100">
+              <div className="overflow-hidden rounded-[var(--radius-md)] border" style={{ borderColor: 'var(--stroke)' }}>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[920px]">
-                    <thead className="bg-gray-50">
+                    <thead style={{ background: 'var(--accent-soft)' }}>
                       <tr>
                         {['Title', 'Type', 'Points Cost', 'Stock', 'Claimed', 'Status', 'Expires', 'Actions'].map((h) => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
-                            {h}
-                          </th>
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y" style={{ borderColor: 'var(--stroke)' }}>
                       {filtered.map((v) => (
                         <tr
                           key={v.id}
-                          className={cn('hover:bg-gray-50', claimsVoucher?.id === v.id && 'bg-blue-50')}
+                          className="transition-colors"
+                          style={{ background: claimsVoucher?.id === v.id ? 'var(--accent-soft)' : 'transparent' }}
+                          onMouseEnter={(e) => { if (claimsVoucher?.id !== v.id) (e.currentTarget as HTMLElement).style.background = 'var(--surface-muted)' }}
+                          onMouseLeave={(e) => { if (claimsVoucher?.id !== v.id) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                         >
                           <td className="px-4 py-4">
-                            <p className="text-sm font-semibold text-gray-900">{v.title}</p>
-                            <p className="mt-0.5 text-xs text-gray-400 line-clamp-1">{v.description || '—'}</p>
+                            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{v.title}</p>
+                            <p className="mt-0.5 line-clamp-1 text-xs" style={{ color: 'var(--muted)' }}>{v.description || '—'}</p>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-600">{v.type || '—'}</td>
-                          <td className="px-4 py-4 text-sm font-semibold text-blue-700">
+                          <td className="px-4 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>{v.type || '—'}</td>
+                          <td className="px-4 py-4 text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
                             {Number(v.pointsCost) > 0 ? `${Number(v.pointsCost).toLocaleString()} pts` : 'Free'}
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-600">
+                          <td className="px-4 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
                             {v.stock == null ? 'Unlimited' : Number(v.stock).toLocaleString()}
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-600">{Number(v.claimedCount ?? 0)}</td>
-                          <td className="px-4 py-4">
-                            <StatusPill status={v.status || 'active'} />
-                          </td>
-                          <td className="px-4 py-4 text-sm text-gray-500">
+                          <td className="px-4 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>{Number(v.claimedCount ?? 0)}</td>
+                          <td className="px-4 py-4"><StatusPill status={v.status || 'active'} /></td>
+                          <td className="px-4 py-4 text-sm" style={{ color: 'var(--muted)' }}>
                             {v.expiresAt ? new Date(v.expiresAt).toLocaleDateString('en-PH') : '—'}
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openEdit(v)}
-                                className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                              >
+                              <button type="button" onClick={() => openEdit(v)} className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ background: 'var(--accent-soft)', color: 'var(--accent-strong)' }}>
                                 Edit
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setClaimsVoucher((prev) => prev?.id === v.id ? null : v)}
-                                className={cn(
-                                  'rounded-lg px-3 py-1.5 text-xs font-semibold',
-                                  claimsVoucher?.id === v.id
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                )}
+                                className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+                                style={claimsVoucher?.id === v.id
+                                  ? { background: 'var(--accent)', color: '#fff' }
+                                  : { background: 'var(--surface-muted)', color: 'var(--ink-soft)' }}
                               >
                                 Claims
                               </button>
-                              {v.status === 'active' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleExpire(v)}
-                                  disabled={isSaving}
-                                  className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
-                                >
+                              {v.status === 'active' && (
+                                <button type="button" onClick={() => void handleExpire(v)} disabled={isSaving} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50">
                                   Expire
                                 </button>
-                              ) : null}
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -747,15 +639,13 @@ export default function VouchersPage() {
             )}
           </section>
 
-          {claimsVoucher ? (
-            <ClaimsPanel voucher={claimsVoucher} onClose={() => setClaimsVoucher(null)} />
-          ) : null}
+          {claimsVoucher && <ClaimsPanel voucher={claimsVoucher} onClose={() => setClaimsVoucher(null)} />}
         </div>
       ) : activeTab === 'redeem' ? (
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="mb-5">
-            <h2 className="text-lg font-black text-gray-900">Redeem Voucher</h2>
-            <p className="mt-1 text-sm text-gray-500">
+        <section className="admin-panel flex flex-col gap-4">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Redeem Voucher</h2>
+            <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
               Scan or enter a youth member&apos;s claim code to mark their voucher as redeemed.
             </p>
           </div>
@@ -763,10 +653,10 @@ export default function VouchersPage() {
         </section>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-          <section className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-black text-gray-900">{editId ? 'Edit Voucher' : 'Create New Voucher'}</h2>
+          <section className="admin-panel flex flex-col gap-4">
+            <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>{editId ? 'Edit Voucher' : 'Create New Voucher'}</h2>
 
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <div>
                 <FieldLabel label="Title" />
                 <input value={form.title} onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))} className={inputClass} placeholder="Voucher title" />
@@ -799,9 +689,9 @@ export default function VouchersPage() {
               <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <div>
                   <FieldLabel label="Stock" />
-                  <input type="number" min="0" value={form.stock} onChange={(e) => setForm((s) => ({ ...s, stock: e.target.value }))} disabled={form.unlimitedStock} className={cn(inputClass, form.unlimitedStock && 'bg-gray-100 text-gray-400')} />
+                  <input type="number" min="0" value={form.stock} onChange={(e) => setForm((s) => ({ ...s, stock: e.target.value }))} disabled={form.unlimitedStock} className={cn(inputClass, form.unlimitedStock && 'opacity-50')} />
                 </div>
-                <label className="mt-7 inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700">
+                <label className="mt-7 inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}>
                   <input type="checkbox" checked={form.unlimitedStock} onChange={(e) => setForm((s) => ({ ...s, unlimitedStock: e.target.checked }))} />
                   Unlimited
                 </label>
@@ -822,18 +712,19 @@ export default function VouchersPage() {
               type="button"
               onClick={() => void handleSubmit()}
               disabled={isSaving || !form.title}
-              className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: 'var(--accent)' }}
             >
               {isSaving ? 'Saving…' : editId ? 'Update Voucher' : 'Create Voucher'}
             </button>
           </section>
 
-          <aside className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <aside className="admin-panel flex flex-col gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-500">Eligibility Conditions</p>
-              <p className="mt-1 text-sm text-gray-500">Leave blank to allow all verified members to claim.</p>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--accent-strong)' }}>Eligibility Conditions</p>
+              <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Leave blank to allow all verified members to claim.</p>
             </div>
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <FieldLabel label="Min Age" />
@@ -853,22 +744,22 @@ export default function VouchersPage() {
                   <option value="Adult Youth">Adult Youth</option>
                 </select>
               </div>
-              <label className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700">
+              <label className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}>
                 <input type="checkbox" checked={form.isVerified} onChange={(e) => setForm((s) => ({ ...s, isVerified: e.target.checked }))} />
                 Require verified KK member status
               </label>
             </div>
 
-            <div className="rounded-2xl bg-blue-50 px-4 py-3 text-xs text-blue-700">
-              <p className="font-semibold">Eligibility summary:</p>
-              <ul className="mt-1 space-y-1">
-                {form.minAge ? <li>• Minimum age: {form.minAge}</li> : null}
-                {form.maxAge ? <li>• Maximum age: {form.maxAge}</li> : null}
-                {form.ageGroup ? <li>• Age group: {form.ageGroup}</li> : null}
-                {form.isVerified ? <li>• Verified members only</li> : null}
-                {!form.minAge && !form.maxAge && !form.ageGroup && !form.isVerified ? (
-                  <li className="text-blue-400">No restrictions set — open to all authenticated users.</li>
-                ) : null}
+            <div className="rounded-xl border p-4" style={{ borderColor: 'var(--accent-soft)', background: 'var(--accent-soft)' }}>
+              <p className="text-xs font-semibold" style={{ color: 'var(--accent-strong)' }}>Eligibility summary:</p>
+              <ul className="mt-1 flex flex-col gap-1 text-xs" style={{ color: 'var(--accent-strong)' }}>
+                {form.minAge && <li>• Minimum age: {form.minAge}</li>}
+                {form.maxAge && <li>• Maximum age: {form.maxAge}</li>}
+                {form.ageGroup && <li>• Age group: {form.ageGroup}</li>}
+                {form.isVerified && <li>• Verified members only</li>}
+                {!form.minAge && !form.maxAge && !form.ageGroup && !form.isVerified && (
+                  <li style={{ color: 'var(--muted)' }}>No restrictions set — open to all authenticated users.</li>
+                )}
               </ul>
             </div>
           </aside>
@@ -878,45 +769,28 @@ export default function VouchersPage() {
   )
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone: 'blue' | 'amber' | 'slate' }) {
-  const tones = { blue: 'bg-blue-50 text-blue-700', amber: 'bg-amber-50 text-amber-700', slate: 'bg-slate-100 text-slate-700' }
+function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">{label}</p>
-      <div className="mt-3 flex items-center justify-between">
-        <p className="text-2xl font-black text-gray-900">{value}</p>
-        <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-semibold', tones[tone])}>Live</span>
-      </div>
-    </div>
-  )
-}
-
-function SearchField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
-  return (
-    <div className="relative">
-      <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
-      </svg>
-      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+    <div className="admin-card">
+      <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{label}</p>
+      <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--ink)' }}>{value}</p>
     </div>
   )
 }
 
 function FieldLabel({ label }: { label: string }) {
-  return <label className="mb-1 block text-sm font-semibold text-gray-700">{label}</label>
+  return <label className="mb-1 block text-sm font-semibold" style={{ color: 'var(--ink)' }}>{label}</label>
 }
 
 function StatusPill({ status }: { status: string }) {
   const tones: Record<string, string> = {
-    active: 'bg-emerald-100 text-emerald-700',
-    expired: 'bg-amber-100 text-amber-700',
-    draft: 'bg-slate-100 text-slate-600',
+    active: 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]',
+    expired: 'bg-amber-50 text-amber-700',
+    draft: 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]',
   }
   return (
-    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', tones[status] || 'bg-gray-100 text-gray-600')}>
+    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold capitalize', tones[status] || 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]')}>
       {status}
     </span>
   )
 }
-
-const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20'

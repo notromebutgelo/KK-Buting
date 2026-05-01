@@ -24,12 +24,16 @@
   font-family: var(--font-body);
 }
 
+.pf-step-form {
+  min-height: 100dvh;
+}
+
 .pf-page {
   background: linear-gradient(180deg, #fcb315 0%, #ffd475 56%, #ffe6b1 100%);
   display: flex;
   flex-direction: column;
+  min-height: 100dvh;
   position: relative;
-  overflow: hidden;
 }
 
 .pf-topbar {
@@ -121,11 +125,10 @@
 
 .pf-form-area {
   width: 100%;
-  flex: 1;
-  padding: 0 20px 120px;
+  flex: 1 1 auto;
+  padding: 0 20px 132px;
   position: relative;
   z-index: 2;
-  overflow-y: auto;
 }
 
 .pf-form-card {
@@ -133,6 +136,42 @@
   border-radius: 22px;
   padding: 18px 16px 20px;
   margin-bottom: 18px;
+}
+
+.pf-section-card {
+  padding: 20px 16px 22px;
+}
+
+.pf-section-copy {
+  margin-bottom: 18px;
+}
+
+.pf-subsection-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--kk-blue);
+  margin: 0;
+}
+
+.pf-subsection-copy,
+.pf-question-copy {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(15, 40, 86, 0.7);
+}
+
+.pf-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pf-field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .pf-row {
@@ -185,6 +224,11 @@
 
 .pf-input::placeholder {
   color: rgba(27, 58, 107, 0.35);
+}
+
+.pf-textarea {
+  min-height: 108px;
+  resize: vertical;
 }
 
 .pf-input-readonly {
@@ -382,6 +426,90 @@
   color: #a63d3d;
 }
 
+.pf-question-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pf-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pf-option-card {
+  width: 100%;
+  border: 1px solid rgba(1, 67, 132, 0.12);
+  border-radius: 18px;
+  padding: 14px 15px;
+  background: rgba(255, 255, 255, 0.88);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  color: var(--kk-blue);
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.pf-option-card.selected {
+  border-color: rgba(5, 114, 220, 0.42);
+  box-shadow: 0 10px 22px rgba(1, 67, 132, 0.14);
+}
+
+.pf-option-card.unselected {
+  color: rgba(15, 40, 86, 0.82);
+}
+
+.pf-option-card:active {
+  transform: scale(0.995);
+}
+
+.pf-option-indicator,
+.pf-checkbox-indicator {
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pf-option-indicator {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(1, 67, 132, 0.28);
+  background: white;
+}
+
+.pf-option-indicator.selected {
+  border-color: var(--kk-blue-md);
+  box-shadow: inset 0 0 0 4px var(--kk-blue-md);
+}
+
+.pf-checkbox-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid rgba(1, 67, 132, 0.22);
+  background: white;
+  color: white;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pf-checkbox-indicator.selected {
+  border-color: var(--kk-blue-md);
+  background: var(--kk-blue-md);
+}
+
+.pf-option-text {
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
 .pf-bottombar {
   position: fixed;
   bottom: 0;
@@ -390,7 +518,13 @@
   padding: 12px 24px max(20px, env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
-  background: transparent;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 212, 117, 0) 0%,
+    rgba(255, 222, 161, 0.72) 32%,
+    rgba(255, 230, 177, 0.96) 100%
+  );
+  backdrop-filter: blur(10px);
   z-index: 10;
   min-height: 84px;
 }

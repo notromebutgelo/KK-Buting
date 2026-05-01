@@ -58,6 +58,12 @@ export default function DigitalIDCard({
     .filter(Boolean)
     .join(', ')
     .toUpperCase()
+  const emergencyContactName = formatEmergencyContactValue(profile.digitalIdEmergencyContactName, 'Not provided yet')
+  const emergencyContactPhone = formatEmergencyContactValue(profile.digitalIdEmergencyContactPhone, '-')
+  const emergencyContactRelationship = formatEmergencyContactValue(
+    profile.digitalIdEmergencyContactRelationship,
+    'Relationship not set'
+  )
 
   return (
     <div className="space-y-5">
@@ -115,6 +121,9 @@ export default function DigitalIDCard({
           <DigitalIdBack
             backgroundSrc="/images/KK ID - Back BG.png"
             qrCodeUrl={qrCodeUrl}
+            emergencyContactName={emergencyContactName}
+            emergencyContactPhone={emergencyContactPhone}
+            emergencyContactRelationship={emergencyContactRelationship}
           />
         </div>
       </div>
@@ -152,17 +161,18 @@ export function DigitalIdFace({
       <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[20.2%] text-[#0b2f5b]">
         <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
           <div className="flex flex-col">
-            <div className="flex h-[58%] items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
+            <div className="flex h-[51%] items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
               {photoUrl ? (
                 <img src={photoUrl} alt={fullName} className="h-full w-full object-cover" />
               ) : (
                 <span className="text-sm font-black text-[#014384]">{getInitials(fullName)}</span>
               )}
             </div>
-            <div className="mt-[5%] border-t border-[#808080] pt-[3.5%] text-center">
+            <div className="mt-[4.8%] min-h-[10%]" />
+            <div className="border-t border-[#808080] pt-[3.2%] text-center">
               <p className="text-[0.38rem] font-medium tracking-[0.07em] text-[#1a1a1a]">SIGNATURE</p>
             </div>
-            <p className="mt-[4%] break-all text-[0.4rem] font-bold leading-tight text-[#0b2f5b]">{memberId || 'PENDING'}</p>
+            <p className="mt-[3.4%] break-all text-[0.4rem] font-bold leading-tight text-[#0b2f5b]">{memberId || 'PENDING'}</p>
           </div>
 
           <div className="flex h-full justify-between gap-[4%]">
@@ -197,9 +207,15 @@ export function DigitalIdFace({
 export function DigitalIdBack({
   backgroundSrc,
   qrCodeUrl,
+  emergencyContactName,
+  emergencyContactPhone,
+  emergencyContactRelationship,
 }: {
   backgroundSrc: string
   qrCodeUrl?: string
+  emergencyContactName: string
+  emergencyContactPhone: string
+  emergencyContactRelationship: string
 }) {
   return (
     <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] shadow-[0_16px_28px_rgba(1,67,132,0.22)]">
@@ -211,13 +227,16 @@ export function DigitalIdBack({
             IN CASE OF EMERGENCY, PLEASE CONTACT:
           </p>
           <p className="mt-[2%] text-[0.7rem] font-black uppercase leading-tight text-[#0b2f5b]">
-            SHARRAINE KIZH V. CUETO
+            {emergencyContactName.toUpperCase()}
+          </p>
+          <p className="mt-[2%] text-[0.42rem] font-semibold uppercase tracking-[0.1em] text-[#48688e]">
+            {emergencyContactRelationship}
           </p>
           <p className="mt-[5%] text-[0.49rem] font-bold uppercase leading-[1.3] text-[#1d5aa1]">
             Emergency Contact No:
           </p>
           <p className="mt-[1%] text-[0.7rem] font-black text-[#0b2f5b]">
-            09220422042
+            {emergencyContactPhone}
           </p>
           <p className="mt-[6%] max-w-[94%] text-[0.52rem] italic leading-[1.4] text-[#4c6d95]">
             If found, please return to the Barangay Hall of Barangay Buting, Pasig City.
@@ -277,4 +296,9 @@ function getInitials(value: string) {
     .map((part) => part[0] || '')
     .join('')
     .toUpperCase()
+}
+
+function formatEmergencyContactValue(value: string | undefined, fallback: string) {
+  const nextValue = String(value || '').trim()
+  return nextValue || fallback
 }

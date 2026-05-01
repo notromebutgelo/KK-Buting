@@ -11,9 +11,11 @@ import BottomTabNavigator from './BottomTabNavigator'
 import ScanFailedScreen from '../screens/scanner/ScanFailedScreen'
 import ScanSuccessSreen from '../screens/scanner/ScanSuccessSreen'
 import TransactionScreen from '../screens/transaction/TransactionScreen'
+import ForcePasswordChangeScreen from '../screens/auth/ForcePasswordChangeScreen'
 
 export type RootStackParamList = {
   Login: undefined
+  ForcePasswordChange: undefined
   MerchantTabs: undefined
   Transactions: undefined
   Promotions: undefined
@@ -49,7 +51,9 @@ export default function AppNavigator() {
           contentStyle: { backgroundColor: '#f6f6ef' },
         }}
       >
-        {user ? (
+        {user ? user.mustChangePassword ? (
+          <Stack.Screen name="ForcePasswordChange" component={ForcePasswordChangeScreen} />
+        ) : (
           <>
             <Stack.Screen name="MerchantTabs" component={BottomTabNavigator} />
             <Stack.Screen name="Transactions" component={TransactionScreen} />

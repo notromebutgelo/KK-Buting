@@ -2,37 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  TOTAL_STEPS,
+  type ProfilingDraft,
+  getProfilingResumePathFromDraft,
+} from "./profiling-schema";
 
-export const PROFILING_STORAGE_KEY = "profiling";
-export const TOTAL_STEPS = 9;
-
-export type ProfilingDraft = {
-  firstName?: string;
-  middleName?: string;
-  lastName?: string;
-  suffix?: string;
-  gender?: string;
-  age?: number;
-  birthday?: string;
-  email?: string;
-  contactNumber?: string;
-  region?: string;
-  province?: string;
-  city?: string;
-  barangay?: string;
-  purok?: string;
-  civilStatus?: string;
-  youthAgeGroup?: string;
-  educationalBackground?: string;
-  youthClassification?: string;
-  workStatus?: string;
-  registeredSkVoter?: boolean;
-  votedLastSkElections?: boolean;
-  registeredNationalVoter?: boolean;
-  attendedKkAssembly?: boolean;
-  kkAssemblyTimesAttended?: number;
-  kkAssemblyReason?: string;
-};
+export const PROFILING_STORAGE_KEY = "profiling-2026";
 
 export function readProfilingDraft(): ProfilingDraft {
   if (typeof window === "undefined") return {};
@@ -99,62 +75,8 @@ export function getAgeFromBirthday(birthday: string) {
   return age >= 0 ? String(age) : "";
 }
 
-export function getAgeGroupFromAge(age: number | string) {
-  const value = typeof age === "string" ? parseInt(age, 10) : age;
-  if (!value || Number.isNaN(value)) return "";
-  if (value >= 15 && value <= 17) return "Child Youth";
-  if (value >= 18 && value <= 24) return "Core Youth";
-  if (value >= 25 && value <= 30) return "Adult Youth";
-  return "";
-}
-
 export function getProfilingResumePath(draft: ProfilingDraft = readProfilingDraft()) {
-  const hasStep1 =
-    Boolean(draft.firstName?.trim()) &&
-    Boolean(draft.middleName?.trim()) &&
-    Boolean(draft.lastName?.trim()) &&
-    Boolean(draft.region) &&
-    Boolean(draft.province) &&
-    Boolean(draft.city) &&
-    Boolean(draft.barangay) &&
-    Boolean(draft.purok);
-
-  if (!hasStep1) return "/profiling/step-1";
-
-  const hasStep2 =
-    Boolean(draft.gender) &&
-    Boolean(draft.birthday) &&
-    Boolean(draft.age) &&
-    Boolean(draft.email) &&
-    Boolean(draft.contactNumber) &&
-    String(draft.contactNumber).length === 10 &&
-    String(draft.contactNumber).startsWith("9");
-
-  if (!hasStep2) return "/profiling/step-2";
-
-  const hasStep3 =
-    Boolean(draft.civilStatus) &&
-    Boolean(draft.youthAgeGroup) &&
-    Boolean(draft.educationalBackground) &&
-    Boolean(draft.youthClassification) &&
-    Boolean(draft.workStatus);
-
-  if (!hasStep3) return "/profiling/step-3";
-
-  if (typeof draft.registeredSkVoter !== "boolean") return "/profiling/step-4";
-  if (typeof draft.votedLastSkElections !== "boolean") return "/profiling/step-5";
-  if (typeof draft.registeredNationalVoter !== "boolean") return "/profiling/step-6";
-  if (typeof draft.attendedKkAssembly !== "boolean") return "/profiling/step-7";
-
-  if (draft.attendedKkAssembly) {
-    if (!draft.kkAssemblyTimesAttended || draft.kkAssemblyTimesAttended <= 0) {
-      return "/profiling/step-8";
-    }
-  } else if (!draft.kkAssemblyReason) {
-    return "/profiling/step-9";
-  }
-
-  return "/profiling/review";
+  return getProfilingResumePathFromDraft(draft);
 }
 
 export function ProfilingShell({
@@ -260,6 +182,7 @@ export function TextField({
   required,
   min,
   max,
+  inputMode,
 }: {
   label: string;
   value: string;
@@ -269,6 +192,7 @@ export function TextField({
   required?: boolean;
   min?: string;
   max?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <div className="pf-col">
@@ -284,6 +208,7 @@ export function TextField({
         onChange={(e) => onChange(e.target.value)}
         min={min}
         max={max}
+        inputMode={inputMode}
         required={required}
       />
     </div>
@@ -301,7 +226,7 @@ export function SelectField({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: string[];
+  options: readonly string[];
   placeholder: string;
   required?: boolean;
 }) {
@@ -440,6 +365,134 @@ export function ChoiceGroup({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+export function RadioListField({
+  label,
+  description,
+  options,
+  value,
+  onChange,
+  helperText,
+}: {
+  label: string;
+  description?: string;
+  options: readonly string[];
+  value: string;
+  onChange: (value: string) => void;
+  helperText?: string;
+}) {
+  return (
+    <div className="pf-question-field">
+      <p className="pf-choice-label">{label}</p>
+      {description ? <p className="pf-question-copy">{description}</p> : null}
+      {helperText ? <p className="pf-input-hint">{helperText}</p> : null}
+      <div className="pf-option-list" role="radiogroup" aria-label={label}>
+        {options.map((option) => {
+          const selected = value === option;
+
+          return (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className={`pf-option-card ${selected ? "selected" : "unselected"}`}
+              onClick={() => onChange(option)}
+            >
+              <span className={`pf-option-indicator ${selected ? "selected" : ""}`} />
+              <span className="pf-option-text">{option}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function CheckboxListField({
+  label,
+  description,
+  options,
+  value,
+  onChange,
+  helperText,
+}: {
+  label: string;
+  description?: string;
+  options: readonly string[];
+  value: string[];
+  onChange: (value: string[]) => void;
+  helperText?: string;
+}) {
+  function toggleOption(option: string) {
+    const nextValue = value.includes(option)
+      ? value.filter((entry) => entry !== option)
+      : [...value, option];
+
+    onChange(nextValue);
+  }
+
+  return (
+    <div className="pf-question-field">
+      <p className="pf-choice-label">{label}</p>
+      {description ? <p className="pf-question-copy">{description}</p> : null}
+      {helperText ? <p className="pf-input-hint">{helperText}</p> : null}
+      <div className="pf-option-list" role="group" aria-label={label}>
+        {options.map((option) => {
+          const selected = value.includes(option);
+
+          return (
+            <button
+              key={option}
+              type="button"
+              className={`pf-option-card ${selected ? "selected" : "unselected"}`}
+              aria-pressed={selected}
+              onClick={() => toggleOption(option)}
+            >
+              <span className={`pf-checkbox-indicator ${selected ? "selected" : ""}`}>
+                {selected ? "✓" : ""}
+              </span>
+              <span className="pf-option-text">{option}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function TextAreaField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required,
+  rows = 4,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  rows?: number;
+}) {
+  return (
+    <div className="pf-col">
+      <label className="pf-label">
+        {label}
+        {required ? <span className="req">*</span> : null}
+      </label>
+      <textarea
+        className="pf-input pf-textarea"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        required={required}
+      />
     </div>
   );
 }

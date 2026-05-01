@@ -33,17 +33,16 @@ export function useAuth() {
         const payload = await getCurrentMerchant()
 
         setUser({
-          uid: String(payload.uid ?? payload.id ?? firebaseUser.uid),
-          email: String(payload.email ?? firebaseUser.email ?? ''),
-          UserName: String(
-            payload.UserName ??
-              payload.username ??
-              firebaseUser.displayName ??
-              firebaseUser.email?.split('@')[0] ??
-              'Merchant'
-          ),
-          role: String(payload.role ?? 'merchant') as 'merchant' | 'admin' | 'youth',
-          createdAt: payload.createdAt ? String(payload.createdAt) : undefined,
+          uid: payload.uid || firebaseUser.uid,
+          email: payload.email || firebaseUser.email || '',
+          UserName:
+            payload.UserName ||
+            firebaseUser.displayName ||
+            firebaseUser.email?.split('@')[0] ||
+            'Merchant',
+          role: payload.role || 'merchant',
+          createdAt: payload.createdAt,
+          mustChangePassword: Boolean(payload.mustChangePassword),
         })
       } catch (error) {
         const status = axios.isAxiosError(error) ? error.response?.status : undefined

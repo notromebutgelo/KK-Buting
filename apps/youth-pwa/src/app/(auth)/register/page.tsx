@@ -9,6 +9,7 @@ import { register, signInWithFacebook, signInWithGoogle } from "@/services/auth.
 import { getPostAuthRedirect } from "@/services/profiling.service";
 import { useAuthStore } from "@/store/authStore";
 import AlertModal from "@/components/ui/AlertModal";
+import { persistYouthSession } from "@/lib/session";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -55,9 +56,9 @@ export default function RegisterPage() {
 
     try {
       const { user, token } = await signInWithGoogle();
+      await persistYouthSession({ token, maxAgeSeconds: 60 * 60 * 24 * 30 });
       setUser(user);
       setToken(token);
-      document.cookie = `auth-token=${token}; path=/; max-age=${60 * 60 * 24 * 30}`;
       router.push(await getPostAuthRedirect("/home"));
     } catch (err: any) {
       setError(err?.message || "Google sign-in failed. Please try again.");
@@ -72,9 +73,9 @@ export default function RegisterPage() {
 
     try {
       const { user, token } = await signInWithFacebook();
+      await persistYouthSession({ token, maxAgeSeconds: 60 * 60 * 24 * 30 });
       setUser(user);
       setToken(token);
-      document.cookie = `auth-token=${token}; path=/; max-age=${60 * 60 * 24 * 30}`;
       router.push(await getPostAuthRedirect("/home"));
     } catch (err: any) {
       setError(err?.message || "Facebook sign-in failed. Please try again.");

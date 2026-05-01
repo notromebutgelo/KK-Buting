@@ -2,47 +2,14 @@ import { db } from "../../config/firebase";
 import { generateQrToken, verifyQrToken } from "../../../utils/renerateQrToken";
 import { addPoints, logMerchantScanFailure } from "../points/points.service";
 import { getMerchantByOwnerId } from "../merchants/merhcants.service";
-
-function extractScanToken(rawValue: string) {
-  const trimmed = String(rawValue || "").trim();
-  if (!trimmed) return "";
-
-  try {
-    const parsed = JSON.parse(trimmed) as {
-      token?: string;
-      qrToken?: string;
-      signedToken?: string;
-    };
-
-    return String(parsed.token || parsed.qrToken || parsed.signedToken || "").trim();
-  } catch {
-    return trimmed;
-  }
-}
-
-function getPointsFromAmount(amountSpent: number, pointsRate: number) {
-  return Math.max(1, Math.floor(amountSpent / Math.max(1, pointsRate)));
-}
+import {
+  assertMerchantCanRedeem,
+  extractScanToken,
+  getPointsFromAmount,
+} from "./qr.helpers";
 
 async function resolveMerchant(ownerId: string) {
-  const merchant = await getMerchantByOwnerId(ownerId);
-  if (!merchant) {
-    throw new Error("Merchant profile not found");
-  }
-
-  if (merchant.status === "pending") {
-    throw new Error("Merchant account is pending approval");
-  }
-
-  if (merchant.status === "suspended") {
-    throw new Error("Merchant account is suspended");
-  }
-
-  if (merchant.status !== "approved") {
-    throw new Error("Merchant account is not approved");
-  }
-
-  return merchant;
+  return assertMerchantCanRedeem(await getMerchantByOwnerId(ownerId));
 }
 
 async function validateYouthQr(rawValue: string) {

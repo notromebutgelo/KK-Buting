@@ -1,0 +1,300 @@
+const assert = require("node:assert/strict");
+
+const { FakeFirestore, FieldValue, FakeTimestamp } = require("./fake-firestore");
+const { loadDistModuleWithMocks } = require("./test-utils");
+
+const FIRESTORE_MODULE_MOCK = {
+  FieldValue,
+  Timestamp: FakeTimestamp,
+};
+
+function createFirebaseConfigMock(db) {
+  return {
+    db,
+    storage: {
+      bucket: () => ({
+        name: "kkprofiling-c42b4.firebasestorage.app",
+      }),
+    },
+    auth: {},
+  };
+}
+
+async function loadNotificationsService(db) {
+  return loadDistModuleWithMocks("dist/src/modules/notifications/notifications.service", {
+    "dist/src/config/firebase": createFirebaseConfigMock(db),
+    "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+  });
+}
+
+async function loadMerchantsService(db) {
+  return loadDistModuleWithMocks("dist/src/modules/merchants/merhcants.service", {
+    "dist/src/config/firebase": createFirebaseConfigMock(db),
+    "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+    "dist/src/modules/auth/user.service": {
+      setUserRole: async () => undefined,
+    },
+    "dist/src/modules/notifications/notifications.service": {
+      createNotification: async () => undefined,
+    },
+  });
+}
+
+async function loadPointsService(db) {
+  return loadDistModuleWithMocks("dist/src/modules/points/points.service", {
+    "dist/src/config/firebase": createFirebaseConfigMock(db),
+    "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+  });
+}
+
+const tests = [
+  {
+    name: "notifications integration writes, lists, and marks records as read in fake Firestore",
+    async run() {
+      const db = new FakeFirestore();
+      const notificationsService = await loadNotificationsService(db);
+
+      const id = await notificationsService.createNotification({
+        recipientUid: "youth-1",
+        audience: "youth",
+        type: "success",
+        title: "Reward redeemed",
+        body: "You redeemed a reward.",
+        link: "/rewards/my-redemptions",
+      });
+
+      assert.ok(id);
+      assert.equal(db.listDocData("notifications").length, 1);
+
+      const listed = await notificationsService.listNotificationsForUser("youth-1");
+      assert.equal(listed.length, 1);
+      assert.equal(listed[0].title, "Reward redeemed");
+      assert.equal(listed[0].read, false);
+
+      const result = await notificationsService.markAllNotificationsRead("youth-1");
+      assert.deepEqual(result, { updated: 1 });
+
+      const after = await notificationsService.listNotificationsForUser("youth-1");
+      assert.equal(after[0].read, true);
+      assert.ok(after[0].readAt);
+    },
+  },
+  {
+    name: "rewards integration redeems a reward, updates balances, and writes notification history",
+    async run() {
+      const db = new FakeFirestore({
+        rewards: {
+          "reward-1": {
+            title: "Free Drink",
+            description: "One free drink",
+            points: 100,
+            stock: 5,
+            merchantId: "merchant-1",
+            validDays: 30,
+            isActive: true,
+            category: "food",
+          },
+        },
+        merchants: {
+          "merchant-1": {
+            businessName: "Cafe Buting",
+            logoUrl: "https://cdn.example.com/logo.png",
+            bannerUrl: "https://cdn.example.com/banner.png",
+          },
+        },
+        points: {
+          "youth-1": {
+            balance: 250,
+            redeemedPoints: 0,
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            idNumber: "KK-001",
+          },
+        },
+        users: {
+          "youth-1": {
+            memberId: "KK-001",
+            UserName: "Juan Dela Cruz",
+          },
+        },
+      });
+
+      const notificationsService = await loadNotificationsService(db);
+      const rewardsService = loadDistModuleWithMocks("dist/src/modules/rewards/rewards.service", {
+        "dist/src/config/firebase": createFirebaseConfigMock(db),
+        "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+        "dist/src/modules/notifications/notifications.service": notificationsService,
+      });
+
+      const redemption = await rewardsService.redeemPublicReward("youth-1", "reward-1");
+
+      assert.equal(redemption.rewardId, "reward-1");
+      assert.equal(redemption.pointsCost, 100);
+      assert.equal(redemption.remainingPoints, 150);
+      assert.match(redemption.code, /^KK-[A-F0-9]{6}$/);
+
+      const pointsDoc = db.getDocData("points", "youth-1");
+      assert.equal(pointsDoc.balance, 150);
+      assert.equal(pointsDoc.redeemedPoints, 100);
+
+      const rewardDoc = db.getDocData("rewards", "reward-1");
+      assert.equal(rewardDoc.stock, 4);
+
+      const transactions = db.listDocData("transactions");
+      assert.equal(transactions.length, 1);
+      assert.equal(transactions[0].type, "redeem");
+      assert.equal(transactions[0].rewardId, "reward-1");
+
+      const pointsHistory = db.listDocData("users/youth-1/pointsHistory");
+      assert.equal(pointsHistory.length, 1);
+      assert.equal(pointsHistory[0].pointsDelta, -100);
+
+      const notifications = db.listDocData("notifications");
+      assert.equal(notifications.length, 1);
+      assert.equal(notifications[0].recipientUid, "youth-1");
+      assert.match(notifications[0].body, /You redeemed Free Drink/);
+
+      const redemptions = await rewardsService.listMyRewardRedemptions("youth-1", "active");
+      assert.equal(redemptions.length, 1);
+      assert.equal(redemptions[0].status, "active");
+      assert.equal(redemptions[0].rewardTitle, "Free Drink");
+    },
+  },
+  {
+    name: "QR integration awards points and writes merchant and member transaction history",
+    async run() {
+      const db = new FakeFirestore({
+        merchants: {
+          "merchant-1": {
+            ownerId: "owner-1",
+            status: "approved",
+            name: "Cafe Buting",
+            businessName: "Cafe Buting",
+            pointsRate: 10,
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            digitalIdStatus: "active",
+            digitalIdRevision: 3,
+            idNumber: "KK-001",
+            firstName: "Juan",
+            lastName: "Dela Cruz",
+          },
+        },
+        users: {
+          "youth-1": {
+            UserName: "Juan Dela Cruz",
+            email: "juan@example.com",
+          },
+        },
+      });
+
+      const pointsService = await loadPointsService(db);
+      const merchantsService = await loadMerchantsService(db);
+      const qrService = loadDistModuleWithMocks("dist/src/modules/qr/qr.service", {
+        "dist/src/config/firebase": createFirebaseConfigMock(db),
+        "dist/utils/renerateQrToken": {
+          generateQrToken: () => "generated-token",
+          verifyQrToken: () => ({
+            userId: "youth-1",
+            revision: 3,
+            timestamp: Date.now(),
+          }),
+        },
+        "dist/src/modules/points/points.service": pointsService,
+        "dist/src/modules/merchants/merhcants.service": merchantsService,
+      });
+
+      const result = await qrService.processQrRedeem("signed-token", "owner-1", 105);
+
+      assert.deepEqual(result, {
+        userId: "youth-1",
+        userName: "Juan Dela Cruz",
+        memberId: "KK-001",
+        merchantId: "merchant-1",
+        merchantName: "Cafe Buting",
+        amountSpent: 105,
+        pointsRate: 10,
+        pointsAwarded: 10,
+      });
+
+      const pointsDoc = db.getDocData("points", "youth-1");
+      assert.equal(pointsDoc.balance, 10);
+      assert.equal(pointsDoc.earnedPoints, 10);
+
+      const transactions = db.listDocData("transactions");
+      assert.equal(transactions.length, 1);
+      assert.equal(transactions[0].type, "earn");
+      assert.equal(transactions[0].merchantId, "merchant-1");
+      assert.equal(transactions[0].amountSpent, 105);
+
+      const merchantTransactions = db.listDocData("merchants/merchant-1/transactions");
+      assert.equal(merchantTransactions.length, 1);
+      assert.equal(merchantTransactions[0].points, 10);
+
+      const userPointsHistory = db.listDocData("users/youth-1/pointsHistory");
+      assert.equal(userPointsHistory.length, 1);
+      assert.equal(userPointsHistory[0].pointsDelta, 10);
+    },
+  },
+  {
+    name: "merchant storefront integration keeps derived image and description fields aligned",
+    async run() {
+      const db = new FakeFirestore({
+        merchants: {
+          "merchant-1": {
+            ownerId: "owner-1",
+            status: "approved",
+            name: "Cafe Buting",
+            businessName: "Cafe Buting",
+            imageUrl: "",
+            bannerUrl: "",
+            logoUrl: "",
+            description: "",
+            shortDescription: "",
+          },
+        },
+      });
+
+      const merchantsService = await loadMerchantsService(db);
+      const updated = await merchantsService.updateMerchantProfileByOwner("owner-1", {
+        bannerUrl: "https://cdn.example.com/banner.png",
+        shortDescription: "Neighborhood cafe favorites",
+        pointsPolicy: "Earn 1 point for every PHP 10 spent.",
+      });
+
+      assert.equal(updated.bannerUrl, "https://cdn.example.com/banner.png");
+      assert.equal(updated.imageUrl, "https://cdn.example.com/banner.png");
+      assert.equal(updated.shortDescription, "Neighborhood cafe favorites");
+      assert.equal(updated.description, "Neighborhood cafe favorites");
+      assert.equal(updated.pointsPolicy, "Earn 1 point for every PHP 10 spent.");
+
+      const stored = db.getDocData("merchants", "merchant-1");
+      assert.equal(stored.imageUrl, "https://cdn.example.com/banner.png");
+      assert.equal(stored.shortDescription, "Neighborhood cafe favorites");
+    },
+  },
+];
+
+(async () => {
+  let passed = 0;
+
+  for (const entry of tests) {
+    try {
+      await entry.run();
+      passed += 1;
+      console.log(`PASS ${entry.name}`);
+    } catch (error) {
+      console.error(`FAIL ${entry.name}`);
+      console.error(error);
+      process.exitCode = 1;
+    }
+  }
+
+  if (!process.exitCode) {
+    console.log(`\n${passed}/${tests.length} backend integration tests passed.`);
+  }
+})();

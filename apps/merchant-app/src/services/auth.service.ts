@@ -1,8 +1,11 @@
 import axios from 'axios'
 import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
+  updatePassword,
 } from 'firebase/auth'
 
 import api, { API_BASE_URL } from '../lib/api'
@@ -21,6 +24,7 @@ function normalizeUser(payload: Record<string, unknown>, fallbackEmail: string):
     UserName: String(payload.UserName ?? payload.username ?? fallbackEmail.split('@')[0] ?? 'Merchant'),
     role: String(payload.role ?? 'merchant') as MerchantUser['role'],
     createdAt: payload.createdAt ? String(payload.createdAt) : undefined,
+    mustChangePassword: Boolean(payload.mustChangePassword),
   }
 }
 
@@ -45,7 +49,7 @@ export async function signIn(email: string, password: string): Promise<AuthPaylo
     const token = await credential.user.getIdToken(true)
     const response = await api.post(
       '/auth/login',
-      {},
+      { password },
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -65,7 +69,7 @@ export async function signIn(email: string, password: string): Promise<AuthPaylo
 export async function getCurrentMerchant() {
   try {
     const response = await api.get('/auth/me')
-    return response.data.user ?? response.data
+    return normalizeUser(response.data.user ?? response.data, auth.currentUser?.email ?? '')
   } catch (error) {
     mapApiError(error)
   }
@@ -77,4 +81,34 @@ export async function signOut() {
 
 export async function resetPassword(email: string) {
   await sendPasswordResetEmail(auth, email.trim())
+}
+
+export async function changePassword(currentPassword: string, nextPassword: string) {
+  const currentUser = auth.currentUser
+
+  if (!currentUser || !currentUser.email) {
+    throw new Error('No signed-in merchant account is available.')
+  }
+
+  const credential = EmailAuthProvider.credential(currentUser.email, currentPassword)
+  await reauthenticateWithCredential(currentUser, credential)
+  await updatePassword(currentUser, nextPassword)
+
+  const refreshedToken = await currentUser.getIdToken(true)
+  await api.post(
+    '/auth/password-changed',
+    {},
+    {
+      headers: { Authorization: `Bearer ${refreshedToken}` },
+    }
+  )
+
+  const response = await api.get('/auth/me', {
+    headers: { Authorization: `Bearer ${refreshedToken}` },
+  })
+
+  return {
+    user: normalizeUser(response.data.user ?? response.data, currentUser.email),
+    token: refreshedToken,
+  }
 }

@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { submitProfiling } from "@/services/profiling.service";
 import AlertModal from "@/components/ui/AlertModal";
 import {
+  PROFILING_STEPS,
+  buildProfilingPayload,
+  formatFieldValueForReview,
+  isFieldVisible,
+  type ProfilingDraft,
+} from "../profiling-schema";
+import {
   FooterBranding,
   ReviewAccordion,
   clearProfilingDraft,
@@ -13,29 +20,36 @@ import {
 
 export default function ProfilingReviewPage() {
   const router = useRouter();
-  const [profileData, setProfileData] = useState<Record<string, unknown>>({});
+  const [draft, setDraft] = useState<ProfilingDraft>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setProfileData(readProfilingDraft() as Record<string, unknown>);
+    setDraft(readProfilingDraft());
   }, []);
 
-  const previousStep = useMemo(() => {
-    return profileData.attendedKkAssembly === false
-      ? "/profiling/step-9"
-      : "/profiling/step-8";
-  }, [profileData.attendedKkAssembly]);
+  const reviewSections = useMemo(() => {
+    return PROFILING_STEPS.map((step) => ({
+      title: step.title,
+      fields: step.sections.flatMap((section) =>
+        section.fields
+          .filter((field) => isFieldVisible(field, draft))
+          .map((field) => ({
+            label: field.reviewLabel || field.label,
+            value: formatFieldValueForReview(field, draft),
+          }))
+          .filter((field) => field.value)
+      ),
+    })).filter((section) => section.fields.length > 0);
+  }, [draft]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setIsLoading(true);
     setError("");
 
     try {
-      await submitProfiling(
-        readProfilingDraft() as Parameters<typeof submitProfiling>[0]
-      );
+      await submitProfiling(buildProfilingPayload(readProfilingDraft()));
       clearProfilingDraft();
       router.push("/profiling/sucess");
     } catch {
@@ -43,14 +57,14 @@ export default function ProfilingReviewPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <div className="pf-review-page">
       <div className="pf-review-topbar">
         <button
           className="pf-review-back"
-          onClick={() => router.push(previousStep)}
+          onClick={() => router.push("/profiling/step-9")}
           aria-label="Back"
         >
           <svg
@@ -72,96 +86,31 @@ export default function ProfilingReviewPage() {
       <div className="pf-review-head">
         <h1 className="pf-review-title">Review Your Profile</h1>
         <p className="pf-review-subtitle">
-          Kindly double check your information and ensure everything is correct
+          Kindly double check your answers before submitting the 2026 KK profiling form.
         </p>
       </div>
       <div className="pf-review-divider" />
 
       <div className="pf-review-cards">
-        <ReviewAccordion
-          title="Profile"
-          openByDefault
-          icon={<ProfileIcon />}
-        >
-          <div className="pf-review-grid">
-            <Field label="First Name" value={profileData.firstName} />
-            <Field label="Middle Name" value={profileData.middleName} />
-            <Field label="Last Name" value={profileData.lastName} />
-            <Field label="Suffix" value={profileData.suffix} />
-            <Field label="Region" value={profileData.region} full />
-            <Field label="Province" value={profileData.province} />
-            <Field label="City/Municipality" value={profileData.city} />
-            <Field label="Barangay" value={profileData.barangay} />
-            <Field label="Purok/Zone" value={profileData.purok} />
-            <Field
-              label="Birthday"
-              value={formatBirthday(profileData.birthday)}
-              full
-            />
-            <Field label="Gender" value={profileData.gender} />
-            <Field label="Age" value={profileData.age} />
-            <Field label="Email" value={profileData.email} full />
-            <Field
-              label="Contact No."
-              value={formatContactNumber(profileData.contactNumber)}
-              full
-            />
-          </div>
-        </ReviewAccordion>
-
-        <ReviewAccordion
-          title="Demographic Characteristics"
-          icon={<DemographicIcon />}
-        >
-          <div className="pf-review-grid">
-            <Field label="Civil Status" value={profileData.civilStatus} />
-            <Field label="Youth Age Group" value={profileData.youthAgeGroup} />
-            <Field
-              label="Educational Background"
-              value={profileData.educationalBackground}
-              full
-            />
-            <Field
-              label="Youth Classification"
-              value={profileData.youthClassification}
-            />
-            <Field label="Work Status" value={profileData.workStatus} />
-            <Field
-              label="Registered SK Voter"
-              value={toYesNo(profileData.registeredSkVoter)}
-            />
-            <Field
-              label="Voted in Last SK Elections"
-              value={toYesNo(profileData.votedLastSkElections)}
-            />
-            <Field
-              label="Registered National Voter"
-              value={toYesNo(profileData.registeredNationalVoter)}
-            />
-            <Field
-              label="Attended KK Assembly"
-              value={toYesNo(profileData.attendedKkAssembly)}
-            />
-            {profileData.attendedKkAssembly === true ? (
-              <Field
-                label="Times Attended"
-                value={formatAssemblyAttendance(profileData.kkAssemblyTimesAttended)}
-                full
-              />
-            ) : (
-              <Field
-                label="Reason"
-                value={profileData.kkAssemblyReason}
-                full
-              />
-            )}
-          </div>
-        </ReviewAccordion>
+        {reviewSections.map((section, index) => (
+          <ReviewAccordion
+            key={section.title}
+            title={section.title}
+            openByDefault={index === 0}
+            icon={<SectionIcon />}
+          >
+            <div className="pf-review-grid">
+              {section.fields.map((field) => (
+                <Field key={field.label} label={field.label} value={field.value} />
+              ))}
+            </div>
+          </ReviewAccordion>
+        ))}
       </div>
 
       <form className="pf-review-bottombar" onSubmit={handleSubmit}>
         <button className="pf-review-next-btn" type="submit" disabled={isLoading}>
-          {isLoading ? "Submitting..." : "Next"}
+          {isLoading ? "Submitting..." : "Submit"}
         </button>
       </form>
 
@@ -180,57 +129,19 @@ export default function ProfilingReviewPage() {
 function Field({
   label,
   value,
-  full,
 }: {
   label: string;
-  value: unknown;
-  full?: boolean;
+  value: string;
 }) {
   return (
-    <div className={`pf-review-field ${full ? "full" : ""}`}>
+    <div className="pf-review-field full">
       <span className="pf-review-field-label">{label}</span>
-      <span className="pf-review-field-value">
-        {value === undefined || value === null || value === "" ? "-" : String(value)}
-      </span>
+      <span className="pf-review-field-value">{value || "-"}</span>
     </div>
   );
 }
 
-function toYesNo(value: unknown) {
-  if (value === true) return "Yes";
-  if (value === false) return "No";
-  return "-";
-}
-
-function formatBirthday(value: unknown) {
-  if (!value || typeof value !== "string") return "-";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "2-digit",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatContactNumber(value: unknown) {
-  if (!value || typeof value !== "string") return "-";
-  const digits = value.replace(/\D/g, "").slice(0, 10);
-  if (digits.length !== 10) return value;
-  return `+63 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-}
-
-function formatAssemblyAttendance(value: unknown) {
-  if (typeof value !== "number") return "-";
-  if (value <= 0) return "-";
-  if (value <= 2) return "1-2 times";
-  if (value <= 4) return "3-4 times";
-  return "5 and above";
-}
-
-function ProfileIcon() {
+function SectionIcon() {
   return (
     <svg
       width="18"
@@ -242,28 +153,7 @@ function ProfileIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M20 21a8 8 0 1 0-16 0" />
-      <circle cx="12" cy="8" r="4" />
-    </svg>
-  );
-}
-
-function DemographicIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="8" cy="8" r="3" />
-      <circle cx="17" cy="7" r="2.5" />
-      <path d="M3.5 18c.8-3 3.1-4.5 6.5-4.5s5.7 1.5 6.5 4.5" />
-      <path d="M14.5 18c.5-2.1 2.1-3.3 4.5-3.3 1 0 1.8.2 2.5.6" />
+      <path d="M5 6h14M5 12h14M5 18h9" />
     </svg>
   );
 }

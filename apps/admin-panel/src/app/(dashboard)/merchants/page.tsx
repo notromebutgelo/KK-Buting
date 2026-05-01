@@ -1,9 +1,23 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { Eye, EyeOff, Search } from 'lucide-react'
 import api from '@/lib/api'
-import Spinner from '@/components/ui/Spinner'
 import LoadingModal from '@/components/ui/LoadingModal'
+import {
+  AdminEmptyState,
+  AdminField,
+  AdminFilterBar,
+  AdminNotice,
+  AdminPageIntro,
+  AdminStatCard,
+  AdminStatGrid,
+  AdminSurface,
+  AdminSurfaceHeader,
+  AdminTabBar,
+  AdminTableShell,
+} from '@/components/admin/workspace'
+import { DashboardMiniStat, DashboardPill } from '@/components/dashboard/primitives'
 import { cn } from '@/utils/cn'
 
 type MerchantStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
@@ -40,12 +54,15 @@ interface MerchantTransaction {
 type MerchantTab = 'applications' | 'directory' | 'transactions' | 'create'
 
 const statusOptions: Array<{ value: MerchantStatus | 'all'; label: string }> = [
-  { value: 'all', label: 'All Statuses' },
+  { value: 'all', label: 'All statuses' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Active' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'rejected', label: 'Rejected' },
 ]
+
+const inputClass =
+  'surface-input w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30'
 
 export default function MerchantsPage() {
   const [adminRole, setAdminRole] = useState('admin')
@@ -62,15 +79,10 @@ export default function MerchantsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [loadingLabel, setLoadingLabel] = useState('Updating merchant')
   const [message, setMessage] = useState('')
-  const [editor, setEditor] = useState({
-    discountInfo: '',
-    termsAndConditions: '',
-    pointsRate: '10',
-  })
+  const [editor, setEditor] = useState({ discountInfo: '', termsAndConditions: '', pointsRate: '10' })
 
   const isSuperadmin = adminRole === 'superadmin'
 
-  // Create merchant form state
   const [createForm, setCreateForm] = useState({
     name: '',
     category: '',
@@ -103,22 +115,21 @@ export default function MerchantsPage() {
       const matchesCategory = categoryFilter === 'all' ? true : merchant.category === categoryFilter
       const matchesDate =
         !dateJoinedFilter ||
-        (joinedDate && !Number.isNaN(joinedDate.getTime()) && joinedDate.toISOString().slice(0, 10) === dateJoinedFilter)
+        (joinedDate &&
+          !Number.isNaN(joinedDate.getTime()) &&
+          joinedDate.toISOString().slice(0, 10) === dateJoinedFilter)
       const matchesTab =
         activeTab === 'applications'
           ? merchant.status === 'pending'
           : activeTab === 'directory'
             ? merchant.status !== 'pending'
             : true
-
       return matchesSearch && matchesStatus && matchesCategory && matchesDate && matchesTab
     })
   }, [activeTab, categoryFilter, dateJoinedFilter, merchants, search, statusFilter])
 
   const selectedMerchant =
-    merchants.find((merchant) => merchant.id === selectedMerchantId) ||
-    filteredMerchants[0] ||
-    null
+    merchants.find((merchant) => merchant.id === selectedMerchantId) || filteredMerchants[0] || null
 
   const categoryOptions = useMemo(
     () =>
@@ -134,13 +145,8 @@ export default function MerchantsPage() {
     async function loadMerchants() {
       setIsLoading(true)
       try {
-        const [merchantsRes, meRes] = await Promise.all([
-          api.get('/admin/merchants'),
-          api.get('/auth/me'),
-        ])
-
+        const [merchantsRes, meRes] = await Promise.all([api.get('/admin/merchants'), api.get('/auth/me')])
         if (!mounted) return
-
         const nextMerchants = merchantsRes.data.merchants || merchantsRes.data || []
         setMerchants(nextMerchants)
         setAdminRole(meRes.data?.role || window.localStorage.getItem('kk-admin-role') || 'admin')
@@ -153,7 +159,7 @@ export default function MerchantsPage() {
       }
     }
 
-    loadMerchants()
+    void loadMerchants()
     return () => {
       mounted = false
     }
@@ -172,17 +178,14 @@ export default function MerchantsPage() {
     })
 
     let mounted = true
+
     async function loadTransactions() {
       setIsDetailLoading(true)
       try {
         const res = await api.get(`/admin/merchants/${selectedMerchant.id}/transactions`)
-        if (mounted) {
-          setTransactions(res.data.transactions || [])
-        }
+        if (mounted) setTransactions(res.data.transactions || [])
       } catch {
-        if (mounted) {
-          setTransactions([])
-        }
+        if (mounted) setTransactions([])
       } finally {
         if (mounted) setIsDetailLoading(false)
       }
@@ -217,15 +220,12 @@ export default function MerchantsPage() {
     setMessage('')
 
     try {
-      if (action === 'approve') {
-        await api.patch(`/admin/merchants/${selectedMerchant.id}/approve`)
-      } else if (action === 'reactivate') {
+      if (action === 'approve') await api.patch(`/admin/merchants/${selectedMerchant.id}/approve`)
+      else if (action === 'reactivate')
         await api.patch(`/admin/merchants/${selectedMerchant.id}/status`, { status: 'approved' })
-      } else if (action === 'suspend') {
+      else if (action === 'suspend')
         await api.patch(`/admin/merchants/${selectedMerchant.id}/status`, { status: 'suspended' })
-      } else {
-        await api.patch(`/admin/merchants/${selectedMerchant.id}/status`, { status: 'rejected' })
-      }
+      else await api.patch(`/admin/merchants/${selectedMerchant.id}/status`, { status: 'rejected' })
 
       setMessage(
         action === 'approve'
@@ -278,12 +278,25 @@ export default function MerchantsPage() {
 
   async function handleCreateMerchant() {
     setCreateError('')
-    if (!createForm.name.trim()) { setCreateError('Business name is required.'); return }
-    if (!createForm.email.trim()) { setCreateError('Email is required.'); return }
-    if (!createForm.password.trim()) { setCreateError('Password is required.'); return }
-    if (createForm.password.length < 8) { setCreateError('Password must be at least 8 characters.'); return }
+    if (!createForm.name.trim()) {
+      setCreateError('Business name is required.')
+      return
+    }
+    if (!createForm.email.trim()) {
+      setCreateError('Email is required.')
+      return
+    }
+    if (!createForm.password.trim()) {
+      setCreateError('Password is required.')
+      return
+    }
+    if (createForm.password.length < 8) {
+      setCreateError('Password must be at least 8 characters.')
+      return
+    }
 
     setIsCreating(true)
+
     try {
       const res = await api.post('/admin/merchants/create', {
         name: createForm.name.trim(),
@@ -293,6 +306,7 @@ export default function MerchantsPage() {
         email: createForm.email.trim(),
         password: createForm.password,
       })
+
       const merchant = res.data.merchant
       setCreateResult({ ...merchant, password: createForm.password })
       setCreateForm({ name: '', category: '', address: '', ownerName: '', email: '', password: '' })
@@ -306,9 +320,19 @@ export default function MerchantsPage() {
 
   const counts = {
     applications: merchants.filter((merchant) => merchant.status === 'pending').length,
-    directory: merchants.filter((merchant) => merchant.status !== 'pending').length,
+    active: merchants.filter((merchant) => merchant.status === 'approved').length,
+    suspended: merchants.filter((merchant) => merchant.status === 'suspended').length,
     transactions: transactions.length,
   }
+
+  const tabs: Array<{ id: MerchantTab; label: string; count?: number }> = [
+    { id: 'applications', label: 'Applications', count: counts.applications },
+    { id: 'directory', label: 'Directory', count: merchants.filter((merchant) => merchant.status !== 'pending').length },
+    { id: 'transactions', label: 'Transactions', count: counts.transactions },
+    ...(isSuperadmin ? [{ id: 'create' as const, label: 'Create merchant' }] : []),
+  ]
+
+  const messageTone = message.toLowerCase().includes('could not') || message.toLowerCase().includes('failed') ? 'danger' : 'success'
 
   return (
     <>
@@ -317,650 +341,635 @@ export default function MerchantsPage() {
         title={loadingLabel}
         description="Please wait while the merchant record and related dashboard data are updated."
       />
-      <div className="space-y-6">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900">Merchant Management</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Partner shop lifecycle from application review through points-issuing status management.
-          </p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <SummaryCard label="Applications Queue" value={counts.applications} accent="yellow" />
-          <SummaryCard label="Active / In Directory" value={counts.directory} accent="blue" />
-          <SummaryCard label="Transaction Logs" value={counts.transactions} accent="green" />
-        </div>
-      </div>
 
-      <div className="flex flex-wrap gap-2">
-        {([
-          { id: 'applications', label: 'Applications Queue' },
-          { id: 'directory', label: 'Merchant Directory' },
-          { id: 'transactions', label: 'Transaction History' },
-          ...(isSuperadmin ? [{ id: 'create', label: '+ Create Merchant Account' }] : []),
-        ] as const).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              setActiveTab(tab.id as MerchantTab)
-              if (tab.id === 'create') {
-                setCreateResult(null)
-                setCreateError('')
-              }
-            }}
-            className={cn(
-              'rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors',
-              activeTab === tab.id
-                ? tab.id === 'create'
-                  ? 'bg-[linear-gradient(135deg,#014384,#0572DC)] text-white shadow-[0_12px_24px_rgba(1,67,132,0.22)]'
-                  : 'bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.18)]'
-                : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'create' && (
-        <div className="mx-auto w-full max-w-2xl">
-          {createResult ? (
-            <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-8 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white">
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-emerald-900">Merchant account created</h2>
-                  <p className="text-sm text-emerald-700">Share these credentials with the merchant. The account is already active.</p>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3 rounded-2xl border border-emerald-200 bg-white p-5">
-                <CredentialRow label="Business Name" value={createResult.name} />
-                <CredentialRow label="Login Email" value={createResult.email} copyable />
-                <CredentialRow label="Password" value={createResult.password} copyable secret />
-                <CredentialRow label="Merchant ID" value={createResult.merchantId} />
-              </div>
-
-              <p className="mt-4 text-xs text-emerald-700">
-                The merchant can log in immediately using the KK Merchant App with the credentials above. Advise them to change their password after the first login.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => { setCreateResult(null); setCreateError('') }}
-                className="mt-6 rounded-xl bg-[linear-gradient(135deg,#014384,#0572DC)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90"
-              >
-                Create Another Merchant
-              </button>
+      <div className="flex flex-col gap-6">
+        <AdminPageIntro
+          eyebrow="Merchant operations"
+          title="Handle merchant onboarding, storefront policy cleanup, and lifecycle actions from one calmer workspace."
+          description="This page now separates queue review from merchant detail work, so you can scan applications quickly and still get a strong side panel for profile editing, status actions, and transaction context."
+          pills={[
+            <DashboardPill key="role" tone={isSuperadmin ? 'soft' : 'default'}>
+              {isSuperadmin ? 'Superadmin controls enabled' : 'Admin access'}
+            </DashboardPill>,
+            <DashboardPill key="queue" tone={counts.applications > 0 ? 'warning' : 'default'}>
+              {counts.applications > 0 ? 'Applications waiting' : 'Queue clear'}
+            </DashboardPill>,
+          ]}
+          aside={
+            <div className="grid grid-cols-2 gap-3">
+              <DashboardMiniStat
+                label="Pending apps"
+                value={counts.applications.toLocaleString()}
+                meta="Merchants waiting for review"
+                tone={counts.applications > 0 ? 'warning' : 'soft'}
+              />
+              <DashboardMiniStat
+                label="Active merchants"
+                value={counts.active.toLocaleString()}
+                meta="Partners already live"
+                tone="neutral"
+              />
             </div>
-          ) : (
-            <div className="rounded-[28px] border border-gray-100 bg-white p-8 shadow-sm">
-              <div className="mb-6">
-                <h2 className="text-xl font-black text-gray-900">Create Merchant Account</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Generate a merchant login and register the business in one step. The account will be immediately active.
+          }
+        />
+
+        <AdminStatGrid>
+        <AdminStatCard
+          label="Applications queue"
+          value={counts.applications.toLocaleString()}
+          meta="Incoming merchants that still need a decision."
+          accent="var(--accent-warm)"
+        />
+        <AdminStatCard
+          label="Active directory"
+          value={counts.active.toLocaleString()}
+          meta="Approved merchants currently able to operate in the ecosystem."
+          accent="var(--accent)"
+        />
+        <AdminStatCard
+          label="Suspended"
+          value={counts.suspended.toLocaleString()}
+          meta="Partners temporarily paused from normal activity."
+          accent="rgba(1, 67, 132, 0.34)"
+        />
+        <AdminStatCard
+          label="Selected transactions"
+          value={counts.transactions.toLocaleString()}
+          meta="Recent QR and points-award activity for the merchant you are reviewing."
+          accent="var(--accent-strong)"
+        />
+        </AdminStatGrid>
+
+        <AdminTabBar
+          value={activeTab}
+          onChange={(tab) => {
+            setActiveTab(tab)
+            if (tab === 'create') {
+              setCreateResult(null)
+              setCreateError('')
+            }
+          }}
+          tabs={tabs}
+        />
+
+        {activeTab === 'create' ? (
+          <div className="mx-auto w-full max-w-3xl">
+            {createResult ? (
+              <AdminSurface tone="soft">
+                <AdminSurfaceHeader
+                  title="Merchant account created"
+                  description="Share these credentials with the merchant. The account is already active and can log in immediately."
+                  action={<DashboardPill tone="success">Ready to share</DashboardPill>}
+                />
+
+                <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
+                  <CredentialRow label="Business name" value={createResult.name} />
+                  <CredentialRow label="Login email" value={createResult.email} copyable />
+                  <CredentialRow label="Password" value={createResult.password} copyable secret />
+                  <CredentialRow label="Merchant ID" value={createResult.merchantId} />
+                </div>
+
+                <p className="mt-4 text-sm leading-6" style={{ color: 'var(--ink-soft)' }}>
+                  Advise the merchant to change their password after the first login and confirm that their storefront details are complete before launch.
                 </p>
-              </div>
 
-              {createError ? (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {createError}
-                </div>
-              ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateResult(null)
+                    setCreateError('')
+                  }}
+                  className="mt-5 rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
+                  style={{ background: 'var(--accent)' }}
+                >
+                  Create another merchant
+                </button>
+              </AdminSurface>
+            ) : (
+              <AdminSurface>
+                <AdminSurfaceHeader
+                  title="Create merchant account"
+                  description="Generate a merchant login and register the business in one step. This route is intended for superadmin-led onboarding."
+                  action={<DashboardPill tone="soft">Immediate activation</DashboardPill>}
+                />
 
-              <div className="space-y-4">
-                <FormField label="Business Name *">
-                  <input
-                    type="text"
-                    value={createForm.name}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="e.g. Juan's Bakery"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </FormField>
+                {createError ? <div className="mt-5"><AdminNotice tone="danger">{createError}</AdminNotice></div> : null}
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField label="Category">
+                <div className="mt-5 grid gap-4">
+                  <AdminField label="Business name *">
                     <input
                       type="text"
-                      value={createForm.category}
-                      onChange={(e) => setCreateForm((f) => ({ ...f, category: e.target.value }))}
-                      placeholder="e.g. Food & Beverage"
-                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      value={createForm.name}
+                      onChange={(e) => setCreateForm((form) => ({ ...form, name: e.target.value }))}
+                      placeholder="e.g. Juan's Bakery"
+                      className={inputClass}
                     />
-                  </FormField>
-                  <FormField label="Owner / Contact Name">
-                    <input
-                      type="text"
-                      value={createForm.ownerName}
-                      onChange={(e) => setCreateForm((f) => ({ ...f, ownerName: e.target.value }))}
-                      placeholder="e.g. Juan Dela Cruz"
-                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                  </FormField>
-                </div>
+                  </AdminField>
 
-                <FormField label="Business Address">
-                  <input
-                    type="text"
-                    value={createForm.address}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, address: e.target.value }))}
-                    placeholder="e.g. 123 Buting Street, Pasig City"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </FormField>
-
-                <FormField label="Login Email *">
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      value={createForm.email}
-                      onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
-                      placeholder="merchant@email.com"
-                      className="min-w-0 flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setCreateForm((f) => ({ ...f, email: generateEmail(f.name) }))}
-                      className="shrink-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-100"
-                    >
-                      Auto-fill
-                    </button>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-400">Or click Auto-fill to generate one from the business name.</p>
-                </FormField>
-
-                <FormField label="Password *">
-                  <div className="flex gap-2">
-                    <div className="relative min-w-0 flex-1">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <AdminField label="Category">
                       <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={createForm.password}
-                        onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-                        placeholder="Min. 8 characters"
-                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 pr-10 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        type="text"
+                        value={createForm.category}
+                        onChange={(e) => setCreateForm((form) => ({ ...form, category: e.target.value }))}
+                        placeholder="e.g. Food & Beverage"
+                        className={inputClass}
+                      />
+                    </AdminField>
+                    <AdminField label="Owner / contact name">
+                      <input
+                        type="text"
+                        value={createForm.ownerName}
+                        onChange={(e) => setCreateForm((form) => ({ ...form, ownerName: e.target.value }))}
+                        placeholder="e.g. Juan Dela Cruz"
+                        className={inputClass}
+                      />
+                    </AdminField>
+                  </div>
+
+                  <AdminField label="Business address">
+                    <input
+                      type="text"
+                      value={createForm.address}
+                      onChange={(e) => setCreateForm((form) => ({ ...form, address: e.target.value }))}
+                      placeholder="e.g. 123 Buting Street, Pasig City"
+                      className={inputClass}
+                    />
+                  </AdminField>
+
+                  <AdminField label="Login email *" hint="Use Auto-fill to generate an email from the business name when needed.">
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={createForm.email}
+                        onChange={(e) => setCreateForm((form) => ({ ...form, email: e.target.value }))}
+                        placeholder="merchant@email.com"
+                        className={cn(inputClass, 'min-w-0 flex-1')}
                       />
                       <button
                         type="button"
-                        onClick={() => setShowPassword((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setCreateForm((form) => ({ ...form, email: generateEmail(form.name) }))}
+                        className="shrink-0 rounded-xl border px-3 py-2.5 text-xs font-semibold"
+                        style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)', color: 'var(--ink-soft)' }}
                       >
-                        {showPassword ? (
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                          </svg>
-                        ) : (
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
+                        Auto-fill
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const pwd = generatePassword()
-                        setCreateForm((f) => ({ ...f, password: pwd }))
-                        setShowPassword(true)
-                      }}
-                      className="shrink-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-100"
-                    >
-                      Generate
-                    </button>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-400">Or click Generate to create a secure random password.</p>
-                </FormField>
+                  </AdminField>
 
-                <div className="pt-2">
+                  <AdminField label="Password *" hint="Use Generate for a secure starter password.">
+                    <div className="flex gap-2">
+                      <div className="relative min-w-0 flex-1">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={createForm.password}
+                          onChange={(e) => setCreateForm((form) => ({ ...form, password: e.target.value }))}
+                          placeholder="Minimum 8 characters"
+                          className={cn(inputClass, 'pr-10')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((value) => !value)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          style={{ color: 'var(--muted)' }}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCreateForm((form) => ({ ...form, password: generatePassword() }))
+                          setShowPassword(true)
+                        }}
+                        className="shrink-0 rounded-xl border px-3 py-2.5 text-xs font-semibold"
+                        style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)', color: 'var(--ink-soft)' }}
+                      >
+                        Generate
+                      </button>
+                    </div>
+                  </AdminField>
+
                   <button
                     type="button"
                     onClick={() => void handleCreateMerchant()}
                     disabled={isCreating}
-                    className="w-full rounded-xl bg-[linear-gradient(135deg,#014384,#0572DC)] py-3 text-sm font-bold text-white shadow-[0_12px_24px_rgba(1,67,132,0.2)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-xl py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{ background: 'var(--accent)' }}
                   >
-                    {isCreating ? 'Creating account...' : 'Create Merchant Account'}
+                    {isCreating ? 'Creating account...' : 'Create merchant account'}
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab !== 'create' && (
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-        <section className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <SearchInput value={search} onChange={setSearch} placeholder="Search merchant, owner, or address" />
-            <SelectField value={statusFilter} onChange={(value) => setStatusFilter(value as MerchantStatus | 'all')}>
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField value={categoryFilter} onChange={setCategoryFilter}>
-              <option value="all">All Categories</option>
-              {categoryOptions.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </SelectField>
-            <input
-              type="date"
-              value={dateJoinedFilter}
-              onChange={(event) => setDateJoinedFilter(event.target.value)}
-              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+              </AdminSurface>
+            )}
           </div>
+        ) : (
+          <div className="grid gap-6 xl:grid-cols-[1.16fr_0.84fr]">
+            <AdminSurface>
+              <AdminSurfaceHeader
+                title={activeTab === 'applications' ? 'Merchant applications' : activeTab === 'directory' ? 'Merchant directory' : 'Merchants and transactions'}
+                description="The left side stays focused on selection and queue scanning, while detailed editing and actions stay on the right."
+                action={<DashboardPill tone="default">{filteredMerchants.length} shown</DashboardPill>}
+              />
 
-          {isLoading ? (
-            <div className="flex justify-center py-16">
-              <Spinner size="lg" />
-            </div>
-          ) : filteredMerchants.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center text-sm text-gray-400">
-              No merchants match the current filters.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-gray-100">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px]">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <HeaderCell>Merchant</HeaderCell>
-                      <HeaderCell>Category</HeaderCell>
-                      <HeaderCell>Status</HeaderCell>
-                      <HeaderCell>Owner</HeaderCell>
-                      <HeaderCell>Date Joined</HeaderCell>
-                      <HeaderCell align="right">Points Rate</HeaderCell>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredMerchants.map((merchant) => {
-                      const isSelected = selectedMerchant?.id === merchant.id
-                      return (
-                        <tr
-                          key={merchant.id}
-                          onClick={() => setSelectedMerchantId(merchant.id)}
-                          className={cn(
-                            'cursor-pointer transition-colors hover:bg-blue-50/50',
-                            isSelected && 'bg-blue-50'
-                          )}
-                        >
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-gray-100">
-                                {merchant.logoUrl || merchant.imageUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={merchant.logoUrl || merchant.imageUrl}
-                                    alt={merchant.name}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-sm font-black text-gray-500">
-                                    {getInitials(merchant.name)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-gray-900">{merchant.name}</p>
-                                <p className="truncate text-xs text-gray-500">
-                                  {merchant.description || 'No business description yet'}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4 text-sm text-gray-600">{merchant.category || 'Uncategorized'}</td>
-                          <td className="px-5 py-4">
-                            <StatusPill status={merchant.status} />
-                          </td>
-                          <td className="px-5 py-4 text-sm text-gray-600">
-                            <p>{merchant.ownerName || 'Unknown owner'}</p>
-                            <p className="text-xs text-gray-400">{merchant.ownerEmail || 'No email saved'}</p>
-                          </td>
-                          <td className="px-5 py-4 text-sm text-gray-500">
-                            {merchant.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-PH') : '—'}
-                          </td>
-                          <td className="px-5 py-4 text-right text-sm font-semibold text-blue-700">
-                            ₱{Number(merchant.pointsRate || 10).toLocaleString()} = 1 pt
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </section>
+              <div className="mt-5">
+                <AdminFilterBar>
+                  <AdminField label="Search merchants">
+                    <div className="relative">
+                      <Search
+                        size={16}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+                        style={{ color: 'var(--muted)' }}
+                      />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search merchant, owner, or address"
+                        className="surface-input w-full rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/25"
+                      />
+                    </div>
+                  </AdminField>
 
-        <aside className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          {selectedMerchant ? (
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-500">Merchant Profile</p>
-                  <h2 className="mt-1 text-xl font-black text-gray-900">{selectedMerchant.name}</h2>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {selectedMerchant.address || 'Address not provided'}
-                  </p>
-                </div>
-                <StatusPill status={selectedMerchant.status} />
+                  <AdminField label="Status">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as MerchantStatus | 'all')}
+                      className={inputClass}
+                    >
+                      {statusOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </AdminField>
+
+                  <AdminField label="Category">
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="all">All categories</option>
+                      {categoryOptions.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </AdminField>
+
+                  <AdminField label="Date joined">
+                    <input
+                      type="date"
+                      value={dateJoinedFilter}
+                      onChange={(e) => setDateJoinedFilter(e.target.value)}
+                      className={inputClass}
+                    />
+                  </AdminField>
+                </AdminFilterBar>
               </div>
 
-              {message ? (
-                <div
-                  className={cn(
-                    'rounded-xl border px-4 py-3 text-sm',
-                    message.toLowerCase().includes('failed') || message.toLowerCase().includes('could not')
-                      ? 'border-red-200 bg-red-50 text-red-700'
-                      : 'border-green-200 bg-green-50 text-green-700'
-                  )}
-                >
-                  {message}
-                </div>
-              ) : null}
-
-              <div className="grid gap-3 rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
-                <DetailRow label="Business Category" value={selectedMerchant.category || 'Uncategorized'} />
-                <DetailRow label="Owner" value={selectedMerchant.ownerName || 'Unknown owner'} />
-                <DetailRow label="Email" value={selectedMerchant.ownerEmail || 'No owner email'} />
-                <DetailRow
-                  label="Date Joined"
-                  value={selectedMerchant.createdAt ? new Date(selectedMerchant.createdAt).toLocaleString('en-PH') : '—'}
-                />
-                <DetailRow label="Business Info" value={selectedMerchant.businessInfo || selectedMerchant.description || 'No business info yet'} />
-              </div>
-
-              <div className="space-y-3 rounded-2xl border border-gray-100 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">Discount & Terms</h3>
-                    <p className="text-xs text-gray-500">Admin can update these on behalf of the merchant.</p>
+              <div className="mt-5">
+                {isLoading ? (
+                  <div className="flex justify-center py-16">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
                   </div>
-                  {!isSuperadmin ? (
-                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                      Admin access
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                      Superadmin access
-                    </span>
-                  )}
-                </div>
-
-                <textarea
-                  value={editor.discountInfo}
-                  onChange={(event) => setEditor((current) => ({ ...current, discountInfo: event.target.value }))}
-                  rows={3}
-                  placeholder="Discount information for youth members"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-                <textarea
-                  value={editor.termsAndConditions}
-                  onChange={(event) => setEditor((current) => ({ ...current, termsAndConditions: event.target.value }))}
-                  rows={4}
-                  placeholder="Terms and conditions shown to the merchant and youth members"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-                <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                  <input
-                    type="number"
-                    min="1"
-                    value={editor.pointsRate}
-                    onChange={(event) => setEditor((current) => ({ ...current, pointsRate: event.target.value }))}
-                    className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    placeholder="Points rate in pesos"
+                ) : filteredMerchants.length === 0 ? (
+                  <AdminEmptyState
+                    title="No merchants match the current filters"
+                    description="Adjust the search, status, category, or date filters to surface more merchant records."
                   />
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveMerchantProfile()}
-                    disabled={isSaving}
-                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(37,99,235,0.16)] transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Save Details
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500">Default conversion is ₱100 = 10 points.</p>
-              </div>
-
-              <div className="space-y-3 rounded-2xl border border-gray-100 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">Lifecycle Actions</h3>
-                    <p className="text-xs text-gray-500">Approval, rejection, suspension, and reactivation controls.</p>
-                  </div>
-                  {!isSuperadmin ? (
-                    <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700">
-                      Superadmin only
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <ActionButton
-                    label="Approve Merchant"
-                    tone="green"
-                    disabled={!isSuperadmin || selectedMerchant.status === 'approved' || isSaving}
-                    onClick={() => void handleMerchantAction('approve')}
-                  />
-                  <ActionButton
-                    label="Reject Merchant"
-                    tone="red"
-                    disabled={!isSuperadmin || selectedMerchant.status === 'rejected' || isSaving}
-                    onClick={() => void handleMerchantAction('reject')}
-                  />
-                  <ActionButton
-                    label="Suspend Merchant"
-                    tone="amber"
-                    disabled={!isSuperadmin || selectedMerchant.status !== 'approved' || isSaving}
-                    onClick={() => void handleMerchantAction('suspend')}
-                  />
-                  <ActionButton
-                    label="Reactivate Merchant"
-                    tone="blue"
-                    disabled={!isSuperadmin || selectedMerchant.status !== 'suspended' || isSaving}
-                    onClick={() => void handleMerchantAction('reactivate')}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3 rounded-2xl border border-gray-100 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">Transaction History</h3>
-                    <p className="text-xs text-gray-500">Every points-awarding QR scan recorded for this merchant.</p>
-                  </div>
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600">
-                    {transactions.length} records
-                  </span>
-                </div>
-
-                {isDetailLoading ? (
-                  <div className="flex justify-center py-10">
-                    <Spinner size="md" />
-                  </div>
-                ) : transactions.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-400">
-                    No merchant transactions found yet.
-                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    {transactions.slice(0, 8).map((transaction) => (
-                      <div key={transaction.id} className="rounded-xl bg-gray-50 px-4 py-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">{transaction.userName}</p>
-                            <p className="text-xs text-gray-500">{transaction.userEmail || 'No email saved'}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-bold text-blue-700">+{transaction.pointsGiven} pts</p>
-                            <p className="text-xs text-gray-500">
-                              {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString('en-PH') : '—'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                          <span>Type: {transaction.type}</span>
-                          <span>
-                            Amount:{' '}
-                            {transaction.amountSpent != null ? `₱${Number(transaction.amountSpent).toLocaleString()}` : 'Not captured'}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <AdminTableShell minWidth="860px">
+                    <table className="w-full">
+                      <thead style={{ background: 'var(--accent-soft)' }}>
+                        <tr>
+                          {['Merchant', 'Category', 'Status', 'Owner', 'Date Joined', 'Points Rate'].map((heading, index) => (
+                            <th
+                              key={heading}
+                              className={cn(
+                                'px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em]',
+                                index === 5 ? 'text-right' : 'text-left'
+                              )}
+                              style={{ color: 'var(--muted)' }}
+                            >
+                              {heading}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y" style={{ borderColor: 'var(--stroke)' }}>
+                        {filteredMerchants.map((merchant) => {
+                          const isSelected = selectedMerchant?.id === merchant.id
+                          return (
+                            <tr
+                              key={merchant.id}
+                              onClick={() => setSelectedMerchantId(merchant.id)}
+                              className="cursor-pointer transition-colors"
+                              style={{
+                                background: isSelected ? 'color-mix(in srgb, var(--accent-soft) 88%, transparent)' : 'transparent',
+                              }}
+                              onMouseEnter={(event) => {
+                                if (!isSelected) {
+                                  ;(event.currentTarget as HTMLElement).style.background =
+                                    'color-mix(in srgb, var(--surface-muted) 76%, transparent)'
+                                }
+                              }}
+                              onMouseLeave={(event) => {
+                                if (!isSelected) {
+                                  ;(event.currentTarget as HTMLElement).style.background = 'transparent'
+                                }
+                              }}
+                            >
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl"
+                                    style={{ background: 'var(--surface-muted)' }}
+                                  >
+                                    {merchant.logoUrl || merchant.imageUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={merchant.logoUrl || merchant.imageUrl}
+                                        alt={merchant.name}
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <span className="text-sm font-bold" style={{ color: 'var(--muted)' }}>
+                                        {getInitials(merchant.name)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                                      {merchant.name}
+                                    </p>
+                                    <p className="truncate text-xs" style={{ color: 'var(--muted)' }}>
+                                      {merchant.description || 'No business description yet'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
+                                {merchant.category || 'Uncategorized'}
+                              </td>
+                              <td className="px-5 py-4">
+                                <StatusPill status={merchant.status} />
+                              </td>
+                              <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
+                                <p>{merchant.ownerName || 'Unknown owner'}</p>
+                                <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                                  {merchant.ownerEmail || 'No email saved'}
+                                </p>
+                              </td>
+                              <td className="px-5 py-4 text-sm" style={{ color: 'var(--muted)' }}>
+                                {merchant.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-PH') : '—'}
+                              </td>
+                              <td className="px-5 py-4 text-right text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
+                                PHP {Number(merchant.pointsRate || 10).toLocaleString()} = 1 pt
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </AdminTableShell>
                 )}
               </div>
-            </>
-          ) : (
-            <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-dashed border-gray-200 text-center text-sm text-gray-400">
-              Select a merchant to review their profile, actions, and transaction history.
-            </div>
-          )}
-        </aside>
-      </div>
-      )}
+            </AdminSurface>
+
+            <AdminSurface tone="neutral">
+              {selectedMerchant ? (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--accent-strong)' }}>
+                        Merchant profile
+                      </p>
+                      <h2 className="mt-2 text-xl font-semibold" style={{ color: 'var(--ink)' }}>
+                        {selectedMerchant.name}
+                      </h2>
+                      <p className="mt-1 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+                        {selectedMerchant.address || 'Address not provided'}
+                      </p>
+                    </div>
+                    <StatusPill status={selectedMerchant.status} />
+                  </div>
+
+                  {message ? <div className="mt-5"><AdminNotice tone={messageTone}>{message}</AdminNotice></div> : null}
+
+                  <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
+                    <div className="grid gap-3">
+                      <DetailRow label="Business category" value={selectedMerchant.category || 'Uncategorized'} />
+                      <DetailRow label="Owner" value={selectedMerchant.ownerName || 'Unknown owner'} />
+                      <DetailRow label="Email" value={selectedMerchant.ownerEmail || 'No owner email'} />
+                      <DetailRow
+                        label="Date joined"
+                        value={selectedMerchant.createdAt ? new Date(selectedMerchant.createdAt).toLocaleString('en-PH') : '—'}
+                      />
+                      <DetailRow
+                        label="Business info"
+                        value={selectedMerchant.businessInfo || selectedMerchant.description || 'No business info yet'}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                          Discount and terms
+                        </h3>
+                        <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                          Admin can update these merchant-facing details on behalf of the partner.
+                        </p>
+                      </div>
+                      <DashboardPill tone={isSuperadmin ? 'soft' : 'default'}>
+                        {isSuperadmin ? 'Superadmin access' : 'Admin access'}
+                      </DashboardPill>
+                    </div>
+
+                    <div className="mt-4 grid gap-3">
+                      <textarea
+                        value={editor.discountInfo}
+                        onChange={(e) => setEditor((current) => ({ ...current, discountInfo: e.target.value }))}
+                        rows={3}
+                        placeholder="Discount information for youth members"
+                        className={inputClass}
+                      />
+                      <textarea
+                        value={editor.termsAndConditions}
+                        onChange={(e) => setEditor((current) => ({ ...current, termsAndConditions: e.target.value }))}
+                        rows={4}
+                        placeholder="Terms and conditions shown to the merchant and youth members"
+                        className={inputClass}
+                      />
+                      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                        <input
+                          type="number"
+                          min="1"
+                          value={editor.pointsRate}
+                          onChange={(e) => setEditor((current) => ({ ...current, pointsRate: e.target.value }))}
+                          className={inputClass}
+                          placeholder="Points rate in pesos"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveMerchantProfile()}
+                          disabled={isSaving}
+                          className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          style={{ background: 'var(--accent)' }}
+                        >
+                          Save details
+                        </button>
+                      </div>
+                      <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                        Default conversion is PHP 100 = 10 points.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                          Lifecycle actions
+                        </h3>
+                        <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                          Approval, rejection, suspension, and reactivation controls live here.
+                        </p>
+                      </div>
+                      {!isSuperadmin ? <DashboardPill tone="danger">Superadmin only</DashboardPill> : null}
+                    </div>
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <ActionButton
+                        label="Approve merchant"
+                        tone="green"
+                        disabled={!isSuperadmin || selectedMerchant.status === 'approved' || isSaving}
+                        onClick={() => void handleMerchantAction('approve')}
+                      />
+                      <ActionButton
+                        label="Reject merchant"
+                        tone="red"
+                        disabled={!isSuperadmin || selectedMerchant.status === 'rejected' || isSaving}
+                        onClick={() => void handleMerchantAction('reject')}
+                      />
+                      <ActionButton
+                        label="Suspend merchant"
+                        tone="amber"
+                        disabled={!isSuperadmin || selectedMerchant.status !== 'approved' || isSaving}
+                        onClick={() => void handleMerchantAction('suspend')}
+                      />
+                      <ActionButton
+                        label="Reactivate merchant"
+                        tone="blue"
+                        disabled={!isSuperadmin || selectedMerchant.status !== 'suspended' || isSaving}
+                        onClick={() => void handleMerchantAction('reactivate')}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                          Transaction history
+                        </h3>
+                        <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                          Every QR award event or points-related scan recorded for this merchant.
+                        </p>
+                      </div>
+                      <DashboardPill tone="default">{transactions.length} records</DashboardPill>
+                    </div>
+
+                    <div className="mt-4">
+                      {isDetailLoading ? (
+                        <div className="flex justify-center py-10">
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
+                        </div>
+                      ) : transactions.length === 0 ? (
+                        <AdminEmptyState
+                          title="No merchant transactions found"
+                          description="Once this merchant starts awarding points, their activity log will appear here."
+                        />
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          {transactions.slice(0, 8).map((transaction) => (
+                            <div
+                              key={transaction.id}
+                              className="rounded-2xl border px-4 py-3"
+                              style={{
+                                background: 'color-mix(in srgb, var(--surface-muted) 76%, transparent)',
+                                borderColor: 'var(--stroke)',
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                                    {transaction.userName}
+                                  </p>
+                                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                                    {transaction.userEmail || 'No email saved'}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
+                                    +{transaction.pointsGiven} pts
+                                  </p>
+                                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                                    {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString('en-PH') : '—'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="mt-2 flex items-center justify-between gap-3 text-xs" style={{ color: 'var(--muted)' }}>
+                                <span>Type: {transaction.type}</span>
+                                <span>
+                                  Amount:{' '}
+                                  {transaction.amountSpent != null
+                                    ? `PHP ${Number(transaction.amountSpent).toLocaleString()}`
+                                    : 'Not captured'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <AdminEmptyState
+                  title="Select a merchant"
+                  description="Choose a merchant from the left table to review their profile, actions, and transaction history."
+                />
+              )}
+            </AdminSurface>
+          </div>
+        )}
       </div>
     </>
   )
 }
 
-function SummaryCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string
-  value: number
-  accent: 'yellow' | 'blue' | 'green'
-}) {
-  const accentClasses = {
-    yellow: 'bg-amber-50 text-amber-700',
-    blue: 'bg-blue-50 text-blue-700',
-    green: 'bg-emerald-50 text-emerald-700',
-  }
-
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">{label}</p>
-      <div className="mt-3 flex items-center justify-between">
-        <p className="text-2xl font-black text-gray-900">{value}</p>
-        <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-semibold', accentClasses[accent])}>
-          Live
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function SearchInput({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
-}) {
-  return (
-    <div className="relative">
-      <svg
-        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
-      </svg>
-      <input
-        type="text"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-      />
-    </div>
-  )
-}
-
-function SelectField({
-  value,
-  onChange,
-  children,
-}: {
-  value: string
-  onChange: (value: string) => void
-  children: React.ReactNode
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-    >
-      {children}
-    </select>
-  )
-}
-
-function HeaderCell({
-  children,
-  align = 'left',
-}: {
-  children: React.ReactNode
-  align?: 'left' | 'right'
-}) {
-  return (
-    <th
-      className={cn(
-        'px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-gray-500',
-        align === 'right' ? 'text-right' : 'text-left'
-      )}
-    >
-      {children}
-    </th>
-  )
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">{label}</span>
-      <span className="max-w-[220px] text-right text-sm font-medium text-gray-700">{value}</span>
-    </div>
-  )
-}
-
 function StatusPill({ status }: { status: MerchantStatus }) {
-  const classes = {
-    pending: 'bg-amber-100 text-amber-700',
-    approved: 'bg-emerald-100 text-emerald-700',
-    rejected: 'bg-rose-100 text-rose-700',
-    suspended: 'bg-slate-200 text-slate-700',
+  const classes: Record<MerchantStatus, string> = {
+    pending: 'bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]',
+    approved: 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]',
+    rejected: 'bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]',
+    suspended: 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]',
   }
-  const labels = {
+  const labels: Record<MerchantStatus, string> = {
     pending: 'Pending',
     approved: 'Active',
     rejected: 'Rejected',
     suspended: 'Suspended',
   }
 
-  return (
-    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', classes[status])}>
-      {labels[status]}
-    </span>
-  )
+  return <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', classes[status])}>{labels[status]}</span>
 }
 
 function ActionButton({
@@ -975,10 +984,10 @@ function ActionButton({
   onClick: () => void
 }) {
   const tones = {
-    green: 'bg-emerald-600 hover:bg-emerald-700',
-    red: 'bg-rose-600 hover:bg-rose-700',
-    amber: 'bg-amber-500 hover:bg-amber-600',
-    blue: 'bg-blue-600 hover:bg-blue-700',
+    green: 'var(--accent)',
+    red: 'var(--danger-accent)',
+    amber: 'var(--accent-warm)',
+    blue: 'var(--accent-strong)',
   }
 
   return (
@@ -986,33 +995,23 @@ function ActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={cn(
-        'rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50',
-        tones[tone]
-      )}
+      className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      style={{ background: tones[tone] }}
     >
       {label}
     </button>
   )
 }
 
-function getInitials(value: string) {
-  return value
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0] || '')
-    .join('')
-    .toUpperCase()
-}
-
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-gray-400">
+    <div className="flex items-start justify-between gap-4">
+      <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
         {label}
-      </label>
-      {children}
+      </span>
+      <span className="max-w-[240px] text-right text-sm leading-6 font-medium" style={{ color: 'var(--ink)' }}>
+        {value}
+      </span>
     </div>
   )
 }
@@ -1032,25 +1031,23 @@ function CredentialRow({
   const [revealed, setRevealed] = useState(false)
 
   function handleCopy() {
-    navigator.clipboard.writeText(value).then(() => {
+    void navigator.clipboard.writeText(value).then(() => {
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      window.setTimeout(() => setCopied(false), 2000)
     })
   }
 
   return (
     <div className="flex items-center justify-between gap-4 py-2">
-      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
+        {label}
+      </span>
       <div className="flex items-center gap-2">
-        <span className="max-w-[240px] truncate text-right text-sm font-mono font-semibold text-gray-800">
+        <span className="max-w-[240px] truncate text-right font-mono text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           {secret && !revealed ? '••••••••••••' : value}
         </span>
         {secret ? (
-          <button
-            type="button"
-            onClick={() => setRevealed((v) => !v)}
-            className="text-xs text-gray-400 hover:text-gray-600"
-          >
+          <button type="button" onClick={() => setRevealed((value) => !value)} className="text-xs" style={{ color: 'var(--muted)' }}>
             {revealed ? 'Hide' : 'Show'}
           </button>
         ) : null}
@@ -1058,7 +1055,8 @@ function CredentialRow({
           <button
             type="button"
             onClick={handleCopy}
-            className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-200"
+            className="rounded-lg px-2.5 py-1 text-xs font-semibold"
+            style={{ background: 'var(--surface-muted)', color: 'var(--ink-soft)' }}
           >
             {copied ? 'Copied!' : 'Copy'}
           </button>
@@ -1066,4 +1064,14 @@ function CredentialRow({
       </div>
     </div>
   )
+}
+
+function getInitials(value: string) {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0] || '')
+    .join('')
+    .toUpperCase()
 }

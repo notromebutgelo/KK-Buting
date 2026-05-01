@@ -7,6 +7,7 @@ export interface MerchantUser {
   UserName: string
   role: 'merchant' | 'admin' | 'youth'
   createdAt?: string
+  mustChangePassword?: boolean
 }
 
 interface AuthState {
