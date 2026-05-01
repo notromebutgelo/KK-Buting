@@ -6,6 +6,7 @@ import {
   TOTAL_STEPS,
   type ProfilingDraft,
   getProfilingResumePathFromDraft,
+  sanitizeDraftForVisibility,
 } from "./profiling-schema";
 
 export const PROFILING_STORAGE_KEY = "profiling-2026";
@@ -35,7 +36,9 @@ export function readProfilingDraft(): ProfilingDraft {
 
 export function saveProfilingDraft(partial: ProfilingDraft) {
   const existing = readProfilingDraft();
-  const nextValue = JSON.stringify({ ...existing, ...partial });
+  const nextValue = JSON.stringify(
+    sanitizeDraftForVisibility({ ...existing, ...partial })
+  );
   localStorage.setItem(PROFILING_STORAGE_KEY, nextValue);
   sessionStorage.setItem(PROFILING_STORAGE_KEY, nextValue);
 }

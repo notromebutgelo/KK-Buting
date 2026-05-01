@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-import { signIn, signInWithFacebook, signInWithGoogle } from "@/services/auth.service";
+import {
+  beginFacebookRedirectSignIn,
+  completeSocialRedirectSignIn,
+  getPendingSocialRedirectProvider,
+  signIn,
+  signInWithGoogle,
+} from "@/services/auth.service";
 import { getPostAuthRedirect } from "@/services/profiling.service";
 import { useAuthStore } from "@/store/authStore";
 import AlertModal from "@/components/ui/AlertModal";
@@ -24,6 +30,49 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [facebookLoading, setFacebookLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function finishSocialRedirect() {
+      if (getPendingSocialRedirectProvider() === "facebook") {
+        setFacebookLoading(true);
+      }
+
+      try {
+        const result = await completeSocialRedirectSignIn();
+
+        if (!result || cancelled) {
+          return;
+        }
+
+        await persistYouthSession({ token: result.token, maxAgeSeconds: 60 * 60 * 24 * 30 });
+        setUser(result.user);
+        setToken(result.token);
+
+        const requestedRedirect = searchParams.get("redirect") || result.completedPath || "/home";
+        const redirect = await getPostAuthRedirect(requestedRedirect);
+
+        if (!cancelled) {
+          router.replace(redirect);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err?.message || "Facebook sign-in failed. Please try again.");
+        }
+      } finally {
+        if (!cancelled) {
+          setFacebookLoading(false);
+        }
+      }
+    }
+
+    finishSocialRedirect();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, searchParams, setToken, setUser]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -84,14 +133,9 @@ export default function LoginPage() {
     setFacebookLoading(true);
 
     try {
-      const { user, token } = await signInWithFacebook();
-      await persistYouthSession({ token, maxAgeSeconds: 60 * 60 * 24 * 30 });
-      setUser(user);
-      setToken(token);
-      router.push(await getPostAuthRedirect("/home"));
+      await beginFacebookRedirectSignIn(searchParams.get("redirect") || "/home");
     } catch (err: any) {
       setError(err?.message || "Facebook sign-in failed. Please try again.");
-    } finally {
       setFacebookLoading(false);
     }
   };

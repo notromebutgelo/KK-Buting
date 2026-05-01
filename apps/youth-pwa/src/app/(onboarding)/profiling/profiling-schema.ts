@@ -549,6 +549,133 @@ function currentlyNotInSchool(draft: ProfilingDraft) {
   return draft.currentlyStudyingOrEnrolled === "No (Hindi)";
 }
 
+function hasSeniorHighBackground(draft: ProfilingDraft) {
+  return [
+    "Senior High School Level (Grades 11 & 12)",
+    "Senior High School Graduate",
+    "College Level",
+    "College Graduate",
+    "Master's Level (Including Law and Medical Degrees)",
+    "Master's Degree Holder (Including Law and Medical Degrees)",
+    "Doctorate Level",
+    "Doctorate Degree Holder",
+  ].includes(draft.highestEducationalAttainment || "");
+}
+
+function shouldAskSeniorHighTrack(draft: ProfilingDraft) {
+  return currentlyInSchool(draft) && hasSeniorHighBackground(draft);
+}
+
+function shouldAskSeniorHighStrand(draft: ProfilingDraft) {
+  return (
+    shouldAskSeniorHighTrack(draft) &&
+    Boolean(draft.seniorHighSchoolTrack) &&
+    !String(draft.seniorHighSchoolTrack || "").startsWith(
+      "Not Applicable; there was still no Senior High School during my time in high school"
+    )
+  );
+}
+
+function shouldAskVocationalCourse(draft: ProfilingDraft) {
+  return (
+    currentlyInSchool(draft) &&
+    [
+      "Vocational/Trade Course Taker",
+      "Vocational/Trade Course Completer",
+    ].includes(draft.highestEducationalAttainment || "")
+  );
+}
+
+function currentlyEmployed(draft: ProfilingDraft) {
+  return (
+    draft.employmentStatus ===
+    "Yes, I am currently employed (Oo, ako ay kasalukuyang employed)"
+  );
+}
+
+function ownsBusiness(draft: ProfilingDraft) {
+  return draft.ownsBusiness === "Yes (Oo)";
+}
+
+function personWithDisability(draft: ProfilingDraft) {
+  return draft.personWithDisability === "Yes (Oo)";
+}
+
+function hasSmokingHistory(draft: ProfilingDraft) {
+  return [
+    "Yes (Oo)",
+    "Not anymore (Huminto na ako sa paninigarilyo)",
+  ].includes(draft.smokingStatus || "");
+}
+
+function hasAlcoholHistory(draft: ProfilingDraft) {
+  return [
+    "Yes (Oo)",
+    "Not anymore (Huminto na ako sa pag-inom ng alcoholic drinks)",
+  ].includes(draft.alcoholConsumptionStatus || "");
+}
+
+function femaleAtBirth(draft: ProfilingDraft) {
+  return draft.sexAssignedAtBirth === "Female";
+}
+
+function maleAtBirth(draft: ProfilingDraft) {
+  return draft.sexAssignedAtBirth === "Male";
+}
+
+function onlineGambler(draft: ProfilingDraft) {
+  return draft.onlineBettingOrGambling === "Yes (Oo)";
+}
+
+function hasChildren(draft: ProfilingDraft) {
+  const rawValue = String(draft.numberOfChildren || "").trim().toLowerCase();
+
+  if (!rawValue) {
+    return false;
+  }
+
+  if (
+    rawValue === "0" ||
+    rawValue === "not applicable" ||
+    rawValue.includes("wala pa akong anak") ||
+    rawValue.includes("prefer not to say")
+  ) {
+    return false;
+  }
+
+  const numericValue = Number.parseInt(rawValue, 10);
+  if (!Number.isNaN(numericValue)) {
+    return numericValue > 0;
+  }
+
+  return true;
+}
+
+function hasSexExperience(draft: ProfilingDraft) {
+  const rawValue = String(draft.ageAtFirstSexExperience || "").trim().toLowerCase();
+
+  if (!rawValue) {
+    return false;
+  }
+
+  if (
+    rawValue === "not applicable" ||
+    rawValue.includes("wala pang sex experience")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function femaleWithSexExperience(draft: ProfilingDraft) {
+  return femaleAtBirth(draft) && hasSexExperience(draft);
+}
+
+function maleWithSexExperience(draft: ProfilingDraft) {
+  return maleAtBirth(draft) && hasSexExperience(draft);
+}
+
 export const PROFILING_STEPS: ProfilingStepConfig[] = [
   {
     stepNumber: 1,
@@ -809,11 +936,20 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             placeholder: "Pumili lamang ng isa.",
           },
           {
+            key: "currentlyStudyingOrEnrolled",
+            label:
+              "Are you currently studying or enrolled in school? (Ikaw ba ay kasalukuyang nag-aaral o naka-enrol sa paaralan?)",
+            type: "radio",
+            required: true,
+            options: YES_NO_OPTIONS,
+          },
+          {
             key: "seniorHighSchoolTrack",
             label:
               "Which Senior High School Track have you completed or are you currently taking? (Aling Senior High School Track ang iyo nang natapos o kasalukuyang kinukuha?)",
             type: "radio",
             required: true,
+            showIf: shouldAskSeniorHighTrack,
             options: SENIOR_HIGH_TRACK_OPTIONS,
             otherKey: "seniorHighSchoolTrackOther",
           },
@@ -823,6 +959,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
               "Which Senior High School Strand have you completed or are you currently taking? (Aling Senior High School Strand ang iyo nang natapos o kasalukuyang kinukuha?)",
             type: "radio",
             required: true,
+            showIf: shouldAskSeniorHighStrand,
             options: SENIOR_HIGH_STRAND_OPTIONS,
             otherKey: "seniorHighSchoolStrandOther",
           },
@@ -832,16 +969,9 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
               "Which Vocational/Trade Course have you completed or are you currently taking? (Aling Vocational/Trade Course ang iyo nang natapos o kasalukuyang kinukuha?)",
             type: "radio",
             required: true,
+            showIf: shouldAskVocationalCourse,
             options: VOCATIONAL_TRADE_COURSE_OPTIONS,
             otherKey: "vocationalTradeCourseOther",
-          },
-          {
-            key: "currentlyStudyingOrEnrolled",
-            label:
-              "Are you currently studying or enrolled in school? (Ikaw ba ay kasalukuyang nag-aaral o naka-enrol sa paaralan?)",
-            type: "radio",
-            required: true,
-            options: YES_NO_OPTIONS,
           },
         ],
       },
@@ -920,6 +1050,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             label: "Employment Sector (Sa aling sektor kabilang ang iyong kasalukuyang trabaho?)",
             type: "radio",
             required: true,
+            showIf: currentlyEmployed,
             options: EMPLOYMENT_SECTOR_OPTIONS,
           },
           {
@@ -927,6 +1058,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             label: "Are you a minimum wage earner? (Ikaw ba ay isang minimum wage earner?)",
             type: "radio",
             required: true,
+            showIf: currentlyEmployed,
             description:
               "Ang kasalukuyang minimum wage sa National Capital Region (NCR) ay P695.00 kada araw. Ang mga kasambahay naman sa NCR ay nararapat na makatanggap ng P7,800.00 kada buwan.",
             options: YES_NO_OPTIONS,
@@ -988,6 +1120,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             label: "Business Sector (Sa aling sektor kabilang ang iyong negosyo?)",
             type: "radio",
             required: true,
+            showIf: ownsBusiness,
             options: BUSINESS_SECTOR_OPTIONS,
             otherKey: "businessSectorOther",
           },
@@ -1026,6 +1159,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
               "For Persons With Disability: Which type of disability do you have? (Para sa mga PWD: Aling uri ng disability ang mayroon ka?)",
             type: "radio",
             required: true,
+            showIf: personWithDisability,
             options: DISABILITY_TYPE_OPTIONS,
             otherKey: "disabilityTypeOther",
           },
@@ -1152,6 +1286,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             label: "How old were you when you started smoking? (Anong edad ka unang nanigarilyo?)",
             type: "text",
             required: true,
+            showIf: hasSmokingHistory,
             placeholder: 'Example: 18 o "Not Applicable"',
             helperText:
               'Ilagay ang "Not Applicable" kung ikaw ay hindi pa naninigarilyo.',
@@ -1180,6 +1315,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
               "How old were you when you started consuming alcoholic drinks? (Anong edad ka unang uminom ng mga inuming may alcohol?)",
             type: "text",
             required: true,
+            showIf: hasAlcoholHistory,
             placeholder: 'Example: 18 o "Not Applicable"',
             helperText:
               'Ilagay ang "Not Applicable" kung ikaw ay hindi pa nakakainom ng mga alcoholic drinks.',
@@ -1223,6 +1359,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             label: "For females only: Age at first pregnancy (Anong edad ka unang nabuntis?)",
             type: "text",
             required: true,
+            showIf: femaleWithSexExperience,
             placeholder: 'Example: 21 o "Not Applicable"',
             helperText:
               'Ilagay ang "Not Applicable" kung ikaw ay hindi pa nabubuntis o kung ikaw ay isang lalaki. Maaari ring ilagay ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
@@ -1234,6 +1371,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
               "For males only: At what age did you first impregnate a girl or woman? (Sa anong edad ka unang nakabuntis?)",
             type: "text",
             required: true,
+            showIf: maleWithSexExperience,
             placeholder: 'Example: 21 o "Not Applicable"',
             helperText:
               'Ilagay ang "Not Applicable" kung ikaw ay hindi pa nakakabuntis o kung ikaw ay isang babae. Maaari ring ilagay ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
@@ -1244,6 +1382,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             label: "Are you a solo parent? (Ikaw ba ay isang solo parent?)",
             type: "radio",
             required: true,
+            showIf: hasChildren,
             options: SOLO_PARENT_OPTIONS,
           },
           {
@@ -1260,6 +1399,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
               "Which of the following contraceptive methods have you used? (Alin sa mga sumusunod na contraceptive methods ang nagamit mo na?)",
             type: "checkbox",
             required: true,
+            showIf: hasSexExperience,
             options: CONTRACEPTIVE_METHOD_OPTIONS,
             otherKey: "contraceptiveMethodsUsedOther",
             helperText: "Maaaring pumili ng higit sa isa.",
@@ -1270,6 +1410,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
               "Have you ever encountered barriers to accessing contraceptives at a time when you needed or wanted to use them? (Naranasan mo na bang mahadlangan ang iyong pag-access sa contraceptives sa oras ng iyong pangangailangan o kagustuhang gamitin ito?)",
             type: "radio",
             required: true,
+            showIf: hasSexExperience,
             options: ["Yes (Oo)", "No (Hindi)", "Not Applicable (Hindi ako gumagamit ng contraceptives)"],
           },
           {
@@ -1376,6 +1517,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             label: "Do you feel safe in school? (Pakiramdam mo ba'y ligtas ka sa iyong paaralan?)",
             type: "radio",
             required: true,
+            showIf: currentlyInSchool,
             options: [...NEVER_SOMETIMES_OFTEN_OPTIONS, "Not Applicable (Hindi ako kasalukuyang naka-enrol sa paaralan)"],
           },
           {
@@ -1383,6 +1525,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             label: "Do you feel safe in your workplace? (Pakiramdam mo ba'y ligtas ka sa lugar ng iyong trabaho?)",
             type: "radio",
             required: true,
+            showIf: currentlyEmployed,
             options: [...NEVER_SOMETIMES_OFTEN_OPTIONS, "Not Applicable (Hindi ako kasalukuyang employed o nagtatrabaho)"],
           },
           {
@@ -1430,6 +1573,7 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
               "How much do you spend, in pesos, for online betting/gambling in a week? (Gaano kalaki ang iyong nagagastos, in pesos, para sa online betting o gambling kada linggo?)",
             type: "text",
             required: true,
+            showIf: onlineGambler,
             placeholder: 'Halimbawa: 1500 o "Not Applicable"',
             helperText:
               'Ilagay ang "Not Applicable" kung hindi nag-o-online betting o gambling.',
@@ -1583,6 +1727,72 @@ export function isFieldVisible(field: ProfilingFieldConfig, draft: ProfilingDraf
   return field.showIf ? field.showIf(draft) : true;
 }
 
+function setDraftField<K extends keyof ProfilingDraft>(
+  draft: ProfilingDraft,
+  key: K,
+  value: ProfilingDraft[K]
+) {
+  draft[key] = value;
+}
+
+function getClearedFieldValue(field: ProfilingFieldConfig) {
+  return (field.type === "checkbox" ? [] : "") as ProfilingDraft[keyof ProfilingDraft];
+}
+
+export function sanitizeDraftForVisibility(draft: ProfilingDraft) {
+  const nextDraft: ProfilingDraft = { ...draft };
+  const allFields = PROFILING_STEPS.flatMap((step) =>
+    step.sections.flatMap((section) => section.fields)
+  );
+
+  let changed = false;
+
+  do {
+    changed = false;
+
+    for (const field of allFields) {
+      const fieldVisible = isFieldVisible(field, nextDraft);
+
+      if (!fieldVisible) {
+        if (!isBlank(nextDraft[field.key])) {
+          setDraftField(
+            nextDraft,
+            field.key,
+            getClearedFieldValue(field) as ProfilingDraft[typeof field.key]
+          );
+          changed = true;
+        }
+
+        if (field.otherKey && !isBlank(nextDraft[field.otherKey])) {
+          setDraftField(
+            nextDraft,
+            field.otherKey,
+            "" as ProfilingDraft[typeof field.otherKey]
+          );
+          changed = true;
+        }
+
+        continue;
+      }
+
+      if (
+        field.otherKey &&
+        !isOtherOptionSelected(field, nextDraft) &&
+        !isBlank(nextDraft[field.otherKey])
+      ) {
+        setDraftField(
+          nextDraft,
+          field.otherKey,
+          "" as ProfilingDraft[typeof field.otherKey]
+        );
+        changed = true;
+      }
+    }
+  } while (changed);
+
+  return nextDraft;
+}
+
 export function isOtherOptionSelected(field: ProfilingFieldConfig, draft: ProfilingDraft) {
   if (!field.otherKey) return false;
 
@@ -1705,6 +1915,7 @@ function deriveWorkStatus(draft: ProfilingDraft) {
 }
 
 export function buildProfilingPayload(draft: ProfilingDraft) {
+  draft = sanitizeDraftForVisibility({ ...draft });
   const age = parseInt(String(draft.ageAtLastBirthday || ""), 10);
   const birthday = deriveBirthday(draft);
   const youthAgeGroup = getAgeGroupFromAge(Number.isNaN(age) ? "" : age);

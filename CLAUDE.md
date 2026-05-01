@@ -177,6 +177,9 @@ The current live points default in code is now:
   - questionnaire wording, option sets, `Other:` follow-ups, checkbox vs dropdown vs single-choice input types, and the explicit address / in-school skip logic were preserved in the new config
   - the youth app still renders the survey inside the existing profiling shell and review experience, but the route pages now act as thin wrappers over a shared step renderer instead of each page owning its own bespoke form logic
   - a new `profiling-schema.ts` file now drives visible questions, review formatting, resume-path logic, and payload normalization
+  - dependent profiling questions now use tighter skip logic instead of relying on "Not Applicable" as the main escape hatch for obviously unrelated branches
+  - education, employment, business, disability, smoking, alcohol, children/solo-parent, sex-experience-driven and sex-specific reproductive questions, school/workplace safety, and weekly online-betting spend now hide when their parent answer makes them irrelevant
+  - hidden follow-up answers are now automatically stripped from the saved draft and final payload so stale branch data does not survive review/submission after a user changes an earlier answer
   - submission now also derives the legacy profile fields that the current backend, digital ID, and admin surfaces still expect, including `birthday`, `youthAgeGroup`, `educationalBackground`, `youthClassification`, `workStatus`, and the older civic booleans such as `registeredSkVoter` and `attendedKkAssembly`
   - the local draft key was versioned to `profiling-2026` so stale drafts from the earlier reduced profiling form do not collide with the new questionnaire structure
   - the profiling shell now keeps the full page scrollable while the step dots and `Next` button stay fixed at the bottom of the viewport
@@ -186,6 +189,11 @@ The current live points default in code is now:
   - the youth `Digital ID` page now blocks the final ID view with an `Add Emergency Contact to Complete Your Digital ID` prompt whenever any of the three fields are missing
   - backend digital ID draft generation, approval submission, activation, and regeneration now refuse to proceed until the emergency-contact fields are complete
   - the youth profile page now also surfaces a reminder card when the Digital ID emergency contact is still missing
+- the youth PWA Facebook sign-in flow is now more reliable for backend user syncing
+  - `apps/youth-pwa/src/services/auth.service.ts` now explicitly requests the Facebook `email` permission before popup sign-in
+  - if Facebook does not return an email address, the app now shows a clearer error instead of trying to auto-register an incomplete backend user record
+  - Facebook sign-in now starts with `signInWithRedirect` on the youth login and register pages, then completes the Firebase + backend session handoff after the browser returns to the same page
+  - a lightweight session-storage handoff preserves the intended post-auth path so mobile browsers and installed PWAs can return users to the correct next screen after Facebook auth
 - merchant accounts created by superadmin now carry a temporary-password policy that is enforced in the Expo merchant app
   - account creation now stores a secure hash of the issued temporary password in a dedicated backend `merchantSecurity` record instead of relying on a client-only reminder
   - merchant login now posts the entered password to `/api/auth/login` after Firebase sign-in so the backend can compare it against the stored temporary-password hash and decide whether `mustChangePassword` should stay on

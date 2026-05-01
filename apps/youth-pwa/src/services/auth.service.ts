@@ -10,10 +10,15 @@ import {
   sendEmailVerification,
   GoogleAuthProvider,
   FacebookAuthProvider,
+  getRedirectResult,
   signInWithPopup,
+  signInWithRedirect,
 } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import api from '@/lib/api'
+
+const SOCIAL_REDIRECT_PROVIDER_KEY = 'kk-youth-social-provider'
+const SOCIAL_REDIRECT_COMPLETED_PATH_KEY = 'kk-youth-social-completed-path'
 
 async function syncBackendUser(token: string, profile?: { email?: string | null; username?: string | null }) {
   try {
@@ -34,6 +39,45 @@ async function syncBackendUser(token: string, profile?: { email?: string | null;
     )
     return { user: res.data.user, token }
   }
+}
+
+function buildFacebookProvider() {
+  const provider = new FacebookAuthProvider()
+  provider.addScope('email')
+  return provider
+}
+
+function setPendingSocialRedirect(provider: 'facebook', completedPath: string) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.sessionStorage.setItem(SOCIAL_REDIRECT_PROVIDER_KEY, provider)
+  window.sessionStorage.setItem(SOCIAL_REDIRECT_COMPLETED_PATH_KEY, completedPath)
+}
+
+function getPendingSocialRedirect() {
+  if (typeof window === 'undefined') {
+    return { provider: null, completedPath: '/home' }
+  }
+
+  return {
+    provider: window.sessionStorage.getItem(SOCIAL_REDIRECT_PROVIDER_KEY),
+    completedPath: window.sessionStorage.getItem(SOCIAL_REDIRECT_COMPLETED_PATH_KEY) || '/home',
+  }
+}
+
+function clearPendingSocialRedirect() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.sessionStorage.removeItem(SOCIAL_REDIRECT_PROVIDER_KEY)
+  window.sessionStorage.removeItem(SOCIAL_REDIRECT_COMPLETED_PATH_KEY)
+}
+
+export function getPendingSocialRedirectProvider() {
+  return getPendingSocialRedirect().provider
 }
 
 export async function signIn(email: string, password: string) {
@@ -110,18 +154,68 @@ export async function signInWithGoogle() {
   })
 }
 
+export async function beginFacebookRedirectSignIn(completedPath = '/home') {
+  const provider = buildFacebookProvider()
+  setPendingSocialRedirect('facebook', completedPath)
+  await signInWithRedirect(auth, provider)
+}
+
+export async function completeSocialRedirectSignIn() {
+  const pending = getPendingSocialRedirect()
+
+  try {
+    const credential = await getRedirectResult(auth)
+
+    if (!credential) {
+      return null
+    }
+
+    const firebaseUser = credential.user
+    const email = firebaseUser.email?.trim()
+
+    if (pending.provider === 'facebook' && !email) {
+      throw new Error(
+        'Facebook did not return an email address. Please use a Facebook account with an email address or sign in with Google/email instead.',
+      )
+    }
+
+    const token = await firebaseUser.getIdToken()
+    const synced = await syncBackendUser(token, {
+      email,
+      username: firebaseUser.displayName,
+    })
+
+    clearPendingSocialRedirect()
+
+    return {
+      ...synced,
+      provider: pending.provider,
+      completedPath: pending.completedPath,
+    }
+  } catch (error) {
+    clearPendingSocialRedirect()
+    throw error
+  }
+}
+
 export async function signInWithFacebook() {
-  const provider = new FacebookAuthProvider()
+  const provider = buildFacebookProvider()
   provider.setCustomParameters({
     display: 'popup',
   })
 
   const credential = await signInWithPopup(auth, provider)
   const firebaseUser = credential.user
+  const email = firebaseUser.email?.trim()
+
+  if (!email) {
+    throw new Error('Facebook did not return an email address. Please use a Facebook account with an email address or sign in with Google/email instead.')
+  }
+
   const token = await firebaseUser.getIdToken()
 
   return syncBackendUser(token, {
-    email: firebaseUser.email,
+    email,
     username: firebaseUser.displayName,
   })
 }

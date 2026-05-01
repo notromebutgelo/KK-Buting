@@ -11,6 +11,7 @@ import {
   getStepByNumber,
   isFieldVisible,
   isOtherOptionSelected,
+  sanitizeDraftForVisibility,
   isStepComplete,
 } from "./profiling-schema";
 import {
@@ -38,7 +39,7 @@ export function ProfilingStepPage({ stepNumber }: { stepNumber: number }) {
   const isValid = useMemo(() => isStepComplete(step, draft), [draft, step]);
 
   function updateField<K extends keyof ProfilingDraft>(key: K, value: ProfilingDraft[K]) {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+    setDraft((prev) => sanitizeDraftForVisibility({ ...prev, [key]: value }));
   }
 
   function handleSubmit(event: React.FormEvent) {
