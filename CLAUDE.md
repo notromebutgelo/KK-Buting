@@ -171,6 +171,11 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- the repo now includes a one-time Firebase cleanup utility for removing pre-live youth test accounts more safely than manual console deletion
+  - `apps/backend/utils/cleanupYouthAccounts.js` now scans Firebase Auth, preserves known admin/superadmin emails plus merchant/admin/superadmin roles, and defaults to dry-run mode so the exact deletion candidates can be reviewed first
+  - when executed with an explicit confirmation token, the cleanup removes youth-linked Firestore records, Auth users, verification-document storage files, voucher claims, and common user-side ledgers such as `pointsHistory`
+  - the cleanup also restores voucher `claimedBy` arrays and stock plus reward stock consumed by deleted test-user redemptions, reducing the risk of carrying test redemption state into live deployment
+  - root and backend package scripts now expose the utility through `npm run cleanup:youth`
 - the youth PWA auth pages now show a branded in-progress modal during email, Google, and Facebook login/register flows
   - `apps/youth-pwa/src/app/(auth)/login/page.tsx` and `apps/youth-pwa/src/app/(auth)/register/page.tsx` now open a shared blocking progress modal whenever auth is still running, so users no longer have to guess whether sign-in is stuck or still processing
   - the modal uses a dedicated shared component at `apps/youth-pwa/src/components/ui/AuthProgressModal.tsx` and keeps the auth screens aligned with the same blue-gold KK visual language already used elsewhere in the app

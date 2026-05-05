@@ -5,7 +5,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "npm run build && node tests/backend.helpers.test.js && node tests/backend.services.test.js && node tests/backend.routes.test.js && node tests/backend.integration.test.js"
+    "test": "npm run build && node tests/backend.helpers.test.js && node tests/backend.services.test.js && node tests/backend.routes.test.js && node tests/backend.integration.test.js",
+    "cleanup:youth": "node utils/cleanupYouthAccounts.js"
   },
   "dependencies": {
     "cloudinary": "^2.9.0",

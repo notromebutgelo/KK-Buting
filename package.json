@@ -22,6 +22,7 @@
     "build:youth": "npm run build --workspace youth-pwa",
     "build:web": "npm run build:youth && npm run build:admin",
     "build:core": "npm run build:backend && npm run build:web",
+    "cleanup:youth": "node apps/backend/utils/cleanupYouthAccounts.js",
     "typecheck:merchant": "npm run typecheck --workspace merchant-app",
     "test:backend": "npm run test --workspace backend"
   },
