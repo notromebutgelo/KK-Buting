@@ -29,6 +29,21 @@ const menuItems = [
     ),
   },
   {
+    href: '/profile/signature',
+    label: 'Digital ID Signature',
+    description: 'Draw, save, or replace the signature shown on the front of your Digital ID.',
+    icon: (
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 20h4l10.5-10.5a2.121 2.121 0 10-3-3L5.5 17v3z"
+        />
+      </svg>
+    ),
+  },
+  {
     href: '/profile/change-password',
     label: 'Change Password',
     description: 'Secure your account with a fresh password whenever you need to.',
@@ -128,6 +143,7 @@ export default function ProfilePage() {
   }, [profile])
 
   const emergencyContactComplete = hasCompleteEmergencyContact(profile)
+  const signatureComplete = hasDigitalIdSignature(profile)
 
   const handleLogout = async () => {
     setIsSigningOut(true)
@@ -278,6 +294,26 @@ export default function ProfilePage() {
             </div>
           ) : null}
 
+          {profile && !signatureComplete ? (
+            <div className="mt-4 rounded-[24px] border border-[#dbe7f6] bg-[#f7fbff] px-5 py-4 shadow-[0_10px_22px_rgba(1,67,132,0.08)]">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#5f7b9d]">
+                Digital ID Reminder
+              </p>
+              <h2 className="mt-2 text-[17px] font-extrabold text-[#014384]">
+                Add your card signature
+              </h2>
+              <p className="mt-2 text-[13px] leading-[1.6] text-[#5c7aa3]">
+                Draw the signature that should appear on the front of your Digital ID. You can re-sign anytime if you want to replace it later.
+              </p>
+              <Link
+                href="/profile/signature"
+                className="mt-4 inline-flex items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035db7_58%,#0a74de_100%)] px-4 py-3 text-[13px] font-bold text-white shadow-[0_10px_20px_rgba(1,67,132,0.16)]"
+              >
+                Add Signature
+              </Link>
+            </div>
+          ) : null}
+
           <div className="mt-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-[16px] font-extrabold text-[#014384]">Profile Tools</h2>
@@ -378,4 +414,15 @@ function hasCompleteEmergencyContact(
       String(profile?.digitalIdEmergencyContactRelationship || '').trim() &&
       String(profile?.digitalIdEmergencyContactPhone || '').trim()
   )
+}
+
+function hasDigitalIdSignature(
+  profile:
+    | {
+        digitalIdSignatureUrl?: string | null
+      }
+    | null
+    | undefined
+) {
+  return Boolean(String(profile?.digitalIdSignatureUrl || '').trim())
 }

@@ -59,6 +59,58 @@ function hasCompleteEmergencyContact(profile: Record<string, any>) {
   );
 }
 
+function hasDigitalIdSignature(profile: Record<string, any>) {
+  return Boolean(normalizeOptionalString(profile.digitalIdSignatureUrl));
+}
+
+function parseBase64FileData(fileData: string) {
+  const match = fileData.match(/^data:(.+);base64,(.+)$/);
+  if (!match) {
+    throw new Error("Invalid file data format");
+  }
+
+  return {
+    mimeType: match[1],
+    base64Payload: match[2],
+  };
+}
+
+function extractStorageFileLocation(url: string) {
+  try {
+    const parsed = new URL(url);
+    const bucketMatch = parsed.pathname.match(/\/v0\/b\/([^/]+)\/o\/(.+)$/);
+    if (!bucketMatch) return null;
+
+    return {
+      bucketName: decodeURIComponent(bucketMatch[1]),
+      filePath: decodeURIComponent(bucketMatch[2]),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function deleteStoredFileFromUrl(url?: string | null) {
+  const normalizedUrl = normalizeOptionalString(url);
+  if (!normalizedUrl || normalizedUrl.startsWith("data:")) {
+    return;
+  }
+
+  const location = extractStorageFileLocation(normalizedUrl);
+  if (!location) {
+    return;
+  }
+
+  try {
+    await storage
+      .bucket(location.bucketName)
+      .file(location.filePath)
+      .delete({ ignoreNotFound: true });
+  } catch {
+    // Ignore cleanup failures so the new signature can still be saved.
+  }
+}
+
 function getRequiredDocumentTypes(ageGroup?: string) {
   const normalizedAgeGroup = normalizeYouthAgeGroup(ageGroup);
 
@@ -145,6 +197,9 @@ export async function getDigitalId(uid: string) {
     ),
     digitalIdEmergencyContactPhone: normalizeOptionalString(data.digitalIdEmergencyContactPhone),
     digitalIdEmergencyContactComplete: hasCompleteEmergencyContact(data),
+    digitalIdSignatureUrl: normalizeOptionalString(data.digitalIdSignatureUrl) || null,
+    digitalIdSignatureSignedAt: toIso(data.digitalIdSignatureSignedAt) || null,
+    digitalIdSignatureComplete: hasDigitalIdSignature(data),
   };
 }
 
@@ -240,6 +295,9 @@ export async function getMyVerificationStatus(uid: string) {
       profile.digitalIdEmergencyContactPhone
     ),
     digitalIdEmergencyContactComplete: hasCompleteEmergencyContact(profile),
+    digitalIdSignatureUrl: normalizeOptionalString(profile.digitalIdSignatureUrl) || null,
+    digitalIdSignatureSignedAt: toIso(profile.digitalIdSignatureSignedAt) || null,
+    digitalIdSignatureComplete: hasDigitalIdSignature(profile),
     registeredSkVoter: profile.registeredSkVoter,
     votedLastSkElections: profile.votedLastSkElections,
     registeredNationalVoter: profile.registeredNationalVoter,
@@ -288,13 +346,7 @@ export async function uploadDocumentFromBase64(
   docType: string,
   fileData: string
 ) {
-  const match = fileData.match(/^data:(.+);base64,(.+)$/);
-  if (!match) {
-    throw new Error("Invalid file data format");
-  }
-
-  const mimeType = match[1];
-  const base64Payload = match[2];
+  const { mimeType, base64Payload } = parseBase64FileData(fileData);
   const extension = mimeType.split("/")[1] || "jpg";
   const filePath = `verification-documents/${uid}/${docType}-${Date.now()}.${extension}`;
   const downloadToken = randomUUID();
@@ -339,4 +391,71 @@ export async function uploadDocumentFromBase64(
   throw new Error(
     "Firebase Storage is not available for document uploads, and this image is too large for the safe inline fallback. Enable the configured storage bucket or upload a smaller image."
   );
+}
+
+export async function uploadDigitalIdSignatureFromBase64(uid: string, fileData: string) {
+  const profileRef = db.collection("kkProfiling").doc(uid);
+  const profileSnap = await profileRef.get();
+
+  if (!profileSnap.exists) {
+    throw new Error("Complete your KK profiling before adding a digital ID signature.");
+  }
+
+  const profile = profileSnap.data() || {};
+  const previousSignatureUrl = normalizeOptionalString(profile.digitalIdSignatureUrl);
+  const { mimeType, base64Payload } = parseBase64FileData(fileData);
+  const extension = mimeType.split("/")[1] || "png";
+  const filePath = `digital-id-signatures/${uid}/signature-${Date.now()}.${extension}`;
+  const downloadToken = randomUUID();
+  let nextSignatureUrl = "";
+
+  for (const bucketName of getDocumentBucketCandidates()) {
+    try {
+      const bucket = storage.bucket(bucketName);
+      const file = bucket.file(filePath);
+
+      await file.save(Buffer.from(base64Payload, "base64"), {
+        metadata: {
+          contentType: mimeType,
+          metadata: {
+            firebaseStorageDownloadTokens: downloadToken,
+          },
+        },
+        resumable: false,
+      });
+
+      nextSignatureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
+        filePath
+      )}?alt=media&token=${downloadToken}`;
+      break;
+    } catch (error: any) {
+      if (!String(error?.message || "").includes("bucket does not exist")) {
+        throw error;
+      }
+    }
+  }
+
+  if (!nextSignatureUrl) {
+    if (fileData.length > INLINE_DOCUMENT_LIMIT) {
+      throw new Error(
+        "Firebase Storage is not available for signature uploads, and this image is too large for the safe inline fallback. Enable the configured storage bucket and try again."
+      );
+    }
+
+    nextSignatureUrl = fileData;
+  }
+
+  await profileRef.set(
+    {
+      digitalIdSignatureUrl: nextSignatureUrl,
+      digitalIdSignatureSignedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  if (previousSignatureUrl && previousSignatureUrl !== nextSignatureUrl) {
+    await deleteStoredFileFromUrl(previousSignatureUrl);
+  }
+
+  return nextSignatureUrl;
 }

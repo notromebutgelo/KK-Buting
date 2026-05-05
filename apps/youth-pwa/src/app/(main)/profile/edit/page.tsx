@@ -26,6 +26,7 @@ export default function EditProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const EMERGENCY_CONTACT_PHONE_MAX_LENGTH = 11
 
   useEffect(() => {
     if (user) {
@@ -38,7 +39,12 @@ export default function EditProfilePage() {
     if (profile) {
       setEmergencyContactName(profile.digitalIdEmergencyContactName || '')
       setEmergencyContactRelationship(profile.digitalIdEmergencyContactRelationship || '')
-      setEmergencyContactPhone(profile.digitalIdEmergencyContactPhone || '')
+      setEmergencyContactPhone(
+        normalizeEmergencyContactPhone(
+          profile.digitalIdEmergencyContactPhone || '',
+          EMERGENCY_CONTACT_PHONE_MAX_LENGTH
+        )
+      )
     }
   }, [profile])
 
@@ -56,7 +62,10 @@ export default function EditProfilePage() {
     const trimmedUsername = username.trim()
     const trimmedContactName = emergencyContactName.trim()
     const trimmedContactRelationship = emergencyContactRelationship.trim()
-    const trimmedContactPhone = emergencyContactPhone.trim()
+    const trimmedContactPhone = normalizeEmergencyContactPhone(
+      emergencyContactPhone,
+      EMERGENCY_CONTACT_PHONE_MAX_LENGTH
+    )
     const hasAnyEmergencyContactField = Boolean(
       trimmedContactName || trimmedContactRelationship || trimmedContactPhone
     )
@@ -173,8 +182,18 @@ export default function EditProfilePage() {
                   label="Emergency Contact Phone"
                   type="tel"
                   value={emergencyContactPhone}
-                  onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                  onChange={(e) =>
+                    setEmergencyContactPhone(
+                      normalizeEmergencyContactPhone(
+                        e.target.value,
+                        EMERGENCY_CONTACT_PHONE_MAX_LENGTH
+                      )
+                    )
+                  }
                   placeholder="Example: 09171234567"
+                  inputMode="numeric"
+                  maxLength={EMERGENCY_CONTACT_PHONE_MAX_LENGTH}
+                  hint="Use up to 11 characters for the contact number."
                 />
               </div>
             </div>
@@ -193,4 +212,8 @@ export default function EditProfilePage() {
       />
     </div>
   )
+}
+
+function normalizeEmergencyContactPhone(value: string, maxLength: number) {
+  return value.replace(/\D/g, '').slice(0, maxLength)
 }

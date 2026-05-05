@@ -654,6 +654,20 @@ export function validateDigitalIdDeactivationRequest(req: Request) {
   return errors;
 }
 
+export function validateDigitalIdSignatureUploadRequest(req: Request) {
+  const errors: string[] = [];
+  const body = ensureBodyRecord(req, errors);
+  if (!body) return errors;
+
+  validateString(errors, body, "fileData", "fileData", {
+    required: true,
+    minLength: 20,
+    maxLength: 350_000,
+  });
+
+  return errors;
+}
+
 export function validateYouthProfileUpdateRequest(req: Request) {
   const errors: string[] = [];
   const body = ensureBodyRecord(req, errors);

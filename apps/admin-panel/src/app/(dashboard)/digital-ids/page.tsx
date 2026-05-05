@@ -26,6 +26,7 @@ interface DigitalIdMember {
   digitalIdDeactivatedAt?: string
   hasDigitalId?: boolean
   emergencyContactComplete?: boolean
+  signatureComplete?: boolean
   profilePhotoUrl?: string | null
 }
 
@@ -53,6 +54,8 @@ interface DigitalIdDetail extends DigitalIdMember {
     digitalIdEmergencyContactName?: string
     digitalIdEmergencyContactRelationship?: string
     digitalIdEmergencyContactPhone?: string
+    digitalIdSignatureUrl?: string | null
+    digitalIdSignatureSignedAt?: string | null
   }
 }
 
@@ -476,7 +479,7 @@ export default function DigitalIdsPage() {
                             {member.digitalIdStatus === 'draft' && !isSuperadmin ? (
                               <ActionChip
                                 label="Send for Approval"
-                                disabled={!member.emergencyContactComplete}
+                                disabled={!member.emergencyContactComplete || !member.signatureComplete}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAction('submit', member)
@@ -486,7 +489,7 @@ export default function DigitalIdsPage() {
                             {member.digitalIdStatus === 'draft' && isSuperadmin ? (
                               <ActionChip
                                 label="Approve & Activate"
-                                disabled={!member.emergencyContactComplete}
+                                disabled={!member.emergencyContactComplete || !member.signatureComplete}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAction('approve', member)
@@ -505,7 +508,7 @@ export default function DigitalIdsPage() {
                             {!member.memberId ? (
                               <ActionChip
                                 label={isSuperadmin ? 'Generate ID' : 'Generate Draft'}
-                                disabled={!member.emergencyContactComplete}
+                                disabled={!member.emergencyContactComplete || !member.signatureComplete}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAction('generate', member)
@@ -552,12 +555,19 @@ export default function DigitalIdsPage() {
                 </div>
               ) : null}
 
+              {!selectedMember.signatureComplete ? (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  The youth member still needs to save a Digital ID signature before this Digital ID can be generated, submitted, approved, or regenerated.
+                </div>
+              ) : null}
+
               <div className="rounded-2xl bg-[color:var(--accent-soft)] p-4 text-sm" style={{ color: 'var(--ink)' }}>
                 <div className="grid gap-2">
                   <DetailRow label="ID Number" value={selectedMember.memberId || selectedMember.profile?.idNumber || 'Not generated'} />
                   <DetailRow label="Status" value={prettifyStatus(selectedMember.digitalIdStatus)} />
                   <DetailRow label="Revision" value={String(selectedMember.digitalIdRevision || selectedMember.profile?.digitalIdRevision || 1)} />
                   <DetailRow label="Emergency Contact" value={getEmergencyContactSummary(selectedMember)} />
+                  <DetailRow label="Signature" value={selectedMember.signatureComplete ? 'Saved' : 'Missing'} />
                   <DetailRow label="Verified On" value={formatDate(selectedMember.verifiedAt || selectedMember.profile?.verifiedAt)} />
                   <DetailRow label="Approval Requested" value={formatDate(selectedMember.profile?.digitalIdApprovalRequestedAt)} />
                   <DetailRow label="Approved On" value={formatDate(selectedMember.digitalIdApprovedAt || selectedMember.profile?.digitalIdApprovedAt)} />
@@ -566,12 +576,12 @@ export default function DigitalIdsPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                {!selectedMember.memberId ? <PrimaryButton label={isSuperadmin ? 'Generate ID' : 'Generate Draft ID'} disabled={isActionLoading || !selectedMember.emergencyContactComplete} onClick={() => handleAction('generate', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'draft' && !isSuperadmin ? <PrimaryButton label="Send to Superadmin" disabled={isActionLoading || !selectedMember.emergencyContactComplete} onClick={() => handleAction('submit', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading || !selectedMember.emergencyContactComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading || !selectedMember.emergencyContactComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
+                {!selectedMember.memberId ? <PrimaryButton label={isSuperadmin ? 'Generate ID' : 'Generate Draft ID'} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('generate', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'draft' && !isSuperadmin ? <PrimaryButton label="Send to Superadmin" disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('submit', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
                 {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label="Download PDF" onClick={() => handleDownloadPdf(selectedMember)} /> : null}
-                {selectedMember.memberId && isSuperadmin ? <SecondaryButton label="Regenerate ID" onClick={() => handleAction('regenerate', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete} /> : null}
+                {selectedMember.memberId && isSuperadmin ? <SecondaryButton label="Regenerate ID" onClick={() => handleAction('regenerate', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} /> : null}
                 {selectedMember.digitalIdStatus === 'active' && isSuperadmin ? <DangerButton label="Deactivate ID" onClick={() => handleAction('deactivate', selectedMember)} disabled={isActionLoading} /> : null}
               </div>
             </div>
@@ -740,6 +750,7 @@ function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
     .join(' ')
     .toUpperCase() || member.fullName?.toUpperCase() || 'KABATAAN MEMBER'
   const photoUrl = member.photoUrl || member.profilePhotoUrl || null
+  const signatureUrl = getMemberSignatureUrl(member)
   const address = buildAddress(member)
   const validThru = getDigitalIdValidThru(member)
   const emergencyContactName = getEmergencyContactName(member)
@@ -752,15 +763,21 @@ function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
         <img src="/images/KK ID - Front BG.png" alt="KK ID front background" className="absolute inset-0 h-full w-full object-cover" />
         <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[22.8%] text-[#0b2f5b]">
           <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
-            <div className="flex flex-col">
-              <div className="flex h-[49%] items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
+            <div className="flex flex-col items-center">
+              <p className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-[0.35rem] font-black leading-none tracking-[0.05em] text-[#0b2f5b]">
+                {member.memberId || member.profile?.idNumber || 'DRAFT'}
+              </p>
+              <div className="mt-[2.8%] flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
                 {photoUrl ? <img src={photoUrl} alt={fullName} className="h-full w-full object-cover" /> : <span className="text-sm font-black text-[#014384]">{getInitials(fullName)}</span>}
               </div>
-              <div className="mt-[5.4%] min-h-[10.5%]" />
-              <div className="border-t border-[#808080] pt-[3.8%] text-center">
+              <div className="mt-[5.2%] flex h-[13%] w-full items-end justify-center overflow-hidden px-[4%]">
+                {signatureUrl ? (
+                  <img src={signatureUrl} alt="Member signature" className="max-h-full w-full object-contain" />
+                ) : null}
+              </div>
+              <div className="w-full border-t border-[#808080] pt-[3.8%] text-center">
                 <p className="text-[0.38rem] font-medium tracking-[0.07em] text-[#1a1a1a]">SIGNATURE</p>
               </div>
-              <p className="mt-[4%] break-all text-[0.42rem] font-bold leading-tight text-[#0b2f5b]">{member.memberId || member.profile?.idNumber || 'DRAFT'}</p>
             </div>
 
             <div className="pt-[0.5%]">
@@ -779,7 +796,7 @@ function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
       <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
         <div className="absolute inset-[3.6%] rounded-[18px] border-[1.5px] border-[#4e5650]/65" />
         <div className="absolute inset-[6.2%] rounded-[14px] border border-[#838b85]/35" />
-        <div className="relative flex h-full flex-col px-[9.2%] pb-[14.2%] pt-[12.2%] text-[#2b312e]">
+        <div className="relative flex h-full flex-col px-[9%] pb-[21.8%] pt-[10%] text-[#2b312e]">
           <div className="text-center">
             <p className="text-[0.42rem] font-bold uppercase tracking-[0.09em] text-[#666d67]">
               In case of emergency, please contact:
@@ -792,7 +809,7 @@ function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
             </p>
           </div>
 
-          <div className="mx-auto mt-[7.4%] max-w-[82%] text-center">
+          <div className="mx-auto mt-[5.6%] max-w-[80%] text-center">
             <p className="text-[0.42rem] font-bold uppercase tracking-[0.18em] text-[#767d78]">
               Terms and Conditions
             </p>
@@ -801,24 +818,24 @@ function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
             </p>
           </div>
 
-          <div className="mt-auto flex justify-center pt-[2.4%]">
-            <div className="flex w-full max-w-[64%] flex-col items-center text-center">
+          <div className="mt-auto flex justify-center pt-[0.8%]">
+            <div className="flex w-full max-w-[61%] flex-col items-center text-center">
               <p className="text-[0.36rem] font-bold uppercase tracking-[0.16em] text-[#7a807b]">
                 Valid Thru
               </p>
-              <p className="mt-[1.8%] text-[0.72rem] font-black text-[#222823]">{validThru}</p>
-              <p className="mt-[4.1%] text-[0.82rem] font-semibold italic tracking-[0.02em] text-[#444b45]">
+              <p className="mt-[1.4%] text-[0.72rem] font-black text-[#222823]">{validThru}</p>
+              <p className="mt-[2.6%] text-[0.82rem] font-semibold italic tracking-[0.02em] text-[#444b45]">
                 {DIGITAL_ID_SIGNATURE_TEXT}
               </p>
-              <div className="mt-[1.5%] h-px w-[58%] bg-[#4d544e]" />
-              <p className="mt-[1.9%] text-[0.34rem] font-black uppercase leading-none tracking-[0.08em] text-[#303731]">
+              <div className="mt-[1%] h-px w-[58%] bg-[#4d544e]" />
+              <p className="mt-[1.2%] text-[0.34rem] font-black uppercase leading-none tracking-[0.08em] text-[#303731]">
                 {DIGITAL_ID_SIGNATORY_NAME}
               </p>
-              <p className="mt-[1.1%] text-[0.33rem] font-black uppercase leading-none tracking-[0.12em] text-[#303731]">
+              <p className="mt-[0.6%] text-[0.33rem] font-black uppercase leading-none tracking-[0.12em] text-[#303731]">
                 {DIGITAL_ID_SIGNATORY_TITLE}
               </p>
               {DIGITAL_ID_SIGNATORY_OFFICE ? (
-                <p className="mt-[0.8%] text-[0.31rem] font-semibold uppercase leading-none tracking-[0.11em] text-[#656d67]">
+                <p className="mt-[0.4%] text-[0.31rem] font-semibold uppercase leading-none tracking-[0.11em] text-[#656d67]">
                   {DIGITAL_ID_SIGNATORY_OFFICE}
                 </p>
               ) : null}
@@ -850,6 +867,10 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   const photoData = member.photoUrl || member.profilePhotoUrl
     ? await loadImageData(member.photoUrl || member.profilePhotoUrl || '').catch(() => '')
     : ''
+  const signatureUrl = getMemberSignatureUrl(member)
+  const signatureData = signatureUrl
+    ? await loadImageData(signatureUrl).catch(() => '')
+    : ''
   const fullName = (member.fullName || buildFullName(member.profile || {})).toUpperCase()
   const address = buildAddress(member)
   const validThru = getDigitalIdValidThru(member)
@@ -870,6 +891,11 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   doc.setLineWidth(0.6)
   doc.roundedRect(45, 355, 370, 216, 14, 14, 'S')
 
+  doc.setTextColor(11, 47, 91)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.1)
+  doc.text(member.memberId || member.profile?.idNumber || 'DRAFT', 89, 70, { align: 'center' })
+
   if (photoData) {
     doc.addImage(photoData, 'JPEG', 53, 83, 72, 94)
   } else {
@@ -878,10 +904,17 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
     doc.text(getInitials(fullName), 89, 138, { align: 'center' })
   }
 
+  if (signatureData) {
+    doc.addImage(signatureData, 'PNG', 48, 184, 82, 22)
+  }
+
+  doc.setDrawColor(128, 128, 128)
+  doc.setLineWidth(0.8)
+  doc.line(50, 208, 128, 208)
+  doc.setTextColor(26, 26, 26)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor(11, 47, 91)
-  doc.setFontSize(6.5)
-  doc.text(member.memberId || member.profile?.idNumber || 'DRAFT', 52, 213)
+  doc.setFontSize(5.6)
+  doc.text('SIGNATURE', 89, 216, { align: 'center' })
 
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(29, 90, 161)
@@ -904,45 +937,45 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   doc.setTextColor(96, 103, 98)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
-  doc.text('IN CASE OF EMERGENCY, PLEASE CONTACT:', 230, 390, { align: 'center' })
+  doc.text('IN CASE OF EMERGENCY, PLEASE CONTACT:', 230, 381, { align: 'center' })
   doc.setTextColor(31, 38, 33)
   doc.setFontSize(13)
-  doc.text(`${emergencyContactName} - ${emergencyContactPhone}`, 230, 408, { align: 'center', maxWidth: 300 })
+  doc.text(`${emergencyContactName} - ${emergencyContactPhone}`, 230, 398, { align: 'center', maxWidth: 300 })
   doc.setTextColor(107, 114, 108)
   doc.setFontSize(7)
-  doc.text(`RELATIONSHIP: ${emergencyContactRelationship}`, 230, 421, { align: 'center', maxWidth: 260 })
+  doc.text(`RELATIONSHIP: ${emergencyContactRelationship}`, 230, 410, { align: 'center', maxWidth: 260 })
 
   doc.setTextColor(118, 125, 120)
   doc.setFontSize(8)
-  doc.text('TERMS AND CONDITIONS', 230, 442, { align: 'center' })
+  doc.text('TERMS AND CONDITIONS', 230, 431, { align: 'center' })
   doc.setTextColor(66, 72, 67)
   doc.setFontSize(7.9)
-  doc.text(DIGITAL_ID_TERMS_TEXT, 230, 458, { align: 'center', maxWidth: 235, lineHeightFactor: 1.26 })
+  doc.text(DIGITAL_ID_TERMS_TEXT, 230, 446, { align: 'center', maxWidth: 235, lineHeightFactor: 1.26 })
 
   doc.setTextColor(122, 128, 123)
   doc.setFontSize(7)
-  doc.text('VALID THRU', 230, 512, { align: 'center' })
+  doc.text('VALID THRU', 230, 490, { align: 'center' })
   doc.setTextColor(34, 40, 35)
   doc.setFontSize(12)
-  doc.text(validThru, 230, 527, { align: 'center' })
+  doc.text(validThru, 230, 504, { align: 'center' })
   doc.setTextColor(68, 75, 69)
   doc.setFont('times', 'italic')
   doc.setFontSize(15)
-  doc.text(DIGITAL_ID_SIGNATURE_TEXT, 230, 548, { align: 'center' })
+  doc.text(DIGITAL_ID_SIGNATURE_TEXT, 230, 521, { align: 'center' })
   doc.setDrawColor(77, 84, 78)
   doc.setLineWidth(0.8)
-  doc.line(186, 553, 274, 553)
+  doc.line(186, 526, 274, 526)
   doc.setTextColor(48, 55, 49)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(6.2)
-  doc.text(DIGITAL_ID_SIGNATORY_NAME, 230, 564, { align: 'center' })
+  doc.text(DIGITAL_ID_SIGNATORY_NAME, 230, 537, { align: 'center' })
   doc.setFontSize(6.4)
-  doc.text(DIGITAL_ID_SIGNATORY_TITLE, 230, 574, { align: 'center' })
+  doc.text(DIGITAL_ID_SIGNATORY_TITLE, 230, 546, { align: 'center' })
   doc.setTextColor(101, 109, 103)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(5.8)
   if (DIGITAL_ID_SIGNATORY_OFFICE) {
-    doc.text(DIGITAL_ID_SIGNATORY_OFFICE, 230, 583, { align: 'center' })
+    doc.text(DIGITAL_ID_SIGNATORY_OFFICE, 230, 554, { align: 'center' })
   }
 
   return doc
@@ -1018,6 +1051,10 @@ function getEmergencyContactRelationship(member: DigitalIdDetail) {
 
 function getEmergencyContactPhone(member: DigitalIdDetail) {
   return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactPhone, 'NOT PROVIDED YET')
+}
+
+function getMemberSignatureUrl(member: DigitalIdDetail) {
+  return member.profile?.digitalIdSignatureUrl || null
 }
 
 function getEmergencyContactSummary(member: DigitalIdDetail) {

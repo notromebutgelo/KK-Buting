@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { submitProfiling } from "@/services/profiling.service";
+import {
+  hasCompletedProfiling,
+  submitProfiling,
+  updateProfiling,
+} from "@/services/profiling.service";
+import { saveDigitalIdSignature } from "@/services/verification.service";
 import AlertModal from "@/components/ui/AlertModal";
 import {
   PROFILING_STEPS,
@@ -37,8 +42,12 @@ export default function ProfilingReviewPage() {
           .map((field) => ({
             label: field.reviewLabel || field.label,
             value: formatFieldValueForReview(field, draft),
+            imageSrc:
+              field.type === "signature" && typeof draft[field.key] === "string"
+                ? String(draft[field.key] || "")
+                : "",
           }))
-          .filter((field) => field.value)
+          .filter((field) => field.value || field.imageSrc)
       ),
     })).filter((section) => section.fields.length > 0);
   }, [draft]);
@@ -48,12 +57,37 @@ export default function ProfilingReviewPage() {
     setIsLoading(true);
     setError("");
 
+    const latestDraft = readProfilingDraft();
+    const payload = buildProfilingPayload(latestDraft);
+    let profilingSubmitted = false;
+
     try {
-      await submitProfiling(buildProfilingPayload(readProfilingDraft()));
+      const alreadySubmitted = await hasCompletedProfiling();
+      if (alreadySubmitted) {
+        await updateProfiling(payload);
+      } else {
+        await submitProfiling(payload);
+      }
+      profilingSubmitted = true;
+
+      if (latestDraft.digitalIdSignatureDataUrl) {
+        await saveDigitalIdSignature(latestDraft.digitalIdSignatureDataUrl);
+      }
+
       clearProfilingDraft();
       router.push("/profiling/sucess");
-    } catch {
-      setError("Failed to submit profiling. Please try again.");
+    } catch (nextError: any) {
+      if (profilingSubmitted) {
+        setError(
+          "Your profiling answers were saved, but your Digital ID signature upload did not finish. Please tap Submit again to retry the signature upload."
+        );
+      } else {
+        setError(
+          nextError?.response?.data?.error ||
+            nextError?.message ||
+            "Failed to submit profiling. Please try again."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +135,12 @@ export default function ProfilingReviewPage() {
           >
             <div className="pf-review-grid">
               {section.fields.map((field) => (
-                <Field key={field.label} label={field.label} value={field.value} />
+                <Field
+                  key={field.label}
+                  label={field.label}
+                  value={field.value}
+                  imageSrc={field.imageSrc}
+                />
               ))}
             </div>
           </ReviewAccordion>
@@ -129,14 +168,31 @@ export default function ProfilingReviewPage() {
 function Field({
   label,
   value,
+  imageSrc,
 }: {
   label: string;
   value: string;
+  imageSrc?: string;
 }) {
   return (
     <div className="pf-review-field full">
       <span className="pf-review-field-label">{label}</span>
-      <span className="pf-review-field-value">{value || "-"}</span>
+      {imageSrc ? (
+        <div className="mt-3 rounded-[24px] border border-dashed border-[#bfd3ea] bg-[#f8fbff] px-4 py-5">
+          <div className="flex min-h-[96px] items-center justify-center">
+            <img
+              src={imageSrc}
+              alt="Digital ID signature preview"
+              className="max-h-[96px] w-full object-contain"
+            />
+          </div>
+          <span className="mt-3 block text-center text-xs font-medium text-[#5c7aa3]">
+            {value}
+          </span>
+        </div>
+      ) : (
+        <span className="pf-review-field-value">{value || "-"}</span>
+      )}
     </div>
   );
 }

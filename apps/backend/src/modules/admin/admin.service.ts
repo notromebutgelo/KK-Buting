@@ -104,6 +104,10 @@ function hasCompleteEmergencyContact(profile: AnyRecord) {
   );
 }
 
+function hasDigitalIdSignature(profile: AnyRecord) {
+  return Boolean(normalizeOptionalString(profile?.digitalIdSignatureUrl));
+}
+
 function assertCompleteEmergencyContact(profile: AnyRecord) {
   if (hasCompleteEmergencyContact(profile)) {
     return;
@@ -111,6 +115,16 @@ function assertCompleteEmergencyContact(profile: AnyRecord) {
 
   throw new Error(
     "Emergency contact is required before generating or activating a digital ID."
+  );
+}
+
+function assertCompleteDigitalIdSignature(profile: AnyRecord) {
+  if (hasDigitalIdSignature(profile)) {
+    return;
+  }
+
+  throw new Error(
+    "A saved member signature is required before generating or activating a digital ID."
   );
 }
 
@@ -1748,6 +1762,7 @@ export async function getDigitalIdMembers(filters: {
         digitalIdDeactivatedAt: member.profile?.digitalIdDeactivatedAt,
         hasDigitalId: digitalIdStatus === "active",
         emergencyContactComplete: hasCompleteEmergencyContact(member.profile || {}),
+        signatureComplete: hasDigitalIdSignature(member.profile || {}),
         profilePhotoUrl:
           member.profile?.photoUrl ||
           member.profile?.idPhotoUrl ||
@@ -1809,6 +1824,7 @@ export async function getDigitalIdMember(userId: string) {
   return {
     ...member,
     emergencyContactComplete: hasCompleteEmergencyContact(profile),
+    signatureComplete: hasDigitalIdSignature(profile),
     profile: serializeRecord({ userId, ...profile }),
     photoUrl:
       documents.find((document) => String(document.documentType || "") === "id_photo")?.fileUrl ||
@@ -1830,6 +1846,7 @@ export async function generateDigitalIdDraft(userId: string, adminEmail: string)
     throw new Error("Only verified profiles can receive a digital ID");
   }
   assertCompleteEmergencyContact(profile);
+  assertCompleteDigitalIdSignature(profile);
 
   const memberId = profile.idNumber || generateIdNumber(userId);
   await profileRef.set(
@@ -1856,6 +1873,7 @@ export async function submitDigitalIdForApproval(userId: string, adminEmail: str
 
   const profile = profileSnap.data() as AnyRecord;
   assertCompleteEmergencyContact(profile);
+  assertCompleteDigitalIdSignature(profile);
 
   await profileRef.set(
     {
@@ -1877,6 +1895,7 @@ export async function approveDigitalId(userId: string, adminEmail: string) {
 
   const profile = profileSnap.data() as AnyRecord;
   assertCompleteEmergencyContact(profile);
+  assertCompleteDigitalIdSignature(profile);
 
   await profileRef.set(
     {
@@ -1912,6 +1931,7 @@ export async function regenerateDigitalId(userId: string, adminEmail: string) {
 
   const profile = profileSnap.data() as AnyRecord;
   assertCompleteEmergencyContact(profile);
+  assertCompleteDigitalIdSignature(profile);
   const nextRevision = Number(profile.digitalIdRevision || 1) + 1;
   const memberId = generateIdNumber(`${userId}-${nextRevision}`);
 

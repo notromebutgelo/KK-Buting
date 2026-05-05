@@ -34,6 +34,11 @@ export async function getDigitalID() {
   return res.data
 }
 
+export async function saveDigitalIdSignature(fileData: string) {
+  const res = await api.post('/digital-id/signature', { fileData })
+  return res.data
+}
+
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()

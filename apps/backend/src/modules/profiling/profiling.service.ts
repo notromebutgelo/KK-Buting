@@ -3,8 +3,10 @@ import { FieldValue } from "firebase-admin/firestore";
 import { createNotification } from "../notifications/notifications.service";
 
 export async function submitProfiling(uid: string, data: Record<string, unknown>) {
+  const normalizedData = normalizeProfilingData(data);
+
   await db.collection("kkProfiling").doc(uid).set({
-    ...data,
+    ...normalizedData,
     userId: uid,
     status: "pending",
     verified: false,
@@ -28,8 +30,28 @@ export async function getProfiling(uid: string) {
 }
 
 export async function updateProfiling(uid: string, data: Record<string, unknown>) {
+  const normalizedData = normalizeProfilingData(data);
+
   await db.collection("kkProfiling").doc(uid).update({
-    ...data,
+    ...normalizedData,
     updatedAt: FieldValue.serverTimestamp(),
   });
+}
+
+function normalizeProfilingData(data: Record<string, unknown>) {
+  const normalizedData = { ...data };
+
+  if ("digitalIdEmergencyContactPhone" in normalizedData) {
+    normalizedData.digitalIdEmergencyContactPhone = normalizeEmergencyContactPhone(
+      normalizedData.digitalIdEmergencyContactPhone
+    );
+  }
+
+  return normalizedData;
+}
+
+function normalizeEmergencyContactPhone(value: unknown) {
+  return String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 11);
 }

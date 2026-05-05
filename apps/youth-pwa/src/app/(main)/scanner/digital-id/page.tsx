@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import jsPDF from 'jspdf'
 import { useEffect, useMemo, useState } from 'react'
 import DigitalIDCard from '@/components/features/DigitalIDCard'
 import AlertModal from '@/components/ui/AlertModal'
@@ -14,7 +15,14 @@ interface DigitalIDData {
   qrCode: string
   memberId: string
   photoUrl?: string | null
+  digitalIdSignatureUrl?: string | null
 }
+
+const DIGITAL_ID_TERMS_TEXT =
+  'This card is non-transferable and must be used only by the cardholder whose signature appears herein. Cardholder privileges remain subject to implementing guidelines approved by the Sangguniang Kabataan Council.'
+const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
+const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
+const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
 
 export default function DigitalIDPage() {
   const { user } = useAuthStore()
@@ -22,6 +30,8 @@ export default function DigitalIDPage() {
   const [idData, setIdData] = useState<DigitalIDData | null>(null)
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [errorTitle, setErrorTitle] = useState('Digital ID Unavailable')
   const [error, setError] = useState('')
 
   const displayName = useMemo(() => {
@@ -37,6 +47,7 @@ export default function DigitalIDPage() {
 
   const isVerified = profile?.status === 'verified'
   const emergencyContactComplete = hasCompleteEmergencyContact(profile)
+  const signatureComplete = hasDigitalIdSignature(profile)
   const queueStatus = profile?.verificationQueueStatus || (profile?.documentsSubmitted ? 'pending' : 'not_submitted')
   const isRejected = profile?.status === 'rejected' || queueStatus === 'rejected'
   const hasSubmittedDocuments = Boolean(
@@ -74,8 +85,9 @@ export default function DigitalIDPage() {
   }, [setProfile])
 
   useEffect(() => {
-    if (isProfileLoading || !isVerified || !emergencyContactComplete) {
+    if (isProfileLoading || !isVerified || !emergencyContactComplete || !signatureComplete) {
       setIdData(null)
+      setErrorTitle('Digital ID Unavailable')
       setError('')
       setIsLoading(false)
       return
@@ -84,9 +96,36 @@ export default function DigitalIDPage() {
     setIsLoading(true)
     getDigitalID()
       .then(setIdData)
-      .catch(() => setError('Could not load your Digital ID right now.'))
+      .catch(() => {
+        setErrorTitle('Digital ID Unavailable')
+        setError('Could not load your Digital ID right now.')
+      })
       .finally(() => setIsLoading(false))
-  }, [emergencyContactComplete, isProfileLoading, isVerified])
+  }, [emergencyContactComplete, isProfileLoading, isVerified, signatureComplete])
+
+  async function handleSaveId() {
+    if (!profile || !idData || isSaving) {
+      return
+    }
+
+    setIsSaving(true)
+
+    try {
+      const pdf = await buildDigitalIdPdf({
+        profile,
+        memberId: idData.memberId,
+        photoUrl: idData.photoUrl || profile.idPhotoUrl || null,
+        signatureUrl: idData.digitalIdSignatureUrl || profile.digitalIdSignatureUrl || null,
+      })
+
+      pdf.save(`${sanitizeFileName(idData.memberId || displayName || 'kk_digital_id')}.pdf`)
+    } catch {
+      setErrorTitle('Save Failed')
+      setError('Could not save your Digital ID right now.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <div className="min-h-screen w-full bg-[#f5f5f5] pb-28 text-[#014384]">
@@ -186,6 +225,44 @@ export default function DigitalIDPage() {
               className="mt-10 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
             >
               Add Emergency Contact
+            </Link>
+
+            <Link
+              href="/home"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-[#cbdcf0] bg-white px-6 py-4 text-[16px] font-semibold text-[#014384]"
+            >
+              Return Home
+            </Link>
+          </div>
+        ) : !signatureComplete ? (
+          <div className="mx-auto flex max-w-[340px] flex-col items-center text-center">
+            <h2 className="text-[20px] font-extrabold text-[#014384]">
+              Add Signature to Complete Your Digital ID
+            </h2>
+
+            <div className="mt-10 flex items-center justify-center">
+              <Image
+                src="/images/DocumentsSubmitted.png"
+                alt="Add digital ID signature"
+                width={150}
+                height={150}
+                className="h-auto w-[150px] object-contain"
+              />
+            </div>
+
+            <p className="mt-10 text-[17px] leading-[1.6] text-[#1e4f91]">
+              Draw the signature that should appear on the front of your Digital ID before the card can be displayed.
+            </p>
+
+            <p className="mt-4 max-w-[290px] text-[13px] leading-[1.6] text-[#6f87a8]">
+              If you make a mistake, you can clear the pad and sign again before saving. You can also replace the saved signature later.
+            </p>
+
+            <Link
+              href="/profile/signature"
+              className="mt-10 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
+            >
+              Add Signature
             </Link>
 
             <Link
@@ -343,19 +420,26 @@ export default function DigitalIDPage() {
           <div className="space-y-5">
             <DigitalIDCard
               profile={profile}
-              qrData={idData.qrCode}
               memberId={idData.memberId}
               photoUrl={idData.photoUrl || profile.idPhotoUrl}
+              signatureUrl={idData.digitalIdSignatureUrl || profile.digitalIdSignatureUrl}
             />
             <p className="text-center text-[13px] text-[#5c7aa3]">
-              Show this QR code to KK officers to verify your membership.
+              Present this Digital ID to KK officers whenever they need to verify your membership.
             </p>
+            <Link
+              href="/profile/signature"
+              className="inline-flex w-full items-center justify-center rounded-full border border-[#cbdcf0] bg-white px-6 py-4 text-[16px] font-semibold text-[#014384]"
+            >
+              Update Signature
+            </Link>
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handleSaveId}
+              disabled={isSaving}
               className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
             >
-              Save / Print ID
+              {isSaving ? 'Saving ID...' : 'Save ID'}
             </button>
           </div>
         )}
@@ -363,9 +447,12 @@ export default function DigitalIDPage() {
 
       <AlertModal
         isOpen={Boolean(error)}
-        title="Digital ID Unavailable"
+        title={errorTitle}
         message={error}
-        onClose={() => setError('')}
+        onClose={() => {
+          setError('')
+          setErrorTitle('Digital ID Unavailable')
+        }}
       />
     </div>
   )
@@ -396,4 +483,245 @@ function hasCompleteEmergencyContact(
       String(profile?.digitalIdEmergencyContactRelationship || '').trim() &&
       String(profile?.digitalIdEmergencyContactPhone || '').trim()
   )
+}
+
+function hasDigitalIdSignature(
+  profile:
+    | {
+        digitalIdSignatureUrl?: string | null
+      }
+    | null
+    | undefined
+) {
+  return Boolean(String(profile?.digitalIdSignatureUrl || '').trim())
+}
+
+async function buildDigitalIdPdf({
+  profile,
+  memberId,
+  photoUrl,
+  signatureUrl,
+}: {
+  profile: {
+    firstName?: string
+    middleName?: string
+    lastName?: string
+    barangay?: string
+    city?: string
+    province?: string
+    birthday?: string
+    gender?: string
+    contactNumber?: string
+    verifiedAt?: string
+    digitalIdEmergencyContactName?: string
+    digitalIdEmergencyContactRelationship?: string
+    digitalIdEmergencyContactPhone?: string
+  }
+  memberId: string
+  photoUrl?: string | null
+  signatureUrl?: string | null
+}) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'pt',
+    format: [700, 460],
+  })
+
+  const [frontBg, photoData, signatureData] = await Promise.all([
+    loadImageData('/images/KK ID - Front BG.png'),
+    photoUrl ? loadImageData(photoUrl).catch(() => '') : Promise.resolve(''),
+    signatureUrl ? loadImageData(signatureUrl).catch(() => '') : Promise.resolve(''),
+  ])
+
+  const fullName = buildFullName(profile).toUpperCase() || 'KABATAAN MEMBER'
+  const address = buildAddress(profile)
+  const validThru = getDigitalIdValidThru(profile.verifiedAt)
+  const emergencyContactName = formatEmergencyContactValue(
+    profile.digitalIdEmergencyContactName,
+    'NOT PROVIDED YET'
+  )
+  const emergencyContactPhone = formatEmergencyContactValue(
+    profile.digitalIdEmergencyContactPhone,
+    'NOT PROVIDED YET'
+  )
+  const emergencyContactRelationship = formatEmergencyContactValue(
+    profile.digitalIdEmergencyContactRelationship,
+    'NOT PROVIDED YET'
+  )
+
+  doc.setFillColor(245, 249, 255)
+  doc.rect(0, 0, 460, 700, 'F')
+
+  doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
+  doc.setFillColor(244, 242, 236)
+  doc.roundedRect(20, 330, 420, 266, 24, 24, 'F')
+  doc.setDrawColor(80, 88, 82)
+  doc.setLineWidth(1.2)
+  doc.roundedRect(35, 345, 390, 236, 18, 18, 'S')
+  doc.setDrawColor(139, 147, 141)
+  doc.setLineWidth(0.6)
+  doc.roundedRect(45, 355, 370, 216, 14, 14, 'S')
+
+  doc.setTextColor(11, 47, 91)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.1)
+  doc.text(memberId || 'DRAFT', 89, 70, { align: 'center' })
+
+  if (photoData) {
+    doc.addImage(photoData, 'JPEG', 53, 83, 72, 94)
+  } else {
+    doc.setTextColor(1, 67, 132)
+    doc.setFontSize(22)
+    doc.text(getInitials(fullName), 89, 138, { align: 'center' })
+  }
+
+  if (signatureData) {
+    doc.addImage(signatureData, 'PNG', 48, 184, 82, 22)
+  }
+
+  doc.setDrawColor(128, 128, 128)
+  doc.setLineWidth(0.8)
+  doc.line(50, 208, 128, 208)
+  doc.setTextColor(26, 26, 26)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(5.6)
+  doc.text('SIGNATURE', 89, 216, { align: 'center' })
+
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(29, 90, 161)
+  doc.setFontSize(7)
+  doc.text('NAME:', 164, 84)
+  doc.text('HOME ADDRESS:', 164, 119)
+  doc.text('DATE OF BIRTH:', 164, 171)
+  doc.text('GENDER:', 299, 171)
+  doc.text('CONTACT NO:', 164, 219)
+
+  doc.setTextColor(11, 47, 91)
+  doc.setFontSize(12)
+  doc.text(fullName, 164, 97)
+  doc.setFontSize(10.5)
+  doc.text(address, 164, 133, { maxWidth: 160 })
+  doc.text(formatShortDate(profile.birthday), 164, 184)
+  doc.text((profile.gender || '-').toUpperCase(), 299, 184)
+  doc.text(profile.contactNumber || '-', 164, 232)
+
+  doc.setTextColor(96, 103, 98)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.text('IN CASE OF EMERGENCY, PLEASE CONTACT:', 230, 381, { align: 'center' })
+  doc.setTextColor(31, 38, 33)
+  doc.setFontSize(13)
+  doc.text(`${emergencyContactName} - ${emergencyContactPhone}`, 230, 398, {
+    align: 'center',
+    maxWidth: 300,
+  })
+  doc.setTextColor(107, 114, 108)
+  doc.setFontSize(7)
+  doc.text(`RELATIONSHIP: ${emergencyContactRelationship}`, 230, 410, {
+    align: 'center',
+    maxWidth: 260,
+  })
+
+  doc.setTextColor(118, 125, 120)
+  doc.setFontSize(8)
+  doc.text('TERMS AND CONDITIONS', 230, 431, { align: 'center' })
+  doc.setTextColor(66, 72, 67)
+  doc.setFontSize(7.9)
+  doc.text(DIGITAL_ID_TERMS_TEXT, 230, 446, {
+    align: 'center',
+    maxWidth: 235,
+    lineHeightFactor: 1.26,
+  })
+
+  doc.setTextColor(122, 128, 123)
+  doc.setFontSize(7)
+  doc.text('VALID THRU', 230, 490, { align: 'center' })
+  doc.setTextColor(34, 40, 35)
+  doc.setFontSize(12)
+  doc.text(validThru, 230, 504, { align: 'center' })
+  doc.setTextColor(68, 75, 69)
+  doc.setFont('times', 'italic')
+  doc.setFontSize(15)
+  doc.text(DIGITAL_ID_SIGNATURE_TEXT, 230, 521, { align: 'center' })
+  doc.setDrawColor(77, 84, 78)
+  doc.setLineWidth(0.8)
+  doc.line(186, 526, 274, 526)
+  doc.setTextColor(48, 55, 49)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(6.2)
+  doc.text(DIGITAL_ID_SIGNATORY_NAME, 230, 537, { align: 'center' })
+  doc.setFontSize(6.4)
+  doc.text(DIGITAL_ID_SIGNATORY_TITLE, 230, 546, { align: 'center' })
+
+  return doc
+}
+
+function buildFullName(profile: {
+  firstName?: string
+  middleName?: string
+  lastName?: string
+}) {
+  return [profile.firstName, profile.middleName, profile.lastName]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function buildAddress(profile: {
+  barangay?: string
+  city?: string
+  province?: string
+}) {
+  const parts = [profile.barangay, profile.city, profile.province]
+    .filter(Boolean)
+    .join(', ')
+    .toUpperCase()
+
+  return parts || '-'
+}
+
+function formatShortDate(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleDateString('en-PH')
+}
+
+function formatEmergencyContactValue(value: string | undefined, fallback: string) {
+  const nextValue = String(value || '').trim()
+  return nextValue || fallback
+}
+
+function getDigitalIdValidThru(value?: string) {
+  const date = new Date(value || new Date().toISOString())
+
+  if (Number.isNaN(date.getTime())) {
+    return '-'
+  }
+
+  date.setFullYear(date.getFullYear() + 5)
+
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  })
+}
+
+async function loadImageData(url: string) {
+  const response = await fetch(url)
+  const blob = await response.blob()
+  return await blobToDataUrl(blob)
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Failed to load image'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+function sanitizeFileName(value: string) {
+  return value.replace(/[^\w-]+/g, '_')
 }

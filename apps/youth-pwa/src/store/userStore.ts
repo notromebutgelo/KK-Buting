@@ -15,6 +15,9 @@ export interface UserProfile {
   digitalIdEmergencyContactRelationship?: string
   digitalIdEmergencyContactPhone?: string
   digitalIdEmergencyContactComplete?: boolean
+  digitalIdSignatureUrl?: string | null
+  digitalIdSignatureSignedAt?: string | null
+  digitalIdSignatureComplete?: boolean
   region: string
   province: string
   city: string

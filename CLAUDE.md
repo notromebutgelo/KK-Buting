@@ -176,6 +176,24 @@ The current live points default in code is now:
   - when executed with an explicit confirmation token, the cleanup removes youth-linked Firestore records, Auth users, verification-document storage files, voucher claims, and common user-side ledgers such as `pointsHistory`
   - the cleanup also restores voucher `claimedBy` arrays and stock plus reward stock consumed by deleted test-user redemptions, reducing the risk of carrying test redemption state into live deployment
   - root and backend package scripts now expose the utility through `npm run cleanup:youth`
+- the youth PWA, backend, and admin panel now support a drawn Digital ID signature flow with re-sign capability
+  - `kkProfiling` records now store `digitalIdSignatureUrl` plus `digitalIdSignatureSignedAt`, and the backend Digital ID + verification-status payloads now expose those fields together with a signature-complete flag
+  - the first `Consent & Identity` step of the youth onboarding profiling flow now collects that signature directly through the questionnaire instead of waiting until after profiling
+  - the profiling review screen now shows a signature preview, and final profiling submission now uploads the captured signature through the dedicated backend Digital ID signature endpoint after the profile record is saved
+  - a new youth page at `apps/youth-pwa/src/app/(main)/profile/signature/page.tsx` lets members draw a signature in a canvas pad, clear and try again before saving, and replace the saved signature later if needed
+  - the youth Digital ID page now blocks final ID display until both the emergency contact and member signature are present, then offers an `Update Signature` path for later re-signing
+  - the youth `Edit Profile` emergency-contact phone field now normalizes to digits and caps input at 11 characters, and backend profiling saves now apply the same 11-digit limit so the rule is enforced consistently
+  - the `Birth & Residence` profiling step now asks for house / block / unit number before street address in both the current and permanent address sections
+  - admin Digital ID generation, approval, and regeneration now require a saved member signature in addition to the emergency contact requirement
+  - the saved signature now renders on the front of the youth Digital ID card, the admin preview card, and the exported admin PDF
+  - the youth PWA Digital ID back card now matches the newer superadmin-style back layout with emergency-contact summary, relationship, terms, valid-thru date, and signatory block instead of the older QR-based back design
+  - the youth PWA Digital ID card spacing was then tuned for narrow mobile screens so the signatory block on the back stays fully visible and the member ID text stays centered under the front-card signature line
+  - the member ID number on the front card was later simplified again into a single readable line above the photo area, removing the extra badge container so the signature/photo block keeps more vertical space
+  - the youth PWA back-card padding was then increased again so the lower signatory stack stays clear of the border line on the mobile Digital ID page
+  - the youth Digital ID action button now uses `Save ID` instead of the old browser `Save / Print ID` flow, and it exports a direct PDF download with the front and back card laid out explicitly so members are not sent through the print dialog or a cropped browser print view
+  - signature export from the pad now trims excess transparent canvas space around the actual strokes so the signature sits more naturally on the card line
+  - verification checks after the rollout: `npx tsc --noEmit -p apps/youth-pwa/tsconfig.json`, `npx tsc --noEmit -p apps/admin-panel/tsconfig.json`, `npm run build:backend`, and `npm run test:backend` all passed
+  - current local build blockers still remain outside the TypeScript/backend checks: `npm run build:youth` now fails during Next page-data collection for `/icon.png` and `/api/session`, while `npm run build:admin` currently fails on this machine with `spawn EPERM`
 - the youth PWA auth pages now show a branded in-progress modal during email, Google, and Facebook login/register flows
   - `apps/youth-pwa/src/app/(auth)/login/page.tsx` and `apps/youth-pwa/src/app/(auth)/register/page.tsx` now open a shared blocking progress modal whenever auth is still running, so users no longer have to guess whether sign-in is stuck or still processing
   - the modal uses a dedicated shared component at `apps/youth-pwa/src/components/ui/AuthProgressModal.tsx` and keeps the auth screens aligned with the same blue-gold KK visual language already used elsewhere in the app
@@ -269,6 +287,9 @@ The current live points default in code is now:
   - the signatory block now shows a signature-style line above the divider, then `HON. MARK JERVIN B. VENTURA`, then `SK CHAIRPERSON`; the optional third office line stays hidden when not needed
   - emergency contact data on the Digital ID back is no longer hardcoded; the admin preview and exported PDF now read the member's saved Digital ID emergency-contact fields and warn admins when those fields are still incomplete
   - the lower signatory stack spacing was tightened afterward so the printed name and `SK CHAIRPERSON` stay inside the back-card border in both the browser preview and PDF export
+  - the superadmin Digital ID back-card content was later shifted upward with roomier bottom padding so the signatory block no longer crowds or touches the lower border in the live preview or exported PDF
+  - the front-card member ID number was later simplified again into a single readable line above the photo block in both the browser preview and exported PDF, removing the extra badge container while keeping the number legible
+  - the superadmin back-card preview/export spacing was then tightened upward once more so the lower signatory lines stay comfortably inside the border
   - the front-card photo and signature area now leaves more breathing room above the signature line so a future e-signature field can fit more naturally without crowding the photo block
 - the admin panel now has explicit Next App Router error boundaries and a safer dashboard stats normalizer
   - `apps/admin-panel/src/app/error.tsx` and `apps/admin-panel/src/app/global-error.tsx` now provide visible recovery UIs instead of falling back to the generic Next dev refresh loop

@@ -3,6 +3,7 @@ import { AuthRequest } from "../../middleware/verifyToken";
 import {
   getDigitalId,
   getMyVerificationStatus,
+  uploadDigitalIdSignatureFromBase64,
   uploadDocument,
   uploadDocumentFromBase64,
 } from "./digitalId.service";
@@ -50,6 +51,28 @@ export async function getMyVerificationStatusHandler(req: AuthRequest, res: Resp
     const status = await getMyVerificationStatus(req.user!.uid);
     if (!status) return res.status(404).json({ error: "No profile found" });
     return res.json(status);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function uploadDigitalIdSignatureHandler(req: AuthRequest, res: Response) {
+  const { fileData } = req.body;
+
+  if (!fileData) {
+    return res.status(400).json({ error: "fileData is required" });
+  }
+
+  try {
+    const signatureUrl = await uploadDigitalIdSignatureFromBase64(
+      req.user!.uid,
+      fileData
+    );
+
+    return res.status(201).json({
+      message: "Digital ID signature saved",
+      signatureUrl,
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

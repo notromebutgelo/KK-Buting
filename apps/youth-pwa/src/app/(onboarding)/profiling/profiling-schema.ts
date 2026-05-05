@@ -37,6 +37,7 @@ export const INFO_SOURCE_OPTIONS = [
 
 export type ProfilingDraft = {
   privacyConsent?: string;
+  digitalIdSignatureDataUrl?: string;
   lastName?: string;
   firstName?: string;
   middleName?: string;
@@ -153,7 +154,8 @@ export type ProfilingFieldType =
   | "textarea"
   | "select"
   | "radio"
-  | "checkbox";
+  | "checkbox"
+  | "signature";
 
 export type ProfilingFieldConfig = {
   key: keyof ProfilingDraft;
@@ -702,6 +704,22 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
         ],
       },
       {
+        title: "Digital ID Signature",
+        description:
+          "Draw the signature that will appear on your KK Digital ID. You can still update it later if your signature changes.",
+        fields: [
+          {
+            key: "digitalIdSignatureDataUrl",
+            label: "Digital ID Signature",
+            type: "signature",
+            required: true,
+            helperText:
+              "Pumirma sa loob ng kahon. Maaari mong i-clear at ulitin ang pirma mo bago magpatuloy.",
+            reviewLabel: "Digital ID Signature",
+          },
+        ],
+      },
+      {
         title: "Name Details",
         description:
           "The questionnaire marks these name fields as optional because they may be considered sensitive information.",
@@ -857,18 +875,18 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             placeholder: "Piliin ang barangay kung saan ka kasalukuyang nakatira.",
           },
           {
-            key: "currentAddressStreetAddress",
-            label: "Current Address — Street Address (Street kung nasaan ang kasalukuyang tirahan)",
-            type: "text",
-            required: true,
-            placeholder: "Example: Alcalde Jose St.",
-          },
-          {
             key: "currentAddressHouseBlockUnitNumber",
             label:
               "Current Address — House/Block/Unit Number (Number ng kasalukuyang tirahan)",
             type: "text",
             placeholder: "Example: 12-B",
+          },
+          {
+            key: "currentAddressStreetAddress",
+            label: "Current Address — Street Address (Street kung nasaan ang kasalukuyang tirahan)",
+            type: "text",
+            required: true,
+            placeholder: "Example: Alcalde Jose St.",
           },
           {
             key: "currentAddressSameAsPermanent",
@@ -897,6 +915,14 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             placeholder: "Piliin ang barangay kung saan ka permanenteng nakatira.",
           },
           {
+            key: "permanentAddressHouseBlockUnitNumber",
+            label:
+              "Permanent Address — House/Block/Unit Number (Number ng permanenteng tirahan)",
+            type: "text",
+            showIf: differentPermanentAddress,
+            placeholder: "Example: 12-B",
+          },
+          {
             key: "permanentAddressStreetAddress",
             label:
               "Permanent Address — Street Address (Street kung nasaan ang permanenteng tirahan)",
@@ -904,14 +930,6 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             required: true,
             showIf: differentPermanentAddress,
             placeholder: "Example: Alcalde Jose St.",
-          },
-          {
-            key: "permanentAddressHouseBlockUnitNumber",
-            label:
-              "Permanent Address — House/Block/Unit Number (Number ng permanenteng tirahan)",
-            type: "text",
-            showIf: differentPermanentAddress,
-            placeholder: "Example: 12-B",
           },
         ],
       },
@@ -1915,99 +1933,100 @@ function deriveWorkStatus(draft: ProfilingDraft) {
 }
 
 export function buildProfilingPayload(draft: ProfilingDraft) {
-  draft = sanitizeDraftForVisibility({ ...draft });
-  const age = parseInt(String(draft.ageAtLastBirthday || ""), 10);
-  const birthday = deriveBirthday(draft);
+  const sanitizedDraft = sanitizeDraftForVisibility({ ...draft });
+  const { digitalIdSignatureDataUrl: _digitalIdSignatureDataUrl, ...profileDraft } = sanitizedDraft;
+  const age = parseInt(String(profileDraft.ageAtLastBirthday || ""), 10);
+  const birthday = deriveBirthday(profileDraft);
   const youthAgeGroup = getAgeGroupFromAge(Number.isNaN(age) ? "" : age);
-  const currentBarangay = draft.currentAddressBarangay || "";
-  const sameAddress = sameAsPermanentAddress(draft);
+  const currentBarangay = profileDraft.currentAddressBarangay || "";
+  const sameAddress = sameAsPermanentAddress(profileDraft);
   const permanentBarangay = sameAddress
     ? currentBarangay
-    : draft.permanentAddressBarangay || "";
+    : profileDraft.permanentAddressBarangay || "";
   const permanentStreetAddress = sameAddress
-    ? draft.currentAddressStreetAddress || ""
-    : draft.permanentAddressStreetAddress || "";
+    ? profileDraft.currentAddressStreetAddress || ""
+    : profileDraft.permanentAddressStreetAddress || "";
   const permanentHouseUnit = sameAddress
-    ? draft.currentAddressHouseBlockUnitNumber || ""
-    : draft.permanentAddressHouseBlockUnitNumber || "";
-  const voted2023 = draft.votedDuring2023BarangayAndSkElections === "Yes (Oo)";
-  const voted2025 = draft.votedDuring2025MidtermAndLocalElections === "Yes (Oo)";
-  const attendedAssembly = draft.attendedKkAssemblySinceJanuary2024 === "Yes (Oo)";
+    ? profileDraft.currentAddressHouseBlockUnitNumber || ""
+    : profileDraft.permanentAddressHouseBlockUnitNumber || "";
+  const voted2023 = profileDraft.votedDuring2023BarangayAndSkElections === "Yes (Oo)";
+  const voted2025 = profileDraft.votedDuring2025MidtermAndLocalElections === "Yes (Oo)";
+  const attendedAssembly = profileDraft.attendedKkAssemblySinceJanuary2024 === "Yes (Oo)";
 
   return {
-    ...draft,
-    privacyConsentGranted: draft.privacyConsent === CONSENT_AGREE,
+    ...profileDraft,
+    privacyConsentGranted: profileDraft.privacyConsent === CONSENT_AGREE,
     sexualOrientation: normalizeSingleChoice(
-      draft.sexualOrientation,
-      draft.sexualOrientationOther
+      profileDraft.sexualOrientation,
+      profileDraft.sexualOrientationOther
     ),
     seniorHighSchoolTrack: normalizeSingleChoice(
-      draft.seniorHighSchoolTrack,
-      draft.seniorHighSchoolTrackOther
+      profileDraft.seniorHighSchoolTrack,
+      profileDraft.seniorHighSchoolTrackOther
     ),
     seniorHighSchoolStrand: normalizeSingleChoice(
-      draft.seniorHighSchoolStrand,
-      draft.seniorHighSchoolStrandOther
+      profileDraft.seniorHighSchoolStrand,
+      profileDraft.seniorHighSchoolStrandOther
     ),
     vocationalTradeCourse: normalizeSingleChoice(
-      draft.vocationalTradeCourse,
-      draft.vocationalTradeCourseOther
+      profileDraft.vocationalTradeCourse,
+      profileDraft.vocationalTradeCourseOther
     ),
     mainReasonNotInSchool: normalizeSingleChoice(
-      draft.mainReasonNotInSchool,
-      draft.mainReasonNotInSchoolOther
+      profileDraft.mainReasonNotInSchool,
+      profileDraft.mainReasonNotInSchoolOther
     ),
     primarySourceOfFunds: normalizeSingleChoice(
-      draft.primarySourceOfFunds,
-      draft.primarySourceOfFundsOther
+      profileDraft.primarySourceOfFunds,
+      profileDraft.primarySourceOfFundsOther
     ),
     businessSector: normalizeSingleChoice(
-      draft.businessSector,
-      draft.businessSectorOther
+      profileDraft.businessSector,
+      profileDraft.businessSectorOther
     ),
     disabilityType: normalizeSingleChoice(
-      draft.disabilityType,
-      draft.disabilityTypeOther
+      profileDraft.disabilityType,
+      profileDraft.disabilityTypeOther
     ),
     biggestSourceOfStress: normalizeSingleChoice(
-      draft.biggestSourceOfStress,
-      draft.biggestSourceOfStressOther
+      profileDraft.biggestSourceOfStress,
+      profileDraft.biggestSourceOfStressOther
     ),
     firstSupportInStress: normalizeSingleChoice(
-      draft.firstSupportInStress,
-      draft.firstSupportInStressOther
+      profileDraft.firstSupportInStress,
+      profileDraft.firstSupportInStressOther
     ),
     mentalHealthSupportType: normalizeSingleChoice(
-      draft.mentalHealthSupportType,
-      draft.mentalHealthSupportTypeOther
+      profileDraft.mentalHealthSupportType,
+      profileDraft.mentalHealthSupportTypeOther
     ),
     mentalHealthInfoSource: normalizeSingleChoice(
-      draft.mentalHealthInfoSource,
-      draft.mentalHealthInfoSourceOther
+      profileDraft.mentalHealthInfoSource,
+      profileDraft.mentalHealthInfoSourceOther
     ),
     contraceptiveMethodsUsed: normalizeMultiChoice(
-      draft.contraceptiveMethodsUsed,
-      draft.contraceptiveMethodsUsedOther
+      profileDraft.contraceptiveMethodsUsed,
+      profileDraft.contraceptiveMethodsUsedOther
     ),
     contraceptiveInfoSource: normalizeSingleChoice(
-      draft.contraceptiveInfoSource,
-      draft.contraceptiveInfoSourceOther
+      profileDraft.contraceptiveInfoSource,
+      profileDraft.contraceptiveInfoSourceOther
     ),
     vaccineInfoSource: normalizeSingleChoice(
-      draft.vaccineInfoSource,
-      draft.vaccineInfoSourceOther
+      profileDraft.vaccineInfoSource,
+      profileDraft.vaccineInfoSourceOther
     ),
     transportationModesUsedDaily: normalizeMultiChoice(
-      draft.transportationModesUsedDaily,
-      draft.transportationModesUsedDailyOther
+      profileDraft.transportationModesUsedDaily,
+      profileDraft.transportationModesUsedDailyOther
     ),
 
     // Legacy profile compatibility for the existing backend, admin, and digital ID flows.
-    firstName: draft.firstName?.trim() || "",
-    middleName: draft.middleName?.trim() || "",
-    lastName: draft.lastName?.trim() || "",
+    firstName: profileDraft.firstName?.trim() || "",
+    middleName: profileDraft.middleName?.trim() || "",
+    lastName: profileDraft.lastName?.trim() || "",
     suffix: "",
-    gender: draft.sexAssignedAtBirth || "",
+    gender: profileDraft.sexAssignedAtBirth || "",
     age: Number.isNaN(age) ? null : age,
     birthday,
     email: "",
@@ -2020,11 +2039,11 @@ export function buildProfilingPayload(draft: ProfilingDraft) {
     city: "Pasig City",
     barangay: currentBarangay,
     purok: "",
-    civilStatus: draft.civilStatus || "",
+    civilStatus: profileDraft.civilStatus || "",
     youthAgeGroup,
-    educationalBackground: draft.highestEducationalAttainment || "",
-    youthClassification: deriveYouthClassification(draft),
-    workStatus: deriveWorkStatus(draft),
+    educationalBackground: profileDraft.highestEducationalAttainment || "",
+    youthClassification: deriveYouthClassification(profileDraft),
+    workStatus: deriveWorkStatus(profileDraft),
     registeredSkVoter: voted2023,
     votedLastSkElections: voted2023,
     registeredNationalVoter: voted2025,
@@ -2042,6 +2061,11 @@ export function formatFieldValueForReview(
   draft: ProfilingDraft
 ) {
   const value = draft[field.key];
+
+  if (field.type === "signature") {
+    return typeof value === "string" && value ? "Ready for your Digital ID" : "";
+  }
+
   if (Array.isArray(value)) {
     const normalized = normalizeMultiChoice(value, field.otherKey ? String(draft[field.otherKey] || "") : "");
     return normalized.join(", ");
