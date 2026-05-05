@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-04-28
+Last updated: 2026-05-05
 
 ## What This Repository Is
 
@@ -171,6 +171,14 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- the youth PWA auth pages now show a branded in-progress modal during email, Google, and Facebook login/register flows
+  - `apps/youth-pwa/src/app/(auth)/login/page.tsx` and `apps/youth-pwa/src/app/(auth)/register/page.tsx` now open a shared blocking progress modal whenever auth is still running, so users no longer have to guess whether sign-in is stuck or still processing
+  - the modal uses a dedicated shared component at `apps/youth-pwa/src/components/ui/AuthProgressModal.tsx` and keeps the auth screens aligned with the same blue-gold KK visual language already used elsewhere in the app
+  - auth form inputs and social buttons now stay disabled while the modal is open so duplicate taps do not trigger overlapping sign-in attempts
+- backend seed defaults for privileged web accounts now use live-style email addresses instead of `.test`
+  - `apps/backend/utils/seedAdmin.js` now defaults to `admin@kkbapp-buting.com`
+  - `apps/backend/utils/seedSuperadmin.js` now defaults to `superadmin@kkbapp-buting.com`
+  - the hardcoded seeded passwords remain overrideable through env vars, but the default email values are now closer to a real deployment setup
 - the youth PWA KK profiling flow now uses the full 2026 Katipunan ng Kabataan profiling questionnaire from the provided Google Forms PDF
   - the old hardcoded 9-page profiling wizard was replaced with a schema-driven section flow under `apps/youth-pwa/src/app/(onboarding)/profiling/`
   - the new form covers consent, core demographics, education, employment, health, reproductive health, vaccines, civic engagement, security, disaster preparedness, urban mobility, and aspirations

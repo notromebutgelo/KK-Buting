@@ -204,7 +204,7 @@ export default function ProfilePage() {
                   </p>
                   <p className="mt-2 text-sm font-medium text-white/75">KK Youth Member</p>
                   <h1 className="mt-1 text-[24px] font-black leading-7">{displayName}</h1>
-                  <p className="mt-2 max-w-[220px] text-[13px] leading-[1.55] text-white/78">
+                  <p className="mt-2 max-w-[220px] text-[13px] leading-[1.55] text-white/78 [overflow-wrap:anywhere]">
                     {user.email || 'No email on file'}
                   </p>
                 </div>
@@ -346,9 +346,9 @@ function ProfileStat({ label, value }: { label: string; value: string }) {
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[20px] border border-[#e1ebf5] bg-[#f8fbff] px-4 py-4">
+    <div className="min-w-0 rounded-[20px] border border-[#e1ebf5] bg-[#f8fbff] px-4 py-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7e95b2]">{label}</p>
-      <p className="mt-2 text-[14px] font-bold leading-5 text-[#014384]">{value}</p>
+      <p className="mt-2 text-[14px] font-bold leading-5 text-[#014384] [overflow-wrap:anywhere]">{value}</p>
     </div>
   )
 }
