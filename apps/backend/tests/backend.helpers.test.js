@@ -147,6 +147,21 @@ const tests = [
     },
   },
   {
+    name: "merchant storefront payload builder normalizes terms arrays into text blocks",
+    run() {
+      const payload = buildMerchantPayload({
+        businessName: "Cafe Buting",
+        termsAndConditions: ["Show QR before checkout", "Promo cannot be combined"],
+      });
+
+      assert.deepEqual(payload, {
+        businessName: "Cafe Buting",
+        termsAndConditions: "Show QR before checkout\nPromo cannot be combined",
+        name: "Cafe Buting",
+      });
+    },
+  },
+  {
     name: "merchant asset helpers normalize type and size limits",
     run() {
       assert.equal(normalizeMerchantAssetType("banner"), "banner");

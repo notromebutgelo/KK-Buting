@@ -249,32 +249,33 @@ export default function HomePage() {
 
         <SectionHeader title="Partner Shops" action={{ href: '/merchants', label: 'View All Shops' }} />
         {partnerMerchants.length > 0 ? (
-          <div className="mt-3 flex items-center gap-3 overflow-hidden rounded-[24px] bg-white px-4 py-4 shadow-[0_10px_24px_rgba(1,67,132,0.06)]">
-            {partnerMerchants.map((merchant, index) => (
-              <Link
-                key={merchant.id || merchant.name || index}
-                href={`/merchants/${merchant.id}`}
-                className="flex h-[56px] w-[56px] flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f6f6f6]"
-              >
-                {merchant.imageUrl ? (
-                  <Image
-                    src={merchant.imageUrl}
-                    alt={merchant.name}
-                    width={56}
-                    height={56}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-center text-[10px] font-extrabold uppercase leading-tight text-[#014384]">
-                    {getInitials(merchant.name)}
-                  </span>
-                )}
-              </Link>
-            ))}
-
+          <div className="mt-3 flex items-center gap-2.5 overflow-hidden rounded-[24px] bg-white px-3.5 py-3.5 shadow-[0_10px_24px_rgba(1,67,132,0.06)]">
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-2.5 pr-1">
+              {partnerMerchants.map((merchant, index) => (
+                <Link
+                  key={merchant.id || merchant.name || index}
+                  href={`/merchants/${merchant.id}`}
+                  className="flex h-[54px] w-[54px] flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f6f6f6]"
+                >
+                  {merchant.imageUrl ? (
+                    <Image
+                      src={merchant.imageUrl}
+                      alt={merchant.name}
+                      width={54}
+                      height={54}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-center text-[10px] font-extrabold uppercase leading-tight text-[#014384]">
+                      {getInitials(merchant.name)}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
             <Link
               href="/merchants"
-              className="ml-auto inline-flex h-9 w-9 flex-shrink-0 items-center justify-center bg-[#edf4fb] text-[#014384]"
+              className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px] bg-[#edf4fb] text-[#014384]"
               aria-label="See all partner shops"
             >
               <svg

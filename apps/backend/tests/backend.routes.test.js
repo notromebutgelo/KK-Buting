@@ -405,6 +405,134 @@ const tests = [
       assert.equal(controllerCalled, false);
     },
   },
+  {
+    name: "merchant profile update accepts text terms and conditions payloads",
+    async run() {
+      let controllerCalled = false;
+      const roleGuard = (requiredRole) => (req, res, next) => {
+        if (req.user?.role !== requiredRole) {
+          return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+        }
+        next();
+      };
+
+      const router = loadDistModuleWithMocks("dist/src/modules/merchants/merchants.routes", {
+        "dist/src/middleware/verifyToken": {
+          verifyToken: createVerifyTokenMock(),
+        },
+        "dist/src/middleware/requireRole": {
+          requireRole: roleGuard,
+        },
+        "dist/src/modules/merchants/merchants.controller": {
+          listMerchants: async (_req, res) => res.json({ merchants: [] }),
+          getMerchant: async (_req, res) => res.json({ merchant: {} }),
+          registerMerchant: async (_req, res) => res.status(201).json({ merchantId: "merchant-1" }),
+          getMyMerchant: async (_req, res) => res.json({ merchant: {} }),
+          updateMyMerchant: async (req, res) => {
+            controllerCalled = true;
+            res.json({ merchant: req.body });
+          },
+          uploadMyMerchantAsset: async (_req, res) => res.json({ fileUrl: "https://example.com/logo.jpg" }),
+          listMyMerchantTransactions: async (_req, res) => res.json({ transactions: [] }),
+          listMyMerchantPromotions: async (_req, res) => res.json({ promotions: [] }),
+          createMyMerchantPromotion: async (_req, res) => res.status(201).json({ promotion: { id: "promo-1" } }),
+          updateMyMerchantPromotion: async (_req, res) => res.json({ promotion: { id: "promo-1" } }),
+          deleteMyMerchantPromotion: async (_req, res) => res.json({ deleted: true }),
+          listMyMerchantProducts: async (_req, res) => res.json({ products: [] }),
+          createMyMerchantProduct: async (_req, res) => res.status(201).json({ product: { id: "product-1" } }),
+          updateMyMerchantProduct: async (_req, res) => res.json({ product: { id: "product-1" } }),
+          deleteMyMerchantProduct: async (_req, res) => res.json({ deleted: true }),
+        },
+      }).default;
+
+      await withExpressServer(router, async (baseUrl) => {
+        const response = await requestJson(baseUrl, "/me", {
+          method: "PATCH",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "merchant",
+          },
+          body: {
+            businessName: "Cafe Buting",
+            shortDescription: "Friendly neighborhood drinks and snacks.",
+            termsAndConditions: "Present your youth QR before checkout.\nPromo cannot be combined with other offers.",
+          },
+        });
+
+        assert.equal(response.status, 200);
+        assert.equal(response.body.merchant.businessName, "Cafe Buting");
+        assert.equal(
+          response.body.merchant.termsAndConditions,
+          "Present your youth QR before checkout.\nPromo cannot be combined with other offers."
+        );
+      });
+
+      assert.equal(controllerCalled, true);
+    },
+  },
+  {
+    name: "merchant profile update also accepts string-array terms payloads",
+    async run() {
+      let controllerCalled = false;
+      const roleGuard = (requiredRole) => (req, res, next) => {
+        if (req.user?.role !== requiredRole) {
+          return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+        }
+        next();
+      };
+
+      const router = loadDistModuleWithMocks("dist/src/modules/merchants/merchants.routes", {
+        "dist/src/middleware/verifyToken": {
+          verifyToken: createVerifyTokenMock(),
+        },
+        "dist/src/middleware/requireRole": {
+          requireRole: roleGuard,
+        },
+        "dist/src/modules/merchants/merchants.controller": {
+          listMerchants: async (_req, res) => res.json({ merchants: [] }),
+          getMerchant: async (_req, res) => res.json({ merchant: {} }),
+          registerMerchant: async (_req, res) => res.status(201).json({ merchantId: "merchant-1" }),
+          getMyMerchant: async (_req, res) => res.json({ merchant: {} }),
+          updateMyMerchant: async (req, res) => {
+            controllerCalled = true;
+            res.json({ merchant: req.body });
+          },
+          uploadMyMerchantAsset: async (_req, res) => res.json({ fileUrl: "https://example.com/logo.jpg" }),
+          listMyMerchantTransactions: async (_req, res) => res.json({ transactions: [] }),
+          listMyMerchantPromotions: async (_req, res) => res.json({ promotions: [] }),
+          createMyMerchantPromotion: async (_req, res) => res.status(201).json({ promotion: { id: "promo-1" } }),
+          updateMyMerchantPromotion: async (_req, res) => res.json({ promotion: { id: "promo-1" } }),
+          deleteMyMerchantPromotion: async (_req, res) => res.json({ deleted: true }),
+          listMyMerchantProducts: async (_req, res) => res.json({ products: [] }),
+          createMyMerchantProduct: async (_req, res) => res.status(201).json({ product: { id: "product-1" } }),
+          updateMyMerchantProduct: async (_req, res) => res.json({ product: { id: "product-1" } }),
+          deleteMyMerchantProduct: async (_req, res) => res.json({ deleted: true }),
+        },
+      }).default;
+
+      await withExpressServer(router, async (baseUrl) => {
+        const response = await requestJson(baseUrl, "/me", {
+          method: "PATCH",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "merchant",
+          },
+          body: {
+            businessName: "Cafe Buting",
+            termsAndConditions: ["Present your youth QR before checkout.", "Promo cannot be combined with other offers."],
+          },
+        });
+
+        assert.equal(response.status, 200);
+        assert.deepEqual(response.body.merchant.termsAndConditions, [
+          "Present your youth QR before checkout.",
+          "Promo cannot be combined with other offers.",
+        ]);
+      });
+
+      assert.equal(controllerCalled, true);
+    },
+  },
 ];
 
 (async () => {

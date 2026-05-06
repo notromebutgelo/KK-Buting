@@ -1163,6 +1163,9 @@ video {
                                                                           .h-px {
   height: 1px;
 }
+                                                                          .h-\[54px\] {
+  height: 54px;
+}
                                                                           .max-h-\[96px\] {
   max-height: 96px;
 }
@@ -1315,6 +1318,9 @@ video {
 }
                                                                           .w-full {
   width: 100%;
+}
+                                                                          .w-\[54px\] {
+  width: 54px;
 }
                                                                           .min-w-0 {
   min-width: 0px;
@@ -2623,6 +2629,10 @@ video {
                                                                           .py-8 {
   padding-top: 2rem;
   padding-bottom: 2rem;
+}
+                                                                          .px-3\.5 {
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
 }
                                                                           .pb-1 {
   padding-bottom: 0.25rem;

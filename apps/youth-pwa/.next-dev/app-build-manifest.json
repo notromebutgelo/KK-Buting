@@ -66,10 +66,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(main)/scanner/page.js"
     ],
-    "/_not-found/page": [
+    "/(main)/merchants/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/(main)/merchants/page.js"
+    ],
+    "/(main)/merchants/[merchantId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(main)/merchants/[merchantId]/page.js"
     ]
   }
 }

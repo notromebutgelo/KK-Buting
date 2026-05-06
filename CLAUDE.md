@@ -346,6 +346,7 @@ The current live points default in code is now:
 - the merchant dashboard footer area was replaced with a more useful storefront summary panel instead of the earlier generic alignment note
 - deployment readiness was improved for the two Next.js apps by generating dedicated `package-lock.json` files inside `apps/admin-panel` and `apps/youth-pwa`
 - the youth PWA home and merchant discovery surfaces no longer rely on sample merchant or promo content and now show backend-driven empty states when live data is unavailable
+- the youth PWA home `Partner Shops` strip now uses tighter padding and a balanced logo row so the last merchant logo sits closer to the arrow CTA instead of leaving an oversized gap before `View All Shops`
 - a root workspace setup now exists with npm workspaces plus shared root scripts for backend, admin panel, youth PWA, and merchant app tasks
 - the youth PWA auth and scanner result routes now wrap `useSearchParams()` usage in `Suspense`-safe client components, and the youth production build completes successfully again
 - the youth PWA deployment flow is hardened so `manifest.json` and `sw.js` bypass auth middleware, and the root layout now includes the non-deprecated `mobile-web-app-capable` meta tag alongside the Apple PWA metadata
@@ -396,6 +397,8 @@ The current live points default in code is now:
   - production and preview builds now require a real public `EXPO_PUBLIC_API_URL` instead of silently falling back to localhost
   - request auth now refreshes Firebase ID tokens from `auth.currentUser.getIdToken()` before backend calls
   - auth session sync now uses `onIdTokenChanged`, so long-lived merchant APK sessions refresh more reliably instead of depending only on the initial login token
+  - merchant storefront profile saves now accept `termsAndConditions` as the same plain text block used by the mobile/admin UIs, instead of being rejected by a backend validator that incorrectly expected an array; the merchant mobile app also now surfaces backend validation detail lines when a save fails
+  - the merchant mobile app now submits `termsAndConditions` as newline-split string arrays for compatibility with the still-older hosted backend validator, while the repo backend now accepts either strings or string arrays and normalizes array submissions back into a text block for storage
 - merchant APK deployment target is currently the existing Render backend hosted at `https://kk-buting-admin-panel.onrender.com`
   - for the merchant app, the API base URL should be `https://kk-buting-admin-panel.onrender.com/api`
   - despite the Render service name, this is currently being treated as the backend deployment
@@ -407,6 +410,10 @@ The current live points default in code is now:
   - the Expo SDK 54 Babel preset can require `react-refresh/babel` from the app-level resolution path during Metro bundling
   - in this workspace snapshot, `react-refresh` was only present under nested package trees, which could make `npx expo start` fail with `Cannot find module 'react-refresh/babel'`
   - keeping `react-refresh` explicit in merchant-app devDependencies makes the Babel dependency path less fragile during local dev
+- merchant app local start scripts now default to Expo LAN mode and expose explicit fallback scripts for tunnel / cache-reset startup
+  - `apps/merchant-app/package.json` now uses `expo start --lan` for the default start path so Expo Go is less likely to receive a localhost-only QR target that a physical phone cannot reach
+  - `npm run start:tunnel --workspace merchant-app` is now the fallback for difficult networks or machines with multiple adapters
+  - `npm run start:clear --workspace merchant-app` is now the intentional cache-reset path instead of needing to remember the full Expo CLI flags manually
 - current local troubleshooting setup for `apps/merchant-app/.env` now points directly to `https://kk-buting-admin-panel.onrender.com/api`
   - this is specifically to avoid Expo Go/dev sessions rewriting localhost to a LAN IP like `192.168.x.x:4000`
   - after changing the local `.env`, Expo/Metro must be restarted so the new `EXPO_PUBLIC_API_URL` is picked up

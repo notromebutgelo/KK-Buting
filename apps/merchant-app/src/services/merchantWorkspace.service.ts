@@ -27,6 +27,21 @@ function mapBackendStatus(status: string | undefined): MerchantStatus {
   return 'pending'
 }
 
+function normalizeTextBlock(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || '').trim()).filter(Boolean).join('\n')
+  }
+
+  return String(value || '')
+}
+
+function toTextLines(value: unknown) {
+  return String(value || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
 function mapBackendProfile(payload: Record<string, unknown>, user: MerchantUser | null | undefined): MerchantProfile {
   const status = mapBackendStatus(String(payload.status || 'pending'))
 
@@ -41,7 +56,7 @@ function mapBackendProfile(payload: Record<string, unknown>, user: MerchantUser 
     shortDescription: String(payload.shortDescription || payload.description || ''),
     businessInfo: String(payload.businessInfo || ''),
     discountInfo: String(payload.discountInfo || ''),
-    termsAndConditions: String(payload.termsAndConditions || ''),
+    termsAndConditions: normalizeTextBlock(payload.termsAndConditions),
     pointsPolicy: String(
       payload.pointsPolicy ||
         'Earn 10 points for every PHP 100 spent at this shop. Present your youth QR during checkout.'
@@ -120,7 +135,12 @@ function mapBackendNotification(item: Record<string, unknown>): MerchantNotifica
 
 function rethrowApiError(error: unknown): never {
   if (axios.isAxiosError(error)) {
-    throw new Error(String(error.response?.data?.error || error.message || 'Request failed'))
+    const baseMessage = String(error.response?.data?.error || error.message || 'Request failed')
+    const details = Array.isArray(error.response?.data?.details)
+      ? error.response?.data?.details.map((detail: unknown) => String(detail)).filter(Boolean).join('\n')
+      : ''
+
+    throw new Error(details ? `${baseMessage}\n${details}` : baseMessage)
   }
 
   throw error
@@ -144,7 +164,7 @@ export async function updateMerchantProfile(
       shortDescription: patch.shortDescription,
       businessInfo: patch.businessInfo,
       discountInfo: patch.discountInfo,
-      termsAndConditions: patch.termsAndConditions,
+      termsAndConditions: toTextLines(patch.termsAndConditions),
       pointsPolicy: patch.pointsPolicy,
       logoUrl: patch.logoUrl,
       bannerUrl: patch.bannerUrl,

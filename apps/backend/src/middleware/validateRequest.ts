@@ -137,6 +137,44 @@ function validateStringArray(
   }
 }
 
+function validateStringOrStringArray(
+  errors: string[],
+  record: AnyRecord,
+  key: string,
+  label: string,
+  options: { required?: boolean; minItems?: number; maxLength?: number } = {},
+) {
+  const value = record[key];
+
+  if (value === undefined || value === null || value === "") {
+    if (options.required) {
+      errors.push(`${label} is required.`);
+    }
+    return;
+  }
+
+  if (typeof value === "string") {
+    validateString(errors, record, key, label, { maxLength: options.maxLength, required: options.required });
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    validateStringArray(errors, record, key, label, { required: options.required, minItems: options.minItems });
+
+    if (options.maxLength) {
+      for (const entry of value) {
+        if (typeof entry === "string" && entry.trim().length > options.maxLength) {
+          errors.push(`${label} entries must be at most ${options.maxLength} characters.`);
+          break;
+        }
+      }
+    }
+    return;
+  }
+
+  errors.push(`${label} must be a string or an array of strings.`);
+}
+
 function validateNumber(
   errors: string[],
   record: AnyRecord,
@@ -438,7 +476,7 @@ export function validateMerchantProfileUpdateRequest(req: Request) {
   }
 
   validateNumber(errors, body, "pointsRate", "pointsRate", { min: 0 });
-  validateStringArray(errors, body, "termsAndConditions", "termsAndConditions");
+  validateStringOrStringArray(errors, body, "termsAndConditions", "termsAndConditions", { maxLength: 2000 });
 
   const businessInfo = body.businessInfo;
   if (businessInfo !== undefined && businessInfo !== null && !isPlainObject(businessInfo) && typeof businessInfo !== "string") {

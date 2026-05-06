@@ -5,6 +5,14 @@ export function normalizeStringList(value: unknown): string[] {
   return value.map((entry) => String(entry || "").trim()).filter(Boolean);
 }
 
+function normalizeTextBlock(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || "").trim()).filter(Boolean).join("\n");
+  }
+
+  return String(value || "");
+}
+
 export function normalizeMerchant(record: AnyRecord): AnyRecord {
   const merchant = { ...record };
   return {
@@ -16,6 +24,7 @@ export function normalizeMerchant(record: AnyRecord): AnyRecord {
     imageUrl: merchant.imageUrl || merchant.bannerUrl || merchant.logoUrl || "",
     bannerUrl: merchant.bannerUrl || merchant.imageUrl || "",
     pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 10),
+    termsAndConditions: normalizeTextBlock(merchant.termsAndConditions),
     pointsPolicy:
       merchant.pointsPolicy ||
       "Earn 10 points for every PHP 100 spent at this shop. Present your youth QR during checkout.",
@@ -45,7 +54,11 @@ export function buildMerchantPayload(data: Record<string, unknown>): AnyRecord {
 
   for (const [key, value] of Object.entries(data)) {
     if (allowedKeys.includes(key) && value !== undefined) {
-      payload[key] = value;
+      if (key === "termsAndConditions" && Array.isArray(value)) {
+        payload[key] = value.map((entry) => String(entry || "").trim()).filter(Boolean).join("\n");
+      } else {
+        payload[key] = value;
+      }
     }
   }
 
