@@ -6,9 +6,6 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import {
-  beginFacebookRedirectSignIn,
-  completeSocialRedirectSignIn,
-  getPendingSocialRedirectProvider,
   signIn,
   signInWithGoogle,
 } from "@/services/auth.service";
@@ -29,63 +26,15 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [facebookLoading, setFacebookLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const authInProgress = isLoading || googleLoading || facebookLoading;
+  const authInProgress = isLoading || googleLoading;
   const authProgressTitle = isLoading
     ? "Signing You In"
-    : googleLoading
-      ? "Continuing with Google"
-      : "Continuing with Facebook";
+    : "Continuing with Google";
   const authProgressMessage = isLoading
     ? "Please wait while we verify your account and open your dashboard."
-    : googleLoading
-      ? "Please wait while we complete your Google sign-in and sync your KK account."
-      : "Please wait while we complete your Facebook sign-in and sync your KK account.";
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function finishSocialRedirect() {
-      if (getPendingSocialRedirectProvider() === "facebook") {
-        setFacebookLoading(true);
-      }
-
-      try {
-        const result = await completeSocialRedirectSignIn();
-
-        if (!result || cancelled) {
-          return;
-        }
-
-        await persistYouthSession({ token: result.token, maxAgeSeconds: 60 * 60 * 24 * 30 });
-        setUser(result.user);
-        setToken(result.token);
-
-        const requestedRedirect = searchParams.get("redirect") || result.completedPath || "/home";
-        const redirect = await getPostAuthRedirect(requestedRedirect);
-
-        if (!cancelled) {
-          router.replace(redirect);
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setError(err?.message || "Facebook sign-in failed. Please try again.");
-        }
-      } finally {
-        if (!cancelled) {
-          setFacebookLoading(false);
-        }
-      }
-    }
-
-    finishSocialRedirect();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router, searchParams, setToken, setUser]);
+    : "Please wait while we complete your Google sign-in and sync your KK account.";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -138,18 +87,6 @@ export default function LoginPage() {
       setError(err?.message || "Google sign-in failed. Please try again.");
     } finally {
       setGoogleLoading(false);
-    }
-  };
-
-  const handleFacebookSignIn = async () => {
-    setError(null);
-    setFacebookLoading(true);
-
-    try {
-      await beginFacebookRedirectSignIn(searchParams.get("redirect") || "/home");
-    } catch (err: any) {
-      setError(err?.message || "Facebook sign-in failed. Please try again.");
-      setFacebookLoading(false);
     }
   };
 
@@ -264,10 +201,10 @@ export default function LoginPage() {
         </div>
 
         {/* Social buttons */}
-        <div className="sk-social-row">
+        <div className="sk-social-center">
           <button
             type="button"
-            className="sk-social-btn"
+            className="sk-social-google-btn"
             aria-label="Continue with Google"
             onClick={handleGoogleSignIn}
             disabled={authInProgress}
@@ -278,22 +215,7 @@ export default function LoginPage() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-          </button>
-          <button
-            type="button"
-            className="sk-social-btn"
-            aria-label="Continue with Facebook"
-            onClick={handleFacebookSignIn}
-            disabled={authInProgress}
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20">
-              <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-            </svg>
-          </button>
-          <button type="button" className="sk-social-btn" aria-label="Continue with Apple">
-            <svg viewBox="0 0 24 24" width="20" height="20">
-              <path fill="#000" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
-            </svg>
+            <span>{googleLoading ? "Connecting Google..." : "Continue with Google"}</span>
           </button>
         </div>
 
@@ -545,29 +467,34 @@ export default function LoginPage() {
         }
 
         /* ---- Social ---- */
-        .sk-social-row {
+        .sk-social-center {
           display: flex;
           justify-content: center;
-          gap: 16px;
           margin-bottom: 32px;
         }
-        .sk-social-btn {
-          width: 52px;
-          height: 52px;
-          border-radius: 50%;
+        .sk-social-google-btn {
+          min-width: 220px;
+          max-width: 100%;
+          min-height: 52px;
+          border-radius: 999px;
           background: #fff;
           border: 1.5px solid #e2e8f0;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
+          gap: 10px;
+          padding: 0 22px;
+          color: #1a1a2e;
+          font-size: 14px;
+          font-weight: 600;
           transition: border-color 0.18s, box-shadow 0.18s;
         }
-        .sk-social-btn:disabled {
+        .sk-social-google-btn:disabled {
           opacity: 0.7;
           cursor: not-allowed;
         }
-        .sk-social-btn:hover {
+        .sk-social-google-btn:hover {
           border-color: #1e4d8c;
           box-shadow: 0 2px 8px rgba(30,77,140,0.12);
         }

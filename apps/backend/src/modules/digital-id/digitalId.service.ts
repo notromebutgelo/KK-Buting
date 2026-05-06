@@ -4,6 +4,7 @@ import { generateIdNumber } from "../../../utils/generateIdNumber";
 import { storage } from "../../config/firebase";
 import { randomUUID } from "crypto";
 import { generateQrToken } from "../../../utils/renerateQrToken";
+import { createNotificationsForRoles } from "../notifications/notifications.service";
 
 const REQUIRED_DOCUMENTS_BY_GROUP: Record<string, string[]> = {
   "Child Youth": ["certificate_of_residency", "school_id", "id_photo"],
@@ -315,6 +316,24 @@ export async function getMyVerificationStatus(uid: string) {
 }
 
 export async function uploadDocument(uid: string, docType: string, fileUrl: string) {
+  const profileRef = db.collection("kkProfiling").doc(uid);
+  const [profileSnap, existingDocumentsSnap, userSnap] = await Promise.all([
+    profileRef.get(),
+    db.collection("documents").where("profileId", "==", uid).get(),
+    db.collection("users").doc(uid).get(),
+  ]);
+  const profile = profileSnap.exists ? profileSnap.data() || {} : {};
+  const existingDocuments = existingDocumentsSnap.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() || {}),
+  })) as Record<string, any>[];
+  const user = userSnap.exists ? userSnap.data() || {} : {};
+  const requiredTypes = getRequiredDocumentTypes(profile.youthAgeGroup);
+  const hadAllRequiredDocuments = requiredTypes.every((type) =>
+    existingDocuments.some((document) => String(document.documentType || "") === type)
+  );
+  const previousQueueStatus = computeQueueStatus(profile, existingDocuments);
+
   await db.collection("documents").add({
     profileId: uid,
     documentType: docType,
@@ -326,7 +345,8 @@ export async function uploadDocument(uid: string, docType: string, fileUrl: stri
     reviewRequestedAt: null,
     uploadedAt: FieldValue.serverTimestamp(),
   });
-  await db.collection("kkProfiling").doc(uid).set(
+
+  await profileRef.set(
     {
       documentsSubmitted: true,
       submittedAt: FieldValue.serverTimestamp(),
@@ -339,6 +359,37 @@ export async function uploadDocument(uid: string, docType: string, fileUrl: stri
     },
     { merge: true }
   );
+
+  const hasAllRequiredDocuments =
+    hadAllRequiredDocuments ||
+    requiredTypes.every((type) =>
+      type === docType ||
+      existingDocuments.some((document) => String(document.documentType || "") === type)
+    );
+  const shouldNotifyAdmins =
+    previousQueueStatus === "resubmission_requested" ||
+    previousQueueStatus === "rejected" ||
+    (!hadAllRequiredDocuments && hasAllRequiredDocuments);
+
+  if (shouldNotifyAdmins) {
+    const fullName = [profile.firstName, profile.middleName, profile.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    const label = fullName || user.UserName || user.email || "A youth member";
+
+    await createNotificationsForRoles(["admin", "superadmin"], {
+      audience: "admin",
+      type: "info",
+      title: "Verification ready for review",
+      body: `${label} uploaded verification documents and is ready for admin review.`,
+      link: "/verification",
+      metadata: {
+        userId: uid,
+        documentType: docType,
+      },
+    });
+  }
 }
 
 export async function uploadDocumentFromBase64(

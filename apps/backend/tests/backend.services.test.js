@@ -31,6 +31,7 @@ const tests = [
         added: null,
         batchUpdates: [],
         committed: false,
+        directUpdates: [],
       };
 
       const db = {
@@ -40,6 +41,21 @@ const tests = [
             add: async (payload) => {
               state.added = payload;
               return { id: "n-3" };
+            },
+            doc(id) {
+              return {
+                id,
+                async get() {
+                  const doc = notificationDocs.find((entry) => entry.id === id);
+                  return {
+                    exists: Boolean(doc),
+                    data: () => (doc ? doc.data() : undefined),
+                  };
+                },
+                async set(payload, options) {
+                  state.directUpdates.push({ id, payload, options });
+                },
+              };
             },
             where(field, operator, value) {
               assert.equal(field, "recipientUid");
@@ -96,6 +112,15 @@ const tests = [
       assert.equal(state.batchUpdates.length, 1);
       assert.equal(state.batchUpdates[0].ref.id, "n-1");
       assert.equal(state.committed, true);
+
+      const single = await service.markNotificationRead("n-1", "user-1");
+      assert.equal(single.id, "n-1");
+      assert.equal(single.read, true);
+      assert.equal(state.directUpdates.length, 1);
+      assert.equal(state.directUpdates[0].id, "n-1");
+
+      const missing = await service.markNotificationRead("missing", "user-1");
+      assert.equal(missing, null);
     },
   },
   {

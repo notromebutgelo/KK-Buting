@@ -801,10 +801,10 @@ function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {
             <p className="text-[0.42rem] font-bold uppercase tracking-[0.09em] text-[#666d67]">
               In case of emergency, please contact:
             </p>
-            <p className="mt-[2.6%] text-[0.74rem] font-black uppercase leading-[1.05] tracking-[0.01em] text-[#1f2621]">
+            <p className="mt-[2.6%] text-[0.74rem] font-black leading-[1.05] tracking-[0.01em] text-[#1f2621]">
               {emergencyContactName} - {emergencyContactPhone}
             </p>
-            <p className="mt-[2.2%] text-[0.38rem] font-semibold uppercase tracking-[0.12em] text-[#6b726c]">
+            <p className="mt-[2.2%] text-[0.38rem] font-semibold tracking-[0.08em] text-[#6b726c]">
               Relationship: {emergencyContactRelationship}
             </p>
           </div>
@@ -865,7 +865,7 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
 
   const frontBg = await loadImageData('/images/KK ID - Front BG.png')
   const photoData = member.photoUrl || member.profilePhotoUrl
-    ? await loadImageData(member.photoUrl || member.profilePhotoUrl || '').catch(() => '')
+    ? await loadImageData(member.photoUrl || member.profilePhotoUrl || '', 'jpeg').catch(() => '')
     : ''
   const signatureUrl = getMemberSignatureUrl(member)
   const signatureData = signatureUrl
@@ -893,15 +893,15 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
 
   doc.setTextColor(11, 47, 91)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.1)
-  doc.text(member.memberId || member.profile?.idNumber || 'DRAFT', 89, 70, { align: 'center' })
+  doc.setFontSize(6.8)
+  doc.text(member.memberId || member.profile?.idNumber || 'DRAFT', 89, 74, { align: 'center', maxWidth: 78 })
 
   if (photoData) {
-    doc.addImage(photoData, 'JPEG', 53, 83, 72, 94)
+    doc.addImage(photoData, 'JPEG', 53, 86, 72, 94)
   } else {
     doc.setTextColor(1, 67, 132)
     doc.setFontSize(22)
-    doc.text(getInitials(fullName), 89, 138, { align: 'center' })
+    doc.text(getInitials(fullName), 89, 142, { align: 'center' })
   }
 
   if (signatureData) {
@@ -981,18 +981,42 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   return doc
 }
 
-async function loadImageData(url: string) {
+async function loadImageData(url: string, output: 'png' | 'jpeg' = 'png') {
   const response = await fetch(url)
   const blob = await response.blob()
-  return await blobToDataUrl(blob)
+  const objectUrl = URL.createObjectURL(blob)
+
+  try {
+    return await rasterizeImage(objectUrl, output)
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
 }
 
-function blobToDataUrl(blob: Blob) {
+function rasterizeImage(url: string, output: 'png' | 'jpeg') {
   return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onloadend = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('Failed to load image'))
-    reader.readAsDataURL(blob)
+    const image = new Image()
+    image.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth || image.width
+      canvas.height = image.naturalHeight || image.height
+
+      const context = canvas.getContext('2d')
+      if (!context) {
+        reject(new Error('Failed to prepare image canvas'))
+        return
+      }
+
+      if (output === 'jpeg') {
+        context.fillStyle = '#ffffff'
+        context.fillRect(0, 0, canvas.width, canvas.height)
+      }
+
+      context.drawImage(image, 0, 0)
+      resolve(canvas.toDataURL(output === 'jpeg' ? 'image/jpeg' : 'image/png', 0.96))
+    }
+    image.onerror = () => reject(new Error('Failed to load image'))
+    image.src = url
   })
 }
 
@@ -1042,15 +1066,15 @@ function buildFullName(profile: DigitalIdDetail['profile']) {
 }
 
 function getEmergencyContactName(member: DigitalIdDetail) {
-  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactName, 'NOT PROVIDED YET')
+  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactName, 'Not Provided Yet')
 }
 
 function getEmergencyContactRelationship(member: DigitalIdDetail) {
-  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactRelationship, 'NOT PROVIDED YET')
+  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactRelationship, 'Not Provided Yet')
 }
 
 function getEmergencyContactPhone(member: DigitalIdDetail) {
-  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactPhone, 'NOT PROVIDED YET')
+  return formatEmergencyContactField(member.profile?.digitalIdEmergencyContactPhone, 'Not Provided Yet')
 }
 
 function getMemberSignatureUrl(member: DigitalIdDetail) {
@@ -1067,7 +1091,26 @@ function getEmergencyContactSummary(member: DigitalIdDetail) {
 
 function formatEmergencyContactField(value: string | undefined, fallback: string) {
   const nextValue = String(value || '').trim()
-  return nextValue || fallback
+  if (!nextValue) {
+    return fallback
+  }
+
+  if (/^\d[\d\s()+-]*$/.test(nextValue)) {
+    return nextValue
+  }
+
+  return nextValue
+    .toLowerCase()
+    .split(/\s+/)
+    .map((part) =>
+      part
+        .split('-')
+        .map((segment) =>
+          segment ? segment.charAt(0).toUpperCase() + segment.slice(1) : ''
+        )
+        .join('-')
+    )
+    .join(' ')
 }
 
 function getDigitalIdValidThru(member: DigitalIdDetail) {

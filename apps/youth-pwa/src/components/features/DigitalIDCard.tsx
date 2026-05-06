@@ -33,15 +33,15 @@ export default function DigitalIDCard({
     .toUpperCase()
   const emergencyContactName = formatEmergencyContactValue(
     profile.digitalIdEmergencyContactName,
-    'NOT PROVIDED YET'
+    'Not Provided Yet'
   )
   const emergencyContactPhone = formatEmergencyContactValue(
     profile.digitalIdEmergencyContactPhone,
-    'NOT PROVIDED YET'
+    'Not Provided Yet'
   )
   const emergencyContactRelationship = formatEmergencyContactValue(
     profile.digitalIdEmergencyContactRelationship,
-    'NOT PROVIDED YET'
+    'Not Provided Yet'
   )
   const memberSignatureUrl = signatureUrl || profile.digitalIdSignatureUrl || null
   const validThru = getDigitalIdValidThru(profile.verifiedAt)
@@ -223,10 +223,10 @@ export function DigitalIdBack({
           <p className="text-[0.38rem] font-bold uppercase tracking-[0.09em] text-[#666d67] sm:text-[0.42rem]">
             In case of emergency, please contact:
           </p>
-          <p className="mt-[2.4%] text-[0.66rem] font-black uppercase leading-[1.08] tracking-[0.01em] text-[#1f2621] sm:mt-[2.6%] sm:text-[0.74rem] sm:leading-[1.05]">
+          <p className="mt-[2.4%] text-[0.66rem] font-black leading-[1.08] tracking-[0.01em] text-[#1f2621] sm:mt-[2.6%] sm:text-[0.74rem] sm:leading-[1.05]">
             {emergencyContactName} - {emergencyContactPhone}
           </p>
-          <p className="mt-[1.8%] text-[0.34rem] font-semibold uppercase tracking-[0.12em] text-[#6b726c] sm:mt-[2.2%] sm:text-[0.38rem]">
+          <p className="mt-[1.8%] text-[0.34rem] font-semibold tracking-[0.08em] text-[#6b726c] sm:mt-[2.2%] sm:text-[0.38rem]">
             Relationship: {emergencyContactRelationship}
           </p>
         </div>
@@ -312,7 +312,26 @@ function getInitials(value: string) {
 
 function formatEmergencyContactValue(value: string | undefined, fallback: string) {
   const nextValue = String(value || '').trim()
-  return nextValue || fallback
+  if (!nextValue) {
+    return fallback
+  }
+
+  if (/^\d[\d\s()+-]*$/.test(nextValue)) {
+    return nextValue
+  }
+
+  return nextValue
+    .toLowerCase()
+    .split(/\s+/)
+    .map((part) =>
+      part
+        .split('-')
+        .map((segment) =>
+          segment ? segment.charAt(0).toUpperCase() + segment.slice(1) : ''
+        )
+        .join('-')
+    )
+    .join(' ')
 }
 
 function getDigitalIdValidThru(value?: string) {

@@ -191,13 +191,21 @@ The current live points default in code is now:
   - the member ID number on the front card was later simplified again into a single readable line above the photo area, removing the extra badge container so the signature/photo block keeps more vertical space
   - the youth PWA back-card padding was then increased again so the lower signatory stack stays clear of the border line on the mobile Digital ID page
   - the youth Digital ID action button now uses `Save ID` instead of the old browser `Save / Print ID` flow, and it exports a direct PDF download with the front and back card laid out explicitly so members are not sent through the print dialog or a cropped browser print view
+  - the youth PDF export now proxies remote Firebase Storage image assets through a same-origin App Router route before rasterizing them, fixing the case where saved PDFs could lose the member photo and e-signature even though the live card still displayed them in-page
+  - the youth PDF export front/back layout now captures hidden high-resolution copies of the same `DigitalIdFace` and `DigitalIdBack` components used in the live preview, replacing the older duplicate coordinate-based drawing path so saved PDFs keep the same padding and positioning seen on the Digital ID page
+  - the youth Save ID exporter now normalizes same-origin absolute image URLs back to local paths before fetch/inlining, and the image-proxy route now also accepts same-origin absolute asset URLs plus loopback `http://localhost` image requests when the app is running locally
+  - the youth Save ID flow was then moved off the browser `foreignObject` DOM-to-canvas capture path and back onto direct `jsPDF` drawing with fetched/proxied image blobs, which avoids the remaining `SecurityError: Tainted canvases may not be exported` failure that could still block Digital ID downloads in the browser
+  - the youth/admin Digital ID back emergency-contact lines now render in proper title-style capitalization instead of forced all-caps, and the youth/admin PDF exporters now rasterize the member photo more reliably before embedding it so saved PDFs keep the photo visible with steadier front-card positioning
   - signature export from the pad now trims excess transparent canvas space around the actual strokes so the signature sits more naturally on the card line
   - verification checks after the rollout: `npx tsc --noEmit -p apps/youth-pwa/tsconfig.json`, `npx tsc --noEmit -p apps/admin-panel/tsconfig.json`, `npm run build:backend`, and `npm run test:backend` all passed
-  - current local build blockers still remain outside the TypeScript/backend checks: `npm run build:youth` now fails during Next page-data collection for `/icon.png` and `/api/session`, while `npm run build:admin` currently fails on this machine with `spawn EPERM`
-- the youth PWA auth pages now show a branded in-progress modal during email, Google, and Facebook login/register flows
+  - verification checks after the latest youth PDF export alignment update: `npx tsc --noEmit -p apps/youth-pwa/tsconfig.json` and `npm run build:youth` both passed locally again; the previously observed youth page-data collection failure for `/icon.png` and `/api/session` is no longer reproducing on this machine
+  - `apps/youth-pwa/next.config.js` now sends `next dev` output to `.next-dev` while keeping production builds on `.next`, so running `npm run build:youth` no longer overwrites the asset set used by a live youth `next dev` session and cause localhost pages to go blank with `text/html` MIME errors for `/_next/static/*`
+  - the remaining local build blocker in this repo snapshot is still `npm run build:admin`, which may continue to fail on this machine with `spawn EPERM`
+- the youth PWA auth pages now show a branded in-progress modal during email and Google login/register flows
   - `apps/youth-pwa/src/app/(auth)/login/page.tsx` and `apps/youth-pwa/src/app/(auth)/register/page.tsx` now open a shared blocking progress modal whenever auth is still running, so users no longer have to guess whether sign-in is stuck or still processing
   - the modal uses a dedicated shared component at `apps/youth-pwa/src/components/ui/AuthProgressModal.tsx` and keeps the auth screens aligned with the same blue-gold KK visual language already used elsewhere in the app
   - auth form inputs and social buttons now stay disabled while the modal is open so duplicate taps do not trigger overlapping sign-in attempts
+  - the youth login and register screens now keep only the Google social sign-in option, and that remaining Google CTA is centered as a single deliberate action instead of sitting in the earlier multi-provider icon row
 - backend seed defaults for privileged web accounts now use live-style email addresses instead of `.test`
   - `apps/backend/utils/seedAdmin.js` now defaults to `admin@kkbapp-buting.com`
   - `apps/backend/utils/seedSuperadmin.js` now defaults to `superadmin@kkbapp-buting.com`
@@ -269,6 +277,9 @@ The current live points default in code is now:
   - clicking outside the dropdown closes it
   - empty state and loading spinner are shown appropriately
   - the existing `/api/notifications/me` endpoint works for any Firebase-authenticated user including admin UIDs, so no backend changes were needed
+  - the bell now also polls periodically and refreshes on window focus so new admin/superadmin notifications appear more reliably during active sessions
+  - individual notifications are now clickable, mark themselves read through a dedicated backend route, visually gray out after being opened, and redirect admins to the linked workspace such as `/verification`, `/youth`, `/promotions`, or `/digital-ids`
+  - youth account creation and completed verification-document submissions now write admin/superadmin notification records so those events actually show up in the bell for follow-up
 - the admin dashboard has been rebuilt around a shared dashboard component system with distinct admin and superadmin views
   - `apps/admin-panel/src/app/(dashboard)/dashboard/page.tsx` now acts as a thin coordinator: it fetches `/api/admin/dashboard`, resolves the role from `localStorage` (`kk-admin-role`), shows loading skeletons, and renders either `AdminDashboardView` or `SuperadminDashboardView`
   - reusable dashboard primitives now live under `apps/admin-panel/src/components/dashboard/`, including page intros, KPI cards, chart cards, status lists, activity feeds, legend grids, and dashboard-specific Recharts wrappers

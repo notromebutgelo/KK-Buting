@@ -56,6 +56,8 @@ export default function DigitalIDPage() {
   )
   const isUnderReview = !isVerified && hasSubmittedDocuments && queueStatus !== 'resubmission_requested'
   const needsResubmission = queueStatus === 'resubmission_requested'
+  const digitalIdPhotoUrl = idData?.photoUrl || profile?.idPhotoUrl || null
+  const digitalIdSignatureUrl = idData?.digitalIdSignatureUrl || profile?.digitalIdSignatureUrl || null
 
   useEffect(() => {
     let active = true
@@ -114,8 +116,8 @@ export default function DigitalIDPage() {
       const pdf = await buildDigitalIdPdf({
         profile,
         memberId: idData.memberId,
-        photoUrl: idData.photoUrl || profile.idPhotoUrl || null,
-        signatureUrl: idData.digitalIdSignatureUrl || profile.digitalIdSignatureUrl || null,
+        photoUrl: digitalIdPhotoUrl,
+        signatureUrl: digitalIdSignatureUrl,
       })
 
       pdf.save(`${sanitizeFileName(idData.memberId || displayName || 'kk_digital_id')}.pdf`)
@@ -421,8 +423,8 @@ export default function DigitalIDPage() {
             <DigitalIDCard
               profile={profile}
               memberId={idData.memberId}
-              photoUrl={idData.photoUrl || profile.idPhotoUrl}
-              signatureUrl={idData.digitalIdSignatureUrl || profile.digitalIdSignatureUrl}
+              photoUrl={digitalIdPhotoUrl}
+              signatureUrl={digitalIdSignatureUrl}
             />
             <p className="text-center text-[13px] text-[#5c7aa3]">
               Present this Digital ID to KK officers whenever they need to verify your membership.
@@ -438,12 +440,12 @@ export default function DigitalIDPage() {
               onClick={handleSaveId}
               disabled={isSaving}
               className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
-            >
-              {isSaving ? 'Saving ID...' : 'Save ID'}
-            </button>
-          </div>
-        )}
-      </section>
+              >
+                {isSaving ? 'Saving ID...' : 'Save ID'}
+              </button>
+            </div>
+          )}
+        </section>
 
       <AlertModal
         isOpen={Boolean(error)}
@@ -529,7 +531,7 @@ async function buildDigitalIdPdf({
 
   const [frontBg, photoData, signatureData] = await Promise.all([
     loadImageData('/images/KK ID - Front BG.png'),
-    photoUrl ? loadImageData(photoUrl).catch(() => '') : Promise.resolve(''),
+    photoUrl ? loadImageData(photoUrl, 'jpeg').catch(() => '') : Promise.resolve(''),
     signatureUrl ? loadImageData(signatureUrl).catch(() => '') : Promise.resolve(''),
   ])
 
@@ -538,15 +540,15 @@ async function buildDigitalIdPdf({
   const validThru = getDigitalIdValidThru(profile.verifiedAt)
   const emergencyContactName = formatEmergencyContactValue(
     profile.digitalIdEmergencyContactName,
-    'NOT PROVIDED YET'
+    'Not Provided Yet'
   )
   const emergencyContactPhone = formatEmergencyContactValue(
     profile.digitalIdEmergencyContactPhone,
-    'NOT PROVIDED YET'
+    'Not Provided Yet'
   )
   const emergencyContactRelationship = formatEmergencyContactValue(
     profile.digitalIdEmergencyContactRelationship,
-    'NOT PROVIDED YET'
+    'Not Provided Yet'
   )
 
   doc.setFillColor(245, 249, 255)
@@ -564,15 +566,15 @@ async function buildDigitalIdPdf({
 
   doc.setTextColor(11, 47, 91)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.1)
-  doc.text(memberId || 'DRAFT', 89, 70, { align: 'center' })
+  doc.setFontSize(6.8)
+  doc.text(memberId || 'DRAFT', 89, 74, { align: 'center', maxWidth: 78 })
 
   if (photoData) {
-    doc.addImage(photoData, 'JPEG', 53, 83, 72, 94)
+    doc.addImage(photoData, 'JPEG', 53, 86, 72, 94)
   } else {
     doc.setTextColor(1, 67, 132)
     doc.setFontSize(22)
-    doc.text(getInitials(fullName), 89, 138, { align: 'center' })
+    doc.text(getInitials(fullName), 89, 142, { align: 'center' })
   }
 
   if (signatureData) {
@@ -688,7 +690,26 @@ function formatShortDate(value?: string) {
 
 function formatEmergencyContactValue(value: string | undefined, fallback: string) {
   const nextValue = String(value || '').trim()
-  return nextValue || fallback
+  if (!nextValue) {
+    return fallback
+  }
+
+  if (/^\d[\d\s()+-]*$/.test(nextValue)) {
+    return nextValue
+  }
+
+  return nextValue
+    .toLowerCase()
+    .split(/\s+/)
+    .map((part) =>
+      part
+        .split('-')
+        .map((segment) =>
+          segment ? segment.charAt(0).toUpperCase() + segment.slice(1) : ''
+        )
+        .join('-')
+    )
+    .join(' ')
 }
 
 function getDigitalIdValidThru(value?: string) {
@@ -707,19 +728,79 @@ function getDigitalIdValidThru(value?: string) {
   })
 }
 
-async function loadImageData(url: string) {
-  const response = await fetch(url)
+async function loadImageData(url: string, output: 'png' | 'jpeg' = 'png') {
+  const response = await fetch(getPdfAssetUrl(url), { cache: 'no-store' })
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image asset: ${response.status}`)
+  }
+
   const blob = await response.blob()
-  return await blobToDataUrl(blob)
+  const objectUrl = URL.createObjectURL(blob)
+
+  try {
+    return await rasterizeImage(objectUrl, output)
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
 }
 
-function blobToDataUrl(blob: Blob) {
+function rasterizeImage(url: string, output: 'png' | 'jpeg') {
   return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onloadend = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('Failed to load image'))
-    reader.readAsDataURL(blob)
+    const image = new window.Image()
+    image.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth || image.width
+      canvas.height = image.naturalHeight || image.height
+
+      const context = canvas.getContext('2d')
+      if (!context) {
+        reject(new Error('Failed to prepare image canvas'))
+        return
+      }
+
+      if (output === 'jpeg') {
+        context.fillStyle = '#ffffff'
+        context.fillRect(0, 0, canvas.width, canvas.height)
+      }
+
+      context.drawImage(image, 0, 0)
+      resolve(canvas.toDataURL(output === 'jpeg' ? 'image/jpeg' : 'image/png', 0.96))
+    }
+    image.onerror = () => reject(new Error('Failed to load image'))
+    image.src = url
   })
+}
+
+function getPdfAssetUrl(url: string) {
+  const normalizedUrl = String(url || '').trim()
+
+  if (!normalizedUrl) {
+    return normalizedUrl
+  }
+
+  if (
+    normalizedUrl.startsWith('data:') ||
+    normalizedUrl.startsWith('blob:') ||
+    normalizedUrl.startsWith('/')
+  ) {
+    return normalizedUrl
+  }
+
+  if (/^https?:\/\//i.test(normalizedUrl)) {
+    try {
+      const parsedUrl = new URL(normalizedUrl)
+
+      if (typeof window !== 'undefined' && parsedUrl.origin === window.location.origin) {
+        return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`
+      }
+    } catch {
+      return normalizedUrl
+    }
+
+    return `/api/image-proxy?url=${encodeURIComponent(normalizedUrl)}`
+  }
+
+  return normalizedUrl
 }
 
 function sanitizeFileName(value: string) {

@@ -38,6 +38,10 @@ const tests = [
               serviceCalls.push(["list", uid]);
               return [{ id: "notif-1", title: "Hello", read: false }];
             },
+            markNotificationRead: async (notificationId, uid) => {
+              serviceCalls.push(["mark-one", notificationId, uid]);
+              return { id: notificationId, read: true };
+            },
             markAllNotificationsRead: async (uid) => {
               serviceCalls.push(["mark", uid]);
               return { updated: 1 };
@@ -70,11 +74,25 @@ const tests = [
           message: "Notifications marked as read",
           updated: 1,
         });
+
+        const singleMarkResponse = await requestJson(baseUrl, "/notif-1/read", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer test-token",
+            "x-test-uid": "user-42",
+          },
+        });
+        assert.equal(singleMarkResponse.status, 200);
+        assert.deepEqual(singleMarkResponse.body, {
+          message: "Notification marked as read",
+          notification: { id: "notif-1", read: true },
+        });
       });
 
       assert.deepEqual(serviceCalls, [
         ["list", "user-42"],
         ["mark", "user-42"],
+        ["mark-one", "notif-1", "user-42"],
       ]);
     },
   },

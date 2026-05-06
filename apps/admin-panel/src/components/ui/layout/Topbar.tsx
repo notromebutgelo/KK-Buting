@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Bell, Command, Menu, Search } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -55,8 +55,17 @@ function notifDotColor(type: string) {
   return 'bg-[color:var(--accent)]';
 }
 
+function resolveAdminNotificationHref(link: string | null) {
+  if (!link) return null;
+  if (link.startsWith('/verification/upload')) return '/verification';
+  if (link.startsWith('/scanner/digital-id')) return '/digital-ids';
+  if (link.startsWith('/rewards/my-redemptions')) return '/rewards';
+  return link;
+}
+
 export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [adminEmail, setAdminEmail] = useState('');
   const [adminRole, setAdminRole] = useState('admin');
   const [mounted, setMounted] = useState(false);
@@ -69,6 +78,7 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
+  const [openingNotificationId, setOpeningNotificationId] = useState<string | null>(null);
   const bellRef = useRef<HTMLButtonElement>(null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -83,12 +93,29 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
     setAdminRole(window.localStorage.getItem('kk-admin-role') || 'admin');
   }, []);
 
-  // Initial silent fetch for badge count
   useEffect(() => {
-    api
-      .get<{ notifications: Notification[] }>('/notifications/me')
-      .then((res) => setNotifications(res.data.notifications || []))
-      .catch(() => {});
+    let active = true;
+
+    async function syncNotifications() {
+      try {
+        const res = await api.get<{ notifications: Notification[] }>('/notifications/me');
+        if (active) {
+          setNotifications(res.data.notifications || []);
+        }
+      } catch {
+        // Keep the last successful state so the bell does not flash empty.
+      }
+    }
+
+    syncNotifications();
+    const interval = window.setInterval(syncNotifications, 30000);
+    window.addEventListener('focus', syncNotifications);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', syncNotifications);
+    };
   }, []);
 
   // Close dropdown on outside click
@@ -126,6 +153,33 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true, readAt: new Date().toISOString() })));
     } catch { /* silent */ }
     finally { setMarkingRead(false); }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    const nextHref = resolveAdminNotificationHref(notification.link);
+
+    setOpeningNotificationId(notification.id);
+    try {
+      if (!notification.read) {
+        await api.post(`/notifications/${notification.id}/read`);
+        setNotifications((prev) =>
+          prev.map((entry) =>
+            entry.id === notification.id
+              ? { ...entry, read: true, readAt: new Date().toISOString() }
+              : entry
+          )
+        );
+      }
+    } catch {
+      // Continue with navigation even if the read-state update fails.
+    } finally {
+      setOpeningNotificationId(null);
+      setNotifOpen(false);
+    }
+
+    if (nextHref) {
+      router.push(nextHref);
+    }
   };
 
   return (
@@ -279,31 +333,38 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
                   {notifications.map((notif) => (
                     <li
                       key={notif.id}
-                      className="flex gap-3 border-b px-5 py-4 transition-colors"
+                      className="border-b"
                       style={{
                         borderColor: 'var(--stroke)',
-                        background: notif.read ? 'transparent' : 'var(--accent-soft)',
+                        background: notif.read ? 'color-mix(in srgb, var(--bg) 88%, #d8dde6 12%)' : 'var(--accent-soft)',
                       }}
                     >
-                      <div className="mt-1 shrink-0">
-                        <span className={`block h-2 w-2 rounded-full ${notif.read ? 'bg-slate-200' : notifDotColor(notif.type)}`} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p
-                            className="text-sm leading-snug"
-                            style={{ color: 'var(--ink)', fontWeight: notif.read ? 500 : 700 }}
-                          >
-                            {notif.title}
-                          </p>
-                          <span className="shrink-0 text-[11px]" style={{ color: 'var(--muted)' }}>
-                            {formatRelativeTime(notif.createdAt)}
-                          </span>
+                      <button
+                        type="button"
+                        onClick={() => handleNotificationClick(notif)}
+                        disabled={openingNotificationId === notif.id}
+                        className="flex w-full gap-3 px-5 py-4 text-left transition-colors hover:bg-black/5 disabled:cursor-wait"
+                      >
+                        <div className="mt-1 shrink-0">
+                          <span className={`block h-2 w-2 rounded-full ${notif.read ? 'bg-slate-300' : notifDotColor(notif.type)}`} />
                         </div>
-                        <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>
-                          {notif.body}
-                        </p>
-                      </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p
+                              className="text-sm leading-snug"
+                              style={{ color: notif.read ? 'var(--muted)' : 'var(--ink)', fontWeight: notif.read ? 500 : 700 }}
+                            >
+                              {notif.title}
+                            </p>
+                            <span className="shrink-0 text-[11px]" style={{ color: 'var(--muted)' }}>
+                              {openingNotificationId === notif.id ? 'Opening...' : formatRelativeTime(notif.createdAt)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed" style={{ color: notif.read ? 'color-mix(in srgb, var(--muted) 86%, #8b96a9 14%)' : 'var(--muted)' }}>
+                            {notif.body}
+                          </p>
+                        </div>
+                      </button>
                     </li>
                   ))}
                 </ul>
