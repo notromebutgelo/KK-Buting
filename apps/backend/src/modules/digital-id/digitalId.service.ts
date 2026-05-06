@@ -21,6 +21,7 @@ const DOCUMENT_LABELS: Record<string, string> = {
 };
 
 const INLINE_DOCUMENT_LIMIT = 350_000;
+const PENDING_SUPERADMIN_ID_GENERATION = "pending_superadmin_id_generation";
 
 function toIso(value: any) {
   if (!value) return undefined;
@@ -50,6 +51,35 @@ function normalizeYouthAgeGroup(ageGroup?: string) {
 
 function normalizeOptionalString(value: any) {
   return String(value || "").trim();
+}
+
+function hasIssuedDigitalId(profile: Record<string, any>) {
+  return Boolean(
+    profile?.digitalIdGeneratedAt ||
+      profile?.digitalIdGeneratedBy ||
+      profile?.digitalIdApprovedAt ||
+      profile?.digitalIdApprovedBy
+  );
+}
+
+function resolveDigitalIdStatus(profile: Record<string, any>) {
+  const rawStatus = normalizeOptionalString(profile?.digitalIdStatus);
+
+  if (rawStatus === "active" && !hasIssuedDigitalId(profile)) {
+    return Boolean(profile?.verified) || String(profile?.status || "").trim() === "verified"
+      ? "pending_approval"
+      : "draft";
+  }
+
+  if (rawStatus) {
+    return rawStatus;
+  }
+
+  if (Boolean(profile?.verified) || String(profile?.status || "").trim() === "verified") {
+    return "pending_approval";
+  }
+
+  return "not_verified";
 }
 
 function hasCompleteEmergencyContact(profile: Record<string, any>) {
@@ -148,6 +178,9 @@ function computeQueueStatus(profile: Record<string, any>, documents: Record<stri
   if (explicitStatus) return explicitStatus;
   if (profile.status === "verified") return "verified";
   if (profile.status === "rejected") return "rejected";
+  if (profile.verificationReferredToSuperadminAt || profile.digitalIdApprovalRequestedAt) {
+    return PENDING_SUPERADMIN_ID_GENERATION;
+  }
   if (documents.some((document) => normalizeDocumentStatus(document) === "resubmission_requested")) {
     return "resubmission_requested";
   }
@@ -166,8 +199,14 @@ export async function getDigitalId(uid: string) {
     .find((document) =>
       ["id_photo", "valid_government_id", "school_id"].includes(String(document.documentType || ""))
     );
-  if (!data.verified || data.digitalIdStatus !== "active") {
-    return { status: data.digitalIdStatus || "not_verified" };
+  const resolvedDigitalIdStatus = resolveDigitalIdStatus(data);
+
+  if (!data.verified || resolvedDigitalIdStatus !== "active") {
+    return {
+      status: resolvedDigitalIdStatus,
+      digitalIdStatus: resolvedDigitalIdStatus,
+      verified: Boolean(data.verified),
+    };
   }
   const idNumber = data.idNumber || generateIdNumber(uid);
   const revision = Number(data.digitalIdRevision || 1);
@@ -191,7 +230,7 @@ export async function getDigitalId(uid: string) {
     address: `${data.barangay}, ${data.city}, ${data.province}`,
     photoUrl: photoDocument?.fileUrl || null,
     verifiedAt: data.verifiedAt,
-    digitalIdStatus: data.digitalIdStatus,
+    digitalIdStatus: resolvedDigitalIdStatus,
     digitalIdEmergencyContactName: normalizeOptionalString(data.digitalIdEmergencyContactName),
     digitalIdEmergencyContactRelationship: normalizeOptionalString(
       data.digitalIdEmergencyContactRelationship
@@ -261,6 +300,7 @@ export async function getMyVerificationStatus(uid: string) {
     userId: uid,
     email: profile.email || user.email || "",
     status: profile.status || "pending",
+    digitalIdStatus: resolveDigitalIdStatus(profile),
     verified: Boolean(profile.verified),
     verifiedAt: toIso(profile.verifiedAt),
     submittedAt: toIso(profile.submittedAt),
@@ -356,6 +396,12 @@ export async function uploadDocument(uid: string, docType: string, fileUrl: stri
       verificationResubmissionMessage: null,
       verificationRejectReason: null,
       verificationRejectNote: null,
+      digitalIdApprovalRequestedAt: null,
+      digitalIdApprovalRequestedBy: null,
+      verificationReferredToSuperadminAt: null,
+      verificationReferredToSuperadminBy: null,
+      verificationDocumentsApprovedAt: null,
+      verificationDocumentsApprovedBy: null,
     },
     { merge: true }
   );

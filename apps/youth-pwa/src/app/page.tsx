@@ -16,7 +16,7 @@ const SLIDES = [
   {
     title: "Get Your Digital KK ID",
     description:
-      "Upload your documents and become a verified member. Once validated, your Digital ID is generated in the app.",
+      "Upload your documents and become a verified member. Once validated and issued by the superadmin, your Digital ID appears in the app.",
     image: "/images/Carousel2.png",
   },
   {

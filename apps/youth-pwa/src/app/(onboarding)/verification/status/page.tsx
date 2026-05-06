@@ -22,18 +22,24 @@ export default function VerificationStatusPage() {
   const queueStatus =
     profile?.verificationQueueStatus ||
     (profile?.documentsSubmitted ? 'pending' : 'not_submitted')
+  const digitalIdIssued = profile?.digitalIdStatus === 'active'
 
   const statusInfo = {
     pending: {
       icon: '⏳',
       title: 'Verification Pending',
-      desc: 'Your profile is under review by KK admin. This usually takes 3-5 business days.',
+      desc:
+        queueStatus === 'pending_superadmin_id_generation'
+          ? 'Your documents were cleared and are now waiting for superadmin Digital ID generation.'
+          : 'Your profile is under review by KK admin. This usually takes 3-5 business days.',
       color: 'bg-yellow-50 border-yellow-200',
     },
     verified: {
       icon: '✅',
       title: 'Profile Verified!',
-      desc: 'Congratulations! Your profile has been verified. You can now access all KK features.',
+      desc: digitalIdIssued
+        ? 'Congratulations! Your profile is verified and your Digital ID is active.'
+        : 'Congratulations! Your profile is verified. Rewards access is available, and your Digital ID is waiting for superadmin issuance.',
       color: 'bg-green-50 border-green-200',
     },
     rejected: {
@@ -47,11 +53,13 @@ export default function VerificationStatusPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <PageHeader title="Verification Status" />
-      <div className="px-5 pt-4 pb-8">
+      <div className="px-5 pb-8 pt-4">
         {isLoading ? (
-          <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+          <div className="flex justify-center py-16">
+            <Spinner size="lg" />
+          </div>
         ) : !profile ? (
-          <div className="text-center py-12">
+          <div className="py-12 text-center">
             <p className="text-gray-500">Profile not found. Please complete your profiling first.</p>
             <Link href="/intro">
               <Button className="mt-4">Start Profiling</Button>
@@ -59,54 +67,99 @@ export default function VerificationStatusPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Status Card */}
-            <div className={`border rounded-2xl p-5 text-center ${statusInfo[profile.status]?.color || 'bg-gray-50 border-gray-200'}`}>
-              <p className="text-4xl mb-3">{statusInfo[profile.status]?.icon || '❓'}</p>
-              <h2 className="text-xl font-black text-gray-900 mb-1">{statusInfo[profile.status]?.title}</h2>
-              <p className="text-gray-600 text-sm">{statusInfo[profile.status]?.desc}</p>
+            <div
+              className={`rounded-2xl border p-5 text-center ${
+                statusInfo[profile.status]?.color || 'bg-gray-50 border-gray-200'
+              }`}
+            >
+              <p className="mb-3 text-4xl">{statusInfo[profile.status]?.icon || '❔'}</p>
+              <h2 className="mb-1 text-xl font-black text-gray-900">
+                {statusInfo[profile.status]?.title}
+              </h2>
+              <p className="text-sm text-gray-600">{statusInfo[profile.status]?.desc}</p>
               <div className="mt-3">
                 <Badge status={profile.status} />
               </div>
             </div>
 
-            {/* Timeline */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm">
-              <h3 className="font-bold text-gray-900 mb-4">Verification Steps</h3>
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <h3 className="mb-4 font-bold text-gray-900">Verification Steps</h3>
               {[
-                { label: 'Profile Submitted', done: !!profile.submittedAt, date: profile.submittedAt ? new Date(profile.submittedAt).toLocaleDateString('en-PH') : null },
+                {
+                  label: 'Profile Submitted',
+                  done: !!profile.submittedAt,
+                  date: profile.submittedAt
+                    ? new Date(profile.submittedAt).toLocaleDateString('en-PH')
+                    : null,
+                },
                 { label: 'Documents Uploaded', done: !!profile.documentsSubmitted, date: null },
-                { label: 'Under Review', done: ['pending', 'in_review', 'verified', 'rejected', 'resubmission_requested'].includes(queueStatus), date: null },
-                { label: 'Verification Complete', done: profile.status === 'verified', date: profile.verifiedAt ? new Date(profile.verifiedAt).toLocaleDateString('en-PH') : null },
+                {
+                  label: 'Under Review',
+                  done: ['pending', 'in_review', 'pending_superadmin_id_generation', 'verified', 'rejected', 'resubmission_requested'].includes(
+                    queueStatus
+                  ),
+                  date: null,
+                },
+                {
+                  label: 'Verification Complete',
+                  done: profile.status === 'verified',
+                  date: profile.verifiedAt
+                    ? new Date(profile.verifiedAt).toLocaleDateString('en-PH')
+                    : null,
+                },
               ].map((step, i) => (
-                <div key={i} className="flex items-start gap-3 mb-3 last:mb-0">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                    step.done ? 'bg-green-500' : 'bg-gray-200'
-                  }`}>
+                <div key={i} className="mb-3 flex items-start gap-3 last:mb-0">
+                  <div
+                    className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${
+                      step.done ? 'bg-green-500' : 'bg-gray-200'
+                    }`}
+                  >
                     {step.done ? (
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="h-3.5 w-3.5 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={3}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     ) : (
-                      <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                      <div className="h-2 w-2 rounded-full bg-gray-400" />
                     )}
                   </div>
                   <div>
-                    <p className={`font-medium text-sm ${step.done ? 'text-gray-900' : 'text-gray-400'}`}>{step.label}</p>
-                    {step.date && <p className="text-gray-400 text-xs mt-0.5">{step.date}</p>}
+                    <p className={`text-sm font-medium ${step.done ? 'text-gray-900' : 'text-gray-400'}`}>
+                      {step.label}
+                    </p>
+                    {step.date ? <p className="mt-0.5 text-xs text-gray-400">{step.date}</p> : null}
                   </div>
                 </div>
               ))}
             </div>
 
-            {profile.status === 'verified' && (
-              <Link href="/home">
-                <Button fullWidth size="lg">Go to Home</Button>
-              </Link>
-            )}
-
-            {profile.status === 'rejected' && (
+            {profile.status === 'verified' ? (
               <div className="space-y-3">
-                {(profile.verificationRejectReason || profile.verificationRejectNote) ? (
+                {!digitalIdIssued ? (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    Your verification is already approved. The Digital ID tab will show your card after the superadmin finishes the issuance step.
+                  </div>
+                ) : null}
+                <Link href={digitalIdIssued ? '/scanner/digital-id' : '/home'}>
+                  <Button fullWidth size="lg">
+                    {digitalIdIssued ? 'Open Digital ID' : 'Go to Home'}
+                  </Button>
+                </Link>
+              </div>
+            ) : null}
+
+            {profile.status === 'rejected' ? (
+              <div className="space-y-3">
+                {profile.verificationRejectReason || profile.verificationRejectNote ? (
                   <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {profile.verificationRejectReason}
                     {profile.verificationRejectNote ? ` ${profile.verificationRejectNote}` : ''}
@@ -116,19 +169,24 @@ export default function VerificationStatusPage() {
                   <Button fullWidth>Retry Submission</Button>
                 </Link>
               </div>
-            )}
+            ) : null}
 
-            {queueStatus === 'resubmission_requested' && (
+            {queueStatus === 'resubmission_requested' ? (
               <Link href="/verification/upload">
                 <Button fullWidth>Re-upload Requested Documents</Button>
               </Link>
-            )}
+            ) : null}
 
-            {profile.status === 'pending' && (
-              <div className="text-center text-gray-400 text-sm">
-                <p>Current queue status: {queueStatus.split('_').join(' ')}</p>
+            {profile.status === 'pending' ? (
+              <div className="text-center text-sm text-gray-400">
+                <p>
+                  Current queue status:{' '}
+                  {queueStatus === 'pending_superadmin_id_generation'
+                    ? 'pending superadmin ID generation'
+                    : queueStatus.split('_').join(' ')}
+                </p>
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </div>

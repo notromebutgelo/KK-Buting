@@ -1,7 +1,8 @@
 {
-  "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(auth)/register/page": "app/(auth)/register/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(main)/scanner/digital-id/page": "app/(main)/scanner/digital-id/page.js",
-  "/(main)/vouchers/page": "app/(main)/vouchers/page.js",
-  "/(main)/profile/page": "app/(main)/profile/page.js"
+  "/(main)/profile/page": "app/(main)/profile/page.js",
+  "/(main)/scanner/page": "app/(main)/scanner/page.js",
+  "/(main)/home/page": "app/(main)/home/page.js"
 }

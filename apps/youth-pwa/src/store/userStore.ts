@@ -15,6 +15,7 @@ export interface UserProfile {
   digitalIdEmergencyContactRelationship?: string
   digitalIdEmergencyContactPhone?: string
   digitalIdEmergencyContactComplete?: boolean
+  digitalIdStatus?: 'draft' | 'pending_approval' | 'active' | 'deactivated' | string | null
   digitalIdSignatureUrl?: string | null
   digitalIdSignatureSignedAt?: string | null
   digitalIdSignatureComplete?: boolean
@@ -35,7 +36,13 @@ export interface UserProfile {
   kkAssemblyTimesAttended: number
   kkAssemblyReason?: string
   documentsSubmitted?: boolean
-  verificationQueueStatus?: 'pending' | 'in_review' | 'resubmission_requested' | 'verified' | 'rejected'
+  verificationQueueStatus?:
+    | 'pending'
+    | 'in_review'
+    | 'pending_superadmin_id_generation'
+    | 'resubmission_requested'
+    | 'verified'
+    | 'rejected'
   verificationResubmissionMessage?: string
   verificationRejectReason?: string
   verificationRejectNote?: string

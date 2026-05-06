@@ -61,6 +61,25 @@ const statusOptions: Array<{ value: MerchantStatus | 'all'; label: string }> = [
   { value: 'rejected', label: 'Rejected' },
 ]
 
+const merchantCreationCategoryOptions = [
+  'Food & Beverage',
+  'Cafe & Milk Tea',
+  'Restaurant',
+  'Bakery & Pastries',
+  'Retail & Grocery',
+  'Convenience Store',
+  'Health & Beauty',
+  'Salon & Barbershop',
+  'Pharmacy',
+  'Printing & School Supplies',
+  'Electronics & Mobile',
+  'Clothing & Apparel',
+  'Home & Lifestyle',
+  'Fitness & Recreation',
+  'Services',
+  'Other',
+]
+
 const inputClass =
   'surface-input w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30'
 
@@ -468,13 +487,18 @@ export default function MerchantsPage() {
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <AdminField label="Category">
-                      <input
-                        type="text"
+                      <select
                         value={createForm.category}
                         onChange={(e) => setCreateForm((form) => ({ ...form, category: e.target.value }))}
-                        placeholder="e.g. Food & Beverage"
                         className={inputClass}
-                      />
+                      >
+                        <option value="">Select category</option>
+                        {merchantCreationCategoryOptions.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
                     </AdminField>
                     <AdminField label="Owner / contact name">
                       <input

@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 
 ## What This Repository Is
 
@@ -195,6 +195,17 @@ The current live points default in code is now:
   - the youth PDF export front/back layout now captures hidden high-resolution copies of the same `DigitalIdFace` and `DigitalIdBack` components used in the live preview, replacing the older duplicate coordinate-based drawing path so saved PDFs keep the same padding and positioning seen on the Digital ID page
   - the youth Save ID exporter now normalizes same-origin absolute image URLs back to local paths before fetch/inlining, and the image-proxy route now also accepts same-origin absolute asset URLs plus loopback `http://localhost` image requests when the app is running locally
   - the youth Save ID flow was then moved off the browser `foreignObject` DOM-to-canvas capture path and back onto direct `jsPDF` drawing with fetched/proxied image blobs, which avoids the remaining `SecurityError: Tainted canvases may not be exported` failure that could still block Digital ID downloads in the browser
+  - admin verification approval no longer makes the youth Digital ID appear immediately in the PWA
+  - when a verified member does not already have an active Digital ID, backend verification approval now queues that member for superadmin Digital ID issuance instead of telling the youth user that the ID is already available
+  - the youth Digital ID tab, youth QR tab, verification-status messaging, and onboarding copy now treat Digital ID visibility as a separate superadmin issuance step after admin verification instead of a same-step unlock
+  - the Digital ID visibility gate is now stricter about legacy or partial records too: a stored `digitalIdStatus: active` no longer counts as displayable unless real Digital ID generation / approval metadata exists behind it, which prevents admin verification plus an old `idNumber` from making the youth card appear prematurely
+  - the verification workflow is now split more strictly by role: regular admins can review individual documents and request resubmission, but final submission approval / rejection is now superadmin-only at both the UI and backend-route level
+  - the admin verification detail page keeps a separate `Refer to Superadmin` handoff once all required documents are approved, but that referral no longer performs final verification under the hood; it only flags the case for superadmin final review and Digital ID issuance
+  - superadmin Digital ID activation now also finalizes the member verification record when needed, so a member referred from admin document review can be fully verified and issued from the superadmin side without leaving the profile in a stale `pending` state
+  - that admin-to-superadmin handoff is now stored as a first-class workflow stage instead of just loose wording: `verificationQueueStatus` can now move into a dedicated pending-superadmin Digital ID generation state, with saved admin handoff metadata for who cleared the documents, who referred the case upward, and when each step happened
+  - the admin verification queue, admin verification detail page, superadmin Digital IDs workspace, and youth verification-status messaging now all surface that same handoff state more clearly through updated badges, workflow copy, and approval metadata such as `Approved by Admin`, `Referred by Admin`, and their timestamps
+  - the superadmin verification/detail experience now treats referred submissions as a distinct issuance step with a dedicated `Generate Digital ID` action, while row/table labels and status copy were retuned so document review, final superadmin review, and Digital ID issuance read as separate responsibilities instead of one blended approval event
+  - the admin Digital IDs workspace now treats pending issuance as a superadmin-only approval/activation step, and superadmin activation can generate the missing member ID details on approval when the record was only waiting for issuance
   - the youth/admin Digital ID back emergency-contact lines now render in proper title-style capitalization instead of forced all-caps, and the youth/admin PDF exporters now rasterize the member photo more reliably before embedding it so saved PDFs keep the photo visible with steadier front-card positioning
   - signature export from the pad now trims excess transparent canvas space around the actual strokes so the signature sits more naturally on the card line
   - verification checks after the rollout: `npx tsc --noEmit -p apps/youth-pwa/tsconfig.json`, `npx tsc --noEmit -p apps/admin-panel/tsconfig.json`, `npm run build:backend`, and `npm run test:backend` all passed
@@ -262,6 +273,7 @@ The current live points default in code is now:
 - superadmin can now create merchant accounts directly from the admin panel
   - a "Create Merchant Account" tab appears in the Merchants page for superadmin only
   - the form collects: business name, category, address, owner name, login email, and password
+  - the category field in that create-merchant form now uses a preset dropdown list instead of free-text entry, which makes onboarding more consistent for merchant directory data and reduces category spelling drift
   - "Auto-fill" derives an email slug from the business name; "Generate" creates a cryptographically random 12-character password; the password field has a show/hide toggle
   - on submit, the backend (`POST /api/admin/merchants/create`, superadmin-only) creates a Firebase Auth user, sets the `merchant` role claim, writes the users doc, and creates a Firestore merchant record with `status: approved` (pre-approved since the superadmin is creating it directly)
   - a welcome notification is sent to the new merchant's UID
@@ -391,6 +403,10 @@ The current live points default in code is now:
   - `apps/merchant-app/.env.example` for local/dev
   - `apps/merchant-app/.env.preview.example` for preview/internal APK builds
   - `apps/merchant-app/.env.production.example` for production APK builds
+- merchant app local Expo startup troubleshooting now also pins a direct `react-refresh` dev dependency in `apps/merchant-app/package.json`
+  - the Expo SDK 54 Babel preset can require `react-refresh/babel` from the app-level resolution path during Metro bundling
+  - in this workspace snapshot, `react-refresh` was only present under nested package trees, which could make `npx expo start` fail with `Cannot find module 'react-refresh/babel'`
+  - keeping `react-refresh` explicit in merchant-app devDependencies makes the Babel dependency path less fragile during local dev
 - current local troubleshooting setup for `apps/merchant-app/.env` now points directly to `https://kk-buting-admin-panel.onrender.com/api`
   - this is specifically to avoid Expo Go/dev sessions rewriting localhost to a LAN IP like `192.168.x.x:4000`
   - after changing the local `.env`, Expo/Metro must be restarted so the new `EXPO_PUBLIC_API_URL` is picked up

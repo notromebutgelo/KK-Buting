@@ -12,6 +12,7 @@ import { useUserStore } from '@/store/userStore'
 
 interface DigitalIdResponse {
   status: string
+  digitalIdStatus?: string | null
   idNumber?: string
   memberId?: string
   qrCode?: string
@@ -38,8 +39,9 @@ export default function ScannerPage() {
   }, [profile, user?.UserName])
 
   const isVerified = Boolean(profile?.verified || profile?.status === 'verified')
+  const digitalIdStatus = String(idData?.digitalIdStatus || profile?.digitalIdStatus || '').trim() || null
   const isDigitalIdReady =
-    idData?.status === 'verified' &&
+    (idData?.status === 'verified' || digitalIdStatus === 'active') &&
     Boolean(idData?.memberId || idData?.idNumber) &&
     Boolean(idData?.qrPayload || idData?.qrCode || idData?.qrToken)
   const memberId = idData?.memberId || idData?.idNumber || 'KK-BUTING-PENDING'
@@ -61,11 +63,16 @@ export default function ScannerPage() {
       }
     : !isDigitalIdReady
       ? {
-          title: 'Your Digital ID is not active yet',
+          title:
+            digitalIdStatus === 'deactivated'
+              ? 'Your Digital ID is inactive'
+              : 'Awaiting superadmin-issued Digital ID',
           description:
-            'Your account is verified, but your KK Digital ID has not been generated or activated yet. Please check back soon or contact your administrator.',
-          href: '/verification/status',
-          label: 'Check Verification Status',
+            digitalIdStatus === 'deactivated'
+              ? 'Your account is still verified, but your Digital ID is currently inactive. Please contact your SK office if it needs to be restored.'
+              : 'Your account is verified, but the superadmin has not issued and activated your KK Digital ID yet. QR access unlocks only after that final step.',
+          href: '/scanner/digital-id',
+          label: 'Open Digital ID Tab',
         }
       : undefined
 
@@ -173,9 +180,35 @@ export default function ScannerPage() {
                 {displayName}
               </h1>
               <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium">
-                <span className={`inline-block h-2.5 w-2.5 rounded-full ${isVerified ? 'bg-[#38a169]' : 'bg-[#FCB315]'}`} />
-                <span className={isVerified ? 'text-[#38a169]' : 'text-[#FCB315]'}>
-                  {isVerified ? 'QR Ready for Merchants' : 'Verification Required'}
+                <span
+                  className={`inline-block h-2.5 w-2.5 rounded-full ${
+                    isDigitalIdReady
+                      ? 'bg-[#38a169]'
+                      : digitalIdStatus === 'deactivated'
+                        ? 'bg-[#d64545]'
+                      : isVerified
+                        ? 'bg-[#0572DC]'
+                        : 'bg-[#FCB315]'
+                  }`}
+                />
+                <span
+                  className={
+                    isDigitalIdReady
+                      ? 'text-[#38a169]'
+                      : digitalIdStatus === 'deactivated'
+                        ? 'text-[#d64545]'
+                      : isVerified
+                        ? 'text-[#0572DC]'
+                        : 'text-[#FCB315]'
+                  }
+                >
+                  {isDigitalIdReady
+                    ? 'QR Ready for Merchants'
+                    : digitalIdStatus === 'deactivated'
+                      ? 'Digital ID Inactive'
+                    : isVerified
+                      ? 'Awaiting ID Activation'
+                      : 'Verification Required'}
                 </span>
               </div>
             </div>

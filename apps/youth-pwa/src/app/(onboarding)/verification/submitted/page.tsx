@@ -28,8 +28,9 @@ export default function VerificationSubmittedPage() {
 
             <p className="mx-auto mt-8 max-w-[265px] text-[13px] leading-[1.55] text-[#4f6f9b]">
               Your documents have been successfully uploaded and are now
-              waiting for admin verification. Our team will review your
-              information to ensure everything is correct.
+              waiting for admin verification. After that review is approved,
+              your Digital ID will still need the final superadmin issuance
+              step before it appears in the app.
             </p>
 
             <Link

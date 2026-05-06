@@ -40,8 +40,19 @@ interface QueueProfile {
   age: number | null
   youthAgeGroup: string
   status: 'pending' | 'verified' | 'rejected'
-  queueStatus: 'pending' | 'in_review' | 'resubmission_requested' | 'verified' | 'rejected'
+  queueStatus:
+    | 'pending'
+    | 'in_review'
+    | 'pending_superadmin_id_generation'
+    | 'resubmission_requested'
+    | 'verified'
+    | 'rejected'
+  digitalIdStatus?: string
   submittedAt: string
+  verificationDocumentsApprovedAt?: string | null
+  verificationDocumentsApprovedBy?: string | null
+  verificationReferredToSuperadminAt?: string | null
+  verificationReferredToSuperadminBy?: string | null
   idPhotoUrl?: string | null
   requiredDocuments: QueueDocument[]
   missingDocuments: QueueDocument[]
@@ -69,6 +80,7 @@ interface QueueResponse {
     total: number
     pending: number
     inReview: number
+    pendingSuperadmin: number
     resubmissionRequested: number
   }
 }
@@ -98,6 +110,7 @@ export default function VerificationPage() {
     total: 0,
     pending: 0,
     inReview: 0,
+    pendingSuperadmin: 0,
     resubmissionRequested: 0,
   })
   const [ageGroupOptions, setAgeGroupOptions] = useState<string[]>([])
@@ -140,6 +153,7 @@ export default function VerificationPage() {
             total: queueRes.data.pagination?.total || 0,
             pending: 0,
             inReview: 0,
+            pendingSuperadmin: 0,
             resubmissionRequested: 0,
           }
         )
@@ -242,7 +256,11 @@ export default function VerificationPage() {
             <DashboardMiniStat
               label="Ready selected"
               value={readySelectedCount.toLocaleString()}
-              meta="Chosen submissions that can be approved now"
+              meta={
+                isSuperadmin
+                  ? 'Chosen submissions that can move into final superadmin review'
+                  : 'Chosen submissions that are ready to be referred upward'
+              }
               tone={readySelectedCount > 0 ? 'soft' : 'neutral'}
             />
             <DashboardMiniStat
@@ -263,15 +281,15 @@ export default function VerificationPage() {
           accent="var(--accent)"
         />
         <AdminStatCard
-          label="Pending"
+          label="Pending document review"
           value={(summary?.pending || 0).toLocaleString()}
-          meta="Submissions still waiting for a reviewer to fully process them."
+          meta="Submissions still waiting for document-by-document review."
           accent="var(--accent-warm)"
         />
         <AdminStatCard
-          label="In review"
-          value={(summary?.inReview || 0).toLocaleString()}
-          meta="Profiles that are already in active review rather than untouched."
+          label="Pending superadmin"
+          value={(summary?.pendingSuperadmin || 0).toLocaleString()}
+          meta="Submissions already cleared by admin review and waiting for superadmin issuance."
           accent="var(--accent-strong)"
         />
         <AdminStatCard
@@ -331,9 +349,9 @@ export default function VerificationPage() {
                 onChange={(e) => setStatus(e.target.value)}
                 className="surface-input w-full rounded-xl bg-transparent px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/25"
               >
-                {['all', 'pending', 'in_review', 'resubmission_requested'].map((option) => (
+                {['all', 'pending', 'in_review', 'pending_superadmin_id_generation', 'resubmission_requested', 'verified', 'rejected'].map((option) => (
                   <option key={option} value={option}>
-                    {option === 'all' ? 'All' : prettifyOption(option)}
+                    {option === 'all' ? 'All' : getQueueStatusLabel(option)}
                   </option>
                 ))}
               </select>
@@ -475,7 +493,19 @@ export default function VerificationPage() {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <QueueStatusBadge status={profile.queueStatus} />
+                        <div className="space-y-2">
+                          <QueueStatusBadge status={profile.queueStatus} />
+                          {profile.queueStatus === 'pending_superadmin_id_generation' ? (
+                            <div className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                              <p>
+                                Approved by {profile.verificationDocumentsApprovedBy || 'admin'}
+                              </p>
+                              <p>
+                                Referred {formatShortDateTime(profile.verificationReferredToSuperadminAt)}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-sm" style={{ color: 'var(--muted)' }}>
                         {profile.submittedAt ? new Date(profile.submittedAt).toLocaleDateString('en-PH') : '-'}
@@ -486,11 +516,13 @@ export default function VerificationPage() {
                             href={`/verification/${profile.userId}`}
                             className="font-semibold text-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
                           >
-                            Review submission
+                            {profile.queueStatus === 'pending_superadmin_id_generation'
+                              ? 'Open superadmin handoff'
+                              : 'Review submission'}
                           </Link>
                           {isEligibleForVerification(profile) ? (
                             <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
-                              Ready to verify
+                              {isSuperadmin ? 'Ready for final review' : 'Ready for superadmin referral'}
                             </span>
                           ) : null}
                         </div>
@@ -545,13 +577,17 @@ function QueueStatusBadge({ status }: { status: string }) {
       ? 'bg-amber-50 text-amber-700'
       : status === 'in_review'
         ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
+        : status === 'pending_superadmin_id_generation'
+          ? 'bg-sky-100 text-sky-800'
         : status === 'resubmission_requested'
           ? 'bg-red-100 text-red-700'
-          : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
+          : status === 'verified'
+            ? 'bg-green-100 text-green-700'
+            : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
 
   return (
     <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', className)}>
-      {prettifyOption(status)}
+      {getQueueStatusLabel(status)}
     </span>
   )
 }
@@ -570,16 +606,29 @@ function DocumentStatusBadge({ status }: { status: string }) {
 
   return (
     <span className={cn('inline-flex rounded-full px-2 py-1 text-[11px] font-semibold', className)}>
-      {prettifyOption(status)}
+      {getDocumentStatusLabel(status)}
     </span>
   )
 }
 
+function getQueueStatusLabel(value: string) {
+  if (value === 'pending_superadmin_id_generation') return 'Pending Superadmin ID Generation'
+  if (value === 'in_review') return 'Documents In Review'
+  if (value === 'pending') return 'Awaiting Document Review'
+  if (value === 'resubmission_requested') return 'Resubmission Requested'
+  if (value === 'verified') return 'Verified'
+  if (value === 'rejected') return 'Rejected'
+  return value.split('_').join(' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function getDocumentStatusLabel(value: string) {
+  if (value === 'rejected') return 'Flagged'
+  if (value === 'pending') return 'Needs Review'
+  return getQueueStatusLabel(value)
+}
+
 function prettifyOption(value: string) {
-  return value
-    .split('_')
-    .join(' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+  return value.split('_').join(' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 function getInitials(fullName: string) {
@@ -594,7 +643,20 @@ function getInitials(fullName: string) {
 function isEligibleForVerification(profile: QueueProfile) {
   return (
     profile.status === 'pending' &&
+    profile.queueStatus !== 'pending_superadmin_id_generation' &&
     profile.missingDocuments.length === 0 &&
     profile.requiredDocuments.every((document) => document.reviewStatus === 'approved')
   )
+}
+
+function formatShortDateTime(value?: string | null) {
+  if (!value) return 'recently'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }

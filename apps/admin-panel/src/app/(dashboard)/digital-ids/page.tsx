@@ -20,6 +20,11 @@ interface DigitalIdMember {
   verifiedAt?: string
   memberId?: string
   digitalIdStatus: 'draft' | 'pending_approval' | 'active' | 'deactivated'
+  verificationQueueStatus?: string
+  verificationDocumentsApprovedAt?: string | null
+  verificationDocumentsApprovedBy?: string | null
+  verificationReferredToSuperadminAt?: string | null
+  verificationReferredToSuperadminBy?: string | null
   digitalIdRevision?: number
   digitalIdGeneratedAt?: string
   digitalIdApprovedAt?: string
@@ -50,6 +55,10 @@ interface DigitalIdDetail extends DigitalIdMember {
     digitalIdGeneratedAt?: string
     digitalIdApprovedAt?: string
     digitalIdApprovalRequestedAt?: string
+    verificationDocumentsApprovedAt?: string | null
+    verificationDocumentsApprovedBy?: string | null
+    verificationReferredToSuperadminAt?: string | null
+    verificationReferredToSuperadminBy?: string | null
     digitalIdRevision?: number
     digitalIdEmergencyContactName?: string
     digitalIdEmergencyContactRelationship?: string
@@ -244,7 +253,7 @@ export default function DigitalIdsPage() {
 
       if (action === 'approve') {
         await api.post(`/admin/digital-ids/${member.uid}/approve`)
-        setMessage('Digital ID approved and activated.')
+        setMessage('Digital ID generated and activated.')
       }
 
       if (action === 'deactivate') {
@@ -339,7 +348,7 @@ export default function DigitalIdsPage() {
         <div>
           <h1 className="text-2xl font-black" style={{ color: 'var(--ink)' }}>Digital IDs</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
-            Generate, review, activate, and print KK Digital IDs through the admin and superadmin workflow.
+            Review the admin handoff, then generate and issue the Digital ID that becomes visible in the youth app.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -363,7 +372,7 @@ export default function DigitalIdsPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryTile label="Draft IDs" value={summary.draft} tone="draft" />
-        <SummaryTile label="Pending Approval" value={summary.pendingApproval} tone="pending" />
+        <SummaryTile label="Pending Superadmin" value={summary.pendingApproval} tone="pending" />
         <SummaryTile label="Active IDs" value={summary.active} tone="active" />
         <SummaryTile label="Deactivated" value={summary.deactivated} tone="deactivated" />
       </div>
@@ -393,7 +402,7 @@ export default function DigitalIdsPage() {
             >
               <option value="all">All</option>
               <option value="draft">Draft</option>
-              <option value="pending_approval">Pending Approval</option>
+              <option value="pending_approval">Pending Superadmin ID Generation</option>
               <option value="active">Active</option>
               <option value="deactivated">Deactivated</option>
             </select>
@@ -469,26 +478,34 @@ export default function DigitalIdsPage() {
                           {member.memberId || 'Not generated'}
                         </td>
                         <td className="px-5 py-4">
-                          <StatusBadge status={member.digitalIdStatus} />
+                          <div className="space-y-2">
+                            <StatusBadge status={member.digitalIdStatus} />
+                            {member.digitalIdStatus === 'pending_approval' ? (
+                              <div className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                                <p>Approved by {member.verificationDocumentsApprovedBy || 'admin'}</p>
+                                <p>Referred by {member.verificationReferredToSuperadminBy || 'admin'}</p>
+                              </div>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-5 py-4 text-sm" style={{ color: 'var(--muted)' }}>
                           {member.verifiedAt ? new Date(member.verifiedAt).toLocaleDateString('en-PH') : '-'}
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex flex-wrap gap-2">
-                            {member.digitalIdStatus === 'draft' && !isSuperadmin ? (
+                            {member.digitalIdStatus === 'draft' && isSuperadmin ? (
                               <ActionChip
-                                label="Send for Approval"
+                                label="Generate & Issue ID"
                                 disabled={!member.emergencyContactComplete || !member.signatureComplete}
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleAction('submit', member)
+                                  handleAction('approve', member)
                                 }}
                               />
                             ) : null}
-                            {member.digitalIdStatus === 'draft' && isSuperadmin ? (
+                            {member.digitalIdStatus === 'pending_approval' && isSuperadmin ? (
                               <ActionChip
-                                label="Approve & Activate"
+                                label="Generate & Issue ID"
                                 disabled={!member.emergencyContactComplete || !member.signatureComplete}
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -502,16 +519,6 @@ export default function DigitalIdsPage() {
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleDownloadPdf(member)
-                                }}
-                              />
-                            ) : null}
-                            {!member.memberId ? (
-                              <ActionChip
-                                label={isSuperadmin ? 'Generate ID' : 'Generate Draft'}
-                                disabled={!member.emergencyContactComplete || !member.signatureComplete}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleAction('generate', member)
                                 }}
                               />
                             ) : null}
@@ -543,11 +550,17 @@ export default function DigitalIdsPage() {
                   {selectedMember.fullName || 'Digital ID Draft'}
                 </h2>
                 <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
-                  Review the card before approval and printing.
+                  Review the admin handoff, then generate the final Digital ID for the youth app.
                 </p>
               </div>
 
               <DigitalIdPreviewCard member={selectedMember} />
+
+              {selectedMember.digitalIdStatus === 'pending_approval' ? (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                  This request is waiting for superadmin issuance. The youth member will only see the Digital ID after you generate and activate it here.
+                </div>
+              ) : null}
 
               {!selectedMember.emergencyContactComplete ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -561,11 +574,21 @@ export default function DigitalIdsPage() {
                 </div>
               ) : null}
 
+              {!isSuperadmin && ['pending_approval', 'draft'].includes(selectedMember.digitalIdStatus) ? (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                  Superadmins are responsible for issuing the Digital ID after admin verification is complete.
+                </div>
+              ) : null}
+
               <div className="rounded-2xl bg-[color:var(--accent-soft)] p-4 text-sm" style={{ color: 'var(--ink)' }}>
                 <div className="grid gap-2">
                   <DetailRow label="ID Number" value={selectedMember.memberId || selectedMember.profile?.idNumber || 'Not generated'} />
                   <DetailRow label="Status" value={prettifyStatus(selectedMember.digitalIdStatus)} />
                   <DetailRow label="Revision" value={String(selectedMember.digitalIdRevision || selectedMember.profile?.digitalIdRevision || 1)} />
+                  <DetailRow label="Approved by Admin" value={selectedMember.verificationDocumentsApprovedBy || selectedMember.profile?.verificationDocumentsApprovedBy || '-'} />
+                  <DetailRow label="Admin Approval Time" value={formatDate(selectedMember.verificationDocumentsApprovedAt || selectedMember.profile?.verificationDocumentsApprovedAt || undefined)} />
+                  <DetailRow label="Referred by Admin" value={selectedMember.verificationReferredToSuperadminBy || selectedMember.profile?.verificationReferredToSuperadminBy || '-'} />
+                  <DetailRow label="Referred On" value={formatDate(selectedMember.verificationReferredToSuperadminAt || selectedMember.profile?.verificationReferredToSuperadminAt || undefined)} />
                   <DetailRow label="Emergency Contact" value={getEmergencyContactSummary(selectedMember)} />
                   <DetailRow label="Signature" value={selectedMember.signatureComplete ? 'Saved' : 'Missing'} />
                   <DetailRow label="Verified On" value={formatDate(selectedMember.verifiedAt || selectedMember.profile?.verifiedAt)} />
@@ -576,10 +599,8 @@ export default function DigitalIdsPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                {!selectedMember.memberId ? <PrimaryButton label={isSuperadmin ? 'Generate ID' : 'Generate Draft ID'} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('generate', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'draft' && !isSuperadmin ? <PrimaryButton label="Send to Superadmin" disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('submit', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
-                {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <PrimaryButton label="Approve & Activate" disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <PrimaryButton label="Generate and Issue Digital ID" disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
+                {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <PrimaryButton label="Generate and Issue Digital ID" disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} onClick={() => handleAction('approve', selectedMember)} /> : null}
                 {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label="Download PDF" onClick={() => handleDownloadPdf(selectedMember)} /> : null}
                 {selectedMember.memberId && isSuperadmin ? <SecondaryButton label="Regenerate ID" onClick={() => handleAction('regenerate', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} /> : null}
                 {selectedMember.digitalIdStatus === 'active' && isSuperadmin ? <DangerButton label="Deactivate ID" onClick={() => handleAction('deactivate', selectedMember)} disabled={isActionLoading} /> : null}
@@ -637,7 +658,7 @@ function StatusBadge({ status }: { status: string }) {
     status === 'draft'
       ? 'bg-amber-50 text-amber-700'
       : status === 'pending_approval'
-        ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
+        ? 'bg-sky-100 text-sky-800'
         : status === 'active'
           ? 'bg-green-100 text-green-700'
           : 'bg-red-100 text-red-700'
@@ -1021,6 +1042,7 @@ function rasterizeImage(url: string, output: 'png' | 'jpeg') {
 }
 
 function prettifyStatus(value: string) {
+  if (value === 'pending_approval') return 'Pending Superadmin ID Generation'
   return value.split('_').join(' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 

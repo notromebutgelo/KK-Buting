@@ -67,8 +67,8 @@ router.get("/dashboard", ...adminOrSuperadmin, getDashboard);
 router.get("/verification", ...adminOrSuperadmin, listVerificationProfiles);
 router.post("/verification/bulk-approve", ...superadminOnly, validateRequest(validateBulkUserIdsRequest), bulkApproveVerificationHandler);
 router.get("/verification/:userId", ...adminOrSuperadmin, getVerificationProfileHandler);
-router.patch("/verification/:userId/approve", ...adminOrSuperadmin, approveVerificationHandler);
-router.patch("/verification/:userId/reject", ...adminOrSuperadmin, validateRequest(validateVerificationRejectRequest), rejectVerificationHandler);
+router.patch("/verification/:userId/approve", ...superadminOnly, approveVerificationHandler);
+router.patch("/verification/:userId/reject", ...superadminOnly, validateRequest(validateVerificationRejectRequest), rejectVerificationHandler);
 router.patch(
   "/verification/:userId/documents/:documentId/review",
   ...adminOrSuperadmin,
@@ -104,7 +104,7 @@ router.patch("/youth/:userId/archive", ...superadminOnly, validateRequest(valida
 router.post("/youth/:userId/points-adjustments", ...superadminOnly, validateRequest(validateAdjustYouthPointsRequest), adjustYouthPointsHandler);
 router.get("/digital-ids", ...adminOrSuperadmin, listDigitalIds);
 router.get("/digital-ids/:userId", ...adminOrSuperadmin, getDigitalIdMemberHandler);
-router.post("/digital-ids/:userId/generate", ...adminOrSuperadmin, generateDigitalIdHandler);
+router.post("/digital-ids/:userId/generate", ...superadminOnly, generateDigitalIdHandler);
 router.post("/digital-ids/:userId/submit", ...adminOrSuperadmin, submitDigitalIdForApprovalHandler);
 router.post("/digital-ids/:userId/approve", ...superadminOnly, approveDigitalIdHandler);
 router.patch("/digital-ids/:userId/deactivate", ...superadminOnly, validateRequest(validateDigitalIdDeactivationRequest), deactivateDigitalIdHandler);

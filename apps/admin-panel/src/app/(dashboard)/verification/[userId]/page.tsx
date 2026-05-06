@@ -51,6 +51,15 @@ interface VerificationProfile {
   verificationRejectReason?: string
   verificationRejectNote?: string
   verificationResubmissionMessage?: string
+  digitalIdStatus?: 'draft' | 'pending_approval' | 'active' | 'deactivated' | string
+  digitalIdApprovalRequestedAt?: string
+  digitalIdApprovalRequestedBy?: string
+  verificationDocumentsApprovedAt?: string | null
+  verificationDocumentsApprovedBy?: string | null
+  verificationReferredToSuperadminAt?: string | null
+  verificationReferredToSuperadminBy?: string | null
+  digitalIdEmergencyContactComplete?: boolean
+  digitalIdSignatureComplete?: boolean
   idPhotoUrl?: string | null
   documents: ReviewDocument[]
   requiredDocuments: ReviewDocument[]
@@ -74,6 +83,8 @@ export default function VerificationDetailPage() {
   const [isApproving, setIsApproving] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
   const [isRequestingResubmission, setIsRequestingResubmission] = useState(false)
+  const [isReferringToSuperadmin, setIsReferringToSuperadmin] = useState(false)
+  const [isGeneratingDigitalId, setIsGeneratingDigitalId] = useState(false)
   const [busyDocId, setBusyDocId] = useState<string | null>(null)
   const [loadingTitle, setLoadingTitle] = useState('Updating verification')
 
@@ -108,6 +119,13 @@ export default function VerificationDetailPage() {
     profile?.status === 'pending' &&
     (profile?.missingDocuments?.length || 0) === 0 &&
     profile?.requiredDocuments?.every((document) => document.reviewStatus === 'approved')
+  const isPendingSuperadminGeneration = profile?.queueStatus === 'pending_superadmin_id_generation'
+  const canOpenReferralFlow =
+    !isSuperadmin &&
+    (profile?.status === 'verified' || Boolean(canVerify)) &&
+    profile?.digitalIdStatus !== 'active'
+  const canReferToSuperadmin =
+    canOpenReferralFlow && (profile?.status === 'verified' || Boolean(canVerify))
 
   const toggleSelectedDoc = (documentId: string) => {
     setSelectedDocs((current) =>
@@ -142,11 +160,41 @@ export default function VerificationDetailPage() {
     try {
       await api.patch(`/admin/verification/${userId}/approve`)
       await loadProfile()
-      setMessage('Submission verified and digital ID unlocked.')
+      setMessage('Submission verified. Digital ID issuance remains a separate superadmin step in the Digital IDs workspace.')
     } catch (error: any) {
       setMessage(error?.response?.data?.error || 'Failed to verify submission.')
     } finally {
       setIsApproving(false)
+    }
+  }
+
+  const handleReferToSuperadmin = async () => {
+    setLoadingTitle('Referring to superadmin')
+    setIsReferringToSuperadmin(true)
+    setMessage('')
+    try {
+      await api.post(`/admin/digital-ids/${userId}/submit`)
+      await loadProfile()
+      setMessage('Referral sent to superadmin for final verification and Digital ID issuance review.')
+    } catch (error: any) {
+      setMessage(error?.response?.data?.error || 'Failed to refer this member to superadmin.')
+    } finally {
+      setIsReferringToSuperadmin(false)
+    }
+  }
+
+  const handleGenerateDigitalId = async () => {
+    setLoadingTitle('Generating Digital ID')
+    setIsGeneratingDigitalId(true)
+    setMessage('')
+    try {
+      await api.post(`/admin/digital-ids/${userId}/approve`)
+      await loadProfile()
+      setMessage('Digital ID generated and issued successfully. The member can now open it in the youth app.')
+    } catch (error: any) {
+      setMessage(error?.response?.data?.error || 'Failed to generate the Digital ID.')
+    } finally {
+      setIsGeneratingDigitalId(false)
     }
   }
 
@@ -203,7 +251,14 @@ export default function VerificationDetailPage() {
   return (
     <>
       <LoadingModal
-        open={Boolean(busyDocId) || isApproving || isRejecting || isRequestingResubmission}
+        open={
+          Boolean(busyDocId) ||
+          isApproving ||
+          isRejecting ||
+          isRequestingResubmission ||
+          isReferringToSuperadmin ||
+          isGeneratingDigitalId
+        }
         title={loadingTitle}
         description="Please wait while the review action is saved and the submission details are refreshed."
       />
@@ -248,6 +303,54 @@ export default function VerificationDetailPage() {
           {message}
         </div>
       ) : null}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <WorkflowStageCard
+          step="1"
+          title="Document Review"
+          description="Admins and superadmins review each uploaded requirement one document at a time."
+          status={
+            profile.requiredDocuments.every((document) => document.reviewStatus === 'approved')
+              ? 'Documents cleared'
+              : profile.requiredDocuments.some((document) => document.reviewStatus === 'rejected')
+                ? 'Issues flagged'
+                : 'Review in progress'
+          }
+          tone={
+            profile.requiredDocuments.every((document) => document.reviewStatus === 'approved')
+              ? 'success'
+              : 'default'
+          }
+        />
+        <WorkflowStageCard
+          step="2"
+          title="Superadmin Handoff"
+          description="Regular admins hand fully reviewed submissions upward instead of issuing the Digital ID themselves."
+          status={
+            isPendingSuperadminGeneration
+              ? `Referred by ${profile.verificationReferredToSuperadminBy || 'admin'}`
+              : isSuperadmin
+                ? 'Awaiting superadmin decision'
+                : canVerify
+                  ? 'Ready for referral'
+                  : 'Waiting for completed document approvals'
+          }
+          tone={isPendingSuperadminGeneration ? 'info' : canVerify ? 'warning' : 'default'}
+        />
+        <WorkflowStageCard
+          step="3"
+          title="Digital ID Issuance"
+          description="The Digital ID appears in the youth app only after a superadmin generates and issues it."
+          status={
+            profile.digitalIdStatus === 'active'
+              ? 'Digital ID issued'
+              : isPendingSuperadminGeneration
+                ? 'Pending superadmin generation'
+                : 'Not yet issued'
+          }
+          tone={profile.digitalIdStatus === 'active' ? 'success' : isPendingSuperadminGeneration ? 'info' : 'default'}
+        />
+      </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_1fr]">
         <div className="space-y-5">
@@ -352,7 +455,7 @@ export default function VerificationDetailPage() {
                         value={docNotes[document.id] || ''}
                         onChange={(e) => setDocNotes((current) => ({ ...current, [document.id]: e.target.value }))}
                         rows={2}
-                        placeholder="Per-document review note"
+                        placeholder="Add a short review note, especially if you need to flag an issue."
                         className="surface-input mt-3 w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
                       />
                       <div className="mt-3 flex gap-2">
@@ -362,7 +465,7 @@ export default function VerificationDetailPage() {
                           disabled={busyDocId === document.id}
                           className="flex-1 rounded-xl bg-green-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                         >
-                          {busyDocId === document.id ? 'Saving...' : 'Approve Document'}
+                          {busyDocId === document.id ? 'Saving...' : 'Mark Approved'}
                         </button>
                         <button
                           type="button"
@@ -370,7 +473,7 @@ export default function VerificationDetailPage() {
                           disabled={busyDocId === document.id}
                           className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                         >
-                          {busyDocId === document.id ? 'Saving...' : 'Reject Document'}
+                          {busyDocId === document.id ? 'Saving...' : 'Flag Issue'}
                         </button>
                       </div>
                     </>
@@ -384,7 +487,7 @@ export default function VerificationDetailPage() {
             <div className="space-y-4">
               {!isSuperadmin ? (
                 <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Bulk approval is superadmin-only, but you can still review documents and process individual submissions here.
+                  Regular admins stop at document review. Once every required document is approved, the next responsibility is to refer the case to the superadmin for final verification and Digital ID issuance.
                 </p>
               ) : null}
 
@@ -420,51 +523,154 @@ export default function VerificationDetailPage() {
                 {isRequestingResubmission ? 'Sending request...' : 'Request Resubmission'}
               </button>
 
-              <div className="admin-card p-4">
-                <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Final Verification</p>
-                <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                  Only verify after every required document is present and approved.
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleVerify}
-                    disabled={!canVerify || isApproving}
-                    className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                    style={{ background: 'var(--accent)' }}
-                  >
-                    {isApproving ? 'Verifying...' : 'Verify Submission'}
-                  </button>
+              {isSuperadmin && !isPendingSuperadminGeneration ? (
+                <div className="admin-card p-4">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Final Verification</p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                    Only verify after every required document is present and approved. Digital ID visibility in the youth app still waits for a superadmin-issued Digital ID record.
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleVerify}
+                      disabled={!canVerify || isApproving}
+                      className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                      style={{ background: 'var(--accent)' }}
+                    >
+                      {isApproving ? 'Verifying...' : 'Verify Submission'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                <p className="text-sm font-semibold text-red-700">Reject Entire Submission</p>
-                <div className="mt-3 space-y-3">
-                  <input
-                    type="text"
-                    value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
-                    placeholder="Reason shown to the youth member"
-                    className="w-full rounded-xl border border-red-200 px-4 py-2.5 text-sm"
-                  />
-                  <textarea
-                    value={rejectNote}
-                    onChange={(e) => setRejectNote(e.target.value)}
-                    rows={3}
-                    placeholder="Internal or supporting note"
-                    className="w-full rounded-xl border border-red-200 px-4 py-2.5 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleReject}
-                    disabled={isRejecting || !rejectReason.trim()}
-                    className="w-full rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {isRejecting ? 'Rejecting...' : 'Reject Submission'}
-                  </button>
+              {canOpenReferralFlow ? (
+                <div className="admin-card p-4">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                    Admin Handoff to Superadmin
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                    Once all required documents are approved, refer the submission upward. The superadmin will review the handoff and generate the Digital ID that appears in the youth app.
+                  </p>
+                  {profile.verificationDocumentsApprovedAt || profile.verificationDocumentsApprovedBy ? (
+                    <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">
+                      Documents cleared by {profile.verificationDocumentsApprovedBy || 'admin'} on{' '}
+                      {formatDateTime(profile.verificationDocumentsApprovedAt || undefined)}.
+                    </div>
+                  ) : null}
+                  {profile.digitalIdApprovalRequestedAt ? (
+                    <p className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                      Last referral sent {formatDateTime(profile.verificationReferredToSuperadminAt || profile.digitalIdApprovalRequestedAt || undefined)}
+                      {profile.verificationReferredToSuperadminBy || profile.digitalIdApprovalRequestedBy
+                        ? ` by ${profile.verificationReferredToSuperadminBy || profile.digitalIdApprovalRequestedBy}`
+                        : ''}.
+                    </p>
+                  ) : null}
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleReferToSuperadmin}
+                      disabled={!canReferToSuperadmin || isReferringToSuperadmin}
+                      className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                      style={{ background: 'var(--ink)' }}
+                    >
+                      {isReferringToSuperadmin
+                        ? 'Sending referral...'
+                        : profile.status !== 'verified'
+                          ? 'Refer to Superadmin for Final Verification'
+                        : profile.digitalIdApprovalRequestedAt
+                          ? 'Send Reminder to Superadmin'
+                          : 'Refer to Superadmin for ID Generation'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
+
+              {isSuperadmin && isPendingSuperadminGeneration ? (
+                <div className="admin-card p-4">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                    Superadmin Digital ID Issuance
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                    This submission was already cleared at the admin document-review stage. Your action here finalizes the review and issues the Digital ID.
+                  </p>
+                  <div className="mt-3 grid gap-2 rounded-2xl bg-[color:var(--accent-soft)] p-4 text-sm">
+                    <DetailRowCompact
+                      label="Approved by Admin"
+                      value={profile.verificationDocumentsApprovedBy || 'Not recorded'}
+                    />
+                    <DetailRowCompact
+                      label="Approved On"
+                      value={formatDateTime(profile.verificationDocumentsApprovedAt || undefined)}
+                    />
+                    <DetailRowCompact
+                      label="Referred by Admin"
+                      value={profile.verificationReferredToSuperadminBy || 'Not recorded'}
+                    />
+                    <DetailRowCompact
+                      label="Referred On"
+                      value={formatDateTime(profile.verificationReferredToSuperadminAt || profile.digitalIdApprovalRequestedAt || undefined)}
+                    />
+                  </div>
+
+                  {!profile.digitalIdEmergencyContactComplete ? (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      The member still needs a complete emergency contact before you can generate the Digital ID.
+                    </div>
+                  ) : null}
+
+                  {!profile.digitalIdSignatureComplete ? (
+                    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                      The member still needs a saved Digital ID signature before you can generate the Digital ID.
+                    </div>
+                  ) : null}
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleGenerateDigitalId}
+                      disabled={
+                        isGeneratingDigitalId ||
+                        !profile.digitalIdEmergencyContactComplete ||
+                        !profile.digitalIdSignatureComplete
+                      }
+                      className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                      style={{ background: 'var(--accent)' }}
+                    >
+                      {isGeneratingDigitalId ? 'Generating Digital ID...' : 'Generate Digital ID'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {isSuperadmin ? (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-semibold text-red-700">Reject Entire Submission</p>
+                  <div className="mt-3 space-y-3">
+                    <input
+                      type="text"
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Reason shown to the youth member"
+                      className="w-full rounded-xl border border-red-200 px-4 py-2.5 text-sm"
+                    />
+                    <textarea
+                      value={rejectNote}
+                      onChange={(e) => setRejectNote(e.target.value)}
+                      rows={3}
+                      placeholder="Internal or supporting note"
+                      className="w-full rounded-xl border border-red-200 px-4 py-2.5 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleReject}
+                      disabled={isRejecting || !rejectReason.trim()}
+                      className="w-full rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      {isRejecting ? 'Rejecting...' : 'Reject Submission'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </Panel>
         </div>
@@ -527,13 +733,17 @@ function QueueStatusBadge({ status }: { status: string }) {
       ? 'bg-amber-50 text-amber-700'
       : status === 'in_review'
         ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
+        : status === 'pending_superadmin_id_generation'
+          ? 'bg-sky-100 text-sky-800'
         : status === 'resubmission_requested'
           ? 'bg-red-100 text-red-700'
-          : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
+          : status === 'verified'
+            ? 'bg-green-100 text-green-700'
+            : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
 
   return (
     <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', className)}>
-      {prettify(status)}
+      {prettifyStatusLabel(status)}
     </span>
   )
 }
@@ -552,8 +762,42 @@ function DocumentStatusBadge({ status }: { status: string }) {
 
   return (
     <span className={cn('inline-flex rounded-full px-2 py-1 text-[11px] font-semibold', className)}>
-      {prettify(status)}
+      {prettifyDocumentStatus(status)}
     </span>
+  )
+}
+
+function WorkflowStageCard({
+  step,
+  title,
+  description,
+  status,
+  tone,
+}: {
+  step: string
+  title: string
+  description: string
+  status: string
+  tone: 'default' | 'warning' | 'info' | 'success'
+}) {
+  const toneClass =
+    tone === 'success'
+      ? 'border-green-200 bg-green-50'
+      : tone === 'info'
+        ? 'border-sky-200 bg-sky-50'
+        : tone === 'warning'
+          ? 'border-amber-200 bg-amber-50'
+          : 'border-[color:var(--stroke)] bg-[color:var(--card)]'
+
+  return (
+    <div className={cn('rounded-2xl border p-4', toneClass)}>
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
+        Step {step}
+      </p>
+      <h3 className="mt-2 text-sm font-black" style={{ color: 'var(--ink)' }}>{title}</h3>
+      <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>{description}</p>
+      <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>{status}</p>
+    </div>
   )
 }
 
@@ -572,12 +816,48 @@ function formatDate(value?: string) {
   return date.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+function formatDateTime(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 function formatBool(value?: boolean | string) {
   if (value === true || value === 'Yes') return 'Yes'
   if (value === false || value === 'No') return 'No'
   return '-'
 }
 
-function prettify(value: string) {
+function prettifyStatusLabel(value: string) {
+  if (value === 'pending_superadmin_id_generation') return 'Pending Superadmin ID Generation'
+  if (value === 'in_review') return 'Documents In Review'
+  if (value === 'pending') return 'Awaiting Document Review'
+  if (value === 'resubmission_requested') return 'Resubmission Requested'
   return value.split('_').join(' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function prettifyDocumentStatus(value: string) {
+  if (value === 'rejected') return 'Flagged'
+  if (value === 'pending') return 'Needs Review'
+  return prettifyStatusLabel(value)
+}
+
+function DetailRowCompact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted)' }}>
+        {label}
+      </span>
+      <span className="text-right text-sm" style={{ color: 'var(--accent-strong)' }}>
+        {value}
+      </span>
+    </div>
+  )
 }

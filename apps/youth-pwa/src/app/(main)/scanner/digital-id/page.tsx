@@ -12,8 +12,11 @@ import { useAuthStore } from '@/store/authStore'
 import { useUserStore } from '@/store/userStore'
 
 interface DigitalIDData {
-  qrCode: string
-  memberId: string
+  status: string
+  idNumber?: string
+  digitalIdStatus?: string | null
+  qrCode?: string
+  memberId?: string
   photoUrl?: string | null
   digitalIdSignatureUrl?: string | null
 }
@@ -48,16 +51,52 @@ export default function DigitalIDPage() {
   const isVerified = profile?.status === 'verified'
   const emergencyContactComplete = hasCompleteEmergencyContact(profile)
   const signatureComplete = hasDigitalIdSignature(profile)
+  const digitalIdStatus = String(idData?.digitalIdStatus || profile?.digitalIdStatus || '').trim() || null
+  const isDigitalIdReady = Boolean(
+    (idData?.status === 'verified' || digitalIdStatus === 'active') &&
+      (idData?.memberId || idData?.idNumber)
+  )
   const queueStatus = profile?.verificationQueueStatus || (profile?.documentsSubmitted ? 'pending' : 'not_submitted')
   const isRejected = profile?.status === 'rejected' || queueStatus === 'rejected'
   const hasSubmittedDocuments = Boolean(
     profile?.documentsSubmitted &&
-      ['pending', 'in_review', 'resubmission_requested', 'verified'].includes(queueStatus)
+      ['pending', 'in_review', 'pending_superadmin_id_generation', 'resubmission_requested', 'verified'].includes(queueStatus)
   )
   const isUnderReview = !isVerified && hasSubmittedDocuments && queueStatus !== 'resubmission_requested'
   const needsResubmission = queueStatus === 'resubmission_requested'
   const digitalIdPhotoUrl = idData?.photoUrl || profile?.idPhotoUrl || null
   const digitalIdSignatureUrl = idData?.digitalIdSignatureUrl || profile?.digitalIdSignatureUrl || null
+  const awaitingSuperadminTitle =
+    digitalIdStatus === 'deactivated' ? 'Digital ID Deactivated' : 'Awaiting Superadmin Approval'
+  const awaitingSuperadminMessage =
+    digitalIdStatus === 'deactivated'
+      ? 'Your Digital ID is currently inactive. Please contact your SK office if it needs to be restored.'
+      : digitalIdStatus === 'draft'
+        ? 'Your verification is complete. Your Digital ID draft is prepared, but the superadmin still needs to issue and activate it before it appears here.'
+        : 'Your verification is complete. Your Digital ID will appear here after the superadmin generates and issues it.'
+  const headerStatus = isDigitalIdReady
+    ? {
+        dot: 'bg-[#38a169]',
+        label: 'Digital ID Active',
+        text: 'text-[#38a169]',
+      }
+    : digitalIdStatus === 'deactivated'
+      ? {
+          dot: 'bg-[#d64545]',
+          label: 'Digital ID Inactive',
+          text: 'text-[#d64545]',
+        }
+    : isVerified
+      ? {
+          dot: 'bg-[#0572DC]',
+          label: 'Awaiting Superadmin',
+          text: 'text-[#0572DC]',
+        }
+      : {
+          dot: 'bg-[#FCB315]',
+          label: 'Not Yet Verified',
+          text: 'text-[#FCB315]',
+        }
 
   useEffect(() => {
     let active = true
@@ -97,7 +136,10 @@ export default function DigitalIDPage() {
 
     setIsLoading(true)
     getDigitalID()
-      .then(setIdData)
+      .then((nextIdData) => {
+        setIdData(nextIdData)
+        setError('')
+      })
       .catch(() => {
         setErrorTitle('Digital ID Unavailable')
         setError('Could not load your Digital ID right now.')
@@ -115,7 +157,7 @@ export default function DigitalIDPage() {
     try {
       const pdf = await buildDigitalIdPdf({
         profile,
-        memberId: idData.memberId,
+        memberId: idData.memberId || idData.idNumber || '',
         photoUrl: digitalIdPhotoUrl,
         signatureUrl: digitalIdSignatureUrl,
       })
@@ -151,13 +193,9 @@ export default function DigitalIDPage() {
               </h1>
               <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium">
                 <span
-                  className={`inline-block h-2.5 w-2.5 rounded-full ${
-                    isVerified ? 'bg-[#38a169]' : 'bg-[#FCB315]'
-                  }`}
+                  className={`inline-block h-2.5 w-2.5 rounded-full ${headerStatus.dot}`}
                 />
-                <span className={isVerified ? 'text-[#38a169]' : 'text-[#FCB315]'}>
-                  {isVerified ? 'Verified' : 'Not Yet Verified'}
-                </span>
+                <span className={headerStatus.text}>{headerStatus.label}</span>
               </div>
             </div>
           </div>
@@ -367,8 +405,9 @@ export default function DigitalIDPage() {
             </p>
 
             <p className="mt-8 max-w-[290px] text-[13px] leading-[1.6] text-[#d69b13]">
-              We&apos;ll send you a notification as soon as your Digital ID and
-              exclusive rewards are unlocked.
+              We&apos;ll send you a notification as soon as your verification
+              decision is ready. Rewards unlock after approval, and your Digital
+              ID appears after final superadmin issuance.
             </p>
           </div>
         ) : !isVerified ? (
@@ -418,11 +457,42 @@ export default function DigitalIDPage() {
               Check Verification Status
             </Link>
           </div>
+        ) : !isDigitalIdReady ? (
+          <div className="mx-auto flex max-w-[340px] flex-col items-center text-center">
+            <h2 className="text-[20px] font-extrabold text-[#014384]">
+              {awaitingSuperadminTitle}
+            </h2>
+
+            <div className="mt-10 flex items-center justify-center">
+              <Image
+                src="/images/DocumentsSubmitted.png"
+                alt="Awaiting Digital ID approval"
+                width={150}
+                height={150}
+                className="h-auto w-[150px] object-contain"
+              />
+            </div>
+
+            <p className="mt-10 text-[17px] leading-[1.6] text-[#1e4f91]">
+              {awaitingSuperadminMessage}
+            </p>
+
+            <p className="mt-4 max-w-[290px] text-[13px] leading-[1.6] text-[#6f87a8]">
+              We&apos;ll show the final card here as soon as the superadmin finishes the Digital ID issuance step.
+            </p>
+
+            <Link
+              href="/verification/status"
+              className="mt-10 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
+            >
+              Check Verification Status
+            </Link>
+          </div>
         ) : (
           <div className="space-y-5">
             <DigitalIDCard
               profile={profile}
-              memberId={idData.memberId}
+              memberId={idData.memberId || idData.idNumber || ''}
               photoUrl={digitalIdPhotoUrl}
               signatureUrl={digitalIdSignatureUrl}
             />
