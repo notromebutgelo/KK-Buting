@@ -104,6 +104,7 @@ export default function DigitalIdsPage() {
   const [adminRole, setAdminRole] = useState('admin')
   const [message, setMessage] = useState('')
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const [preferredMemberId, setPreferredMemberId] = useState<string | null>(null)
   const [selectedMember, setSelectedMember] = useState<DigitalIdDetail | null>(null)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [pagination, setPagination] = useState<DigitalIdResponse['pagination']>({
@@ -134,6 +135,15 @@ export default function DigitalIdsPage() {
     members.length > 0 && members.every((member) => selectedIds.includes(member.uid))
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const memberFromQuery = new URLSearchParams(window.location.search).get('member')
+    if (memberFromQuery) {
+      setPreferredMemberId(memberFromQuery)
+      setSelectedMemberId(memberFromQuery)
+    }
+  }, [])
+
+  useEffect(() => {
     setCurrentPage(1)
   }, [status, search])
 
@@ -156,7 +166,9 @@ export default function DigitalIdsPage() {
         setSummary(idsRes.data.summary)
         setAdminRole(meRes.data?.role || window.localStorage.getItem('kk-admin-role') || 'admin')
 
-        if (!selectedMemberId && nextMembers[0]?.uid) {
+        if (preferredMemberId) {
+          setSelectedMemberId(preferredMemberId)
+        } else if (!selectedMemberId && nextMembers[0]?.uid) {
           setSelectedMemberId(nextMembers[0].uid)
         } else if (
           selectedMemberId &&
@@ -177,7 +189,7 @@ export default function DigitalIdsPage() {
     return () => {
       mounted = false
     }
-  }, [queryParams, selectedMemberId])
+  }, [preferredMemberId, queryParams, selectedMemberId])
 
   useEffect(() => {
     if (!selectedMemberId) {
@@ -248,7 +260,7 @@ export default function DigitalIdsPage() {
 
       if (action === 'submit') {
         await api.post(`/admin/digital-ids/${member.uid}/submit`)
-        setMessage('Digital ID sent to Superadmin for approval.')
+        setMessage('Digital ID request queued for superadmin generation.')
       }
 
       if (action === 'approve') {
@@ -348,7 +360,7 @@ export default function DigitalIdsPage() {
         <div>
           <h1 className="text-2xl font-black" style={{ color: 'var(--ink)' }}>Digital IDs</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
-            Review the admin handoff, then generate and issue the Digital ID that becomes visible in the youth app.
+            This is the superadmin issuance queue. Review the admin handoff here, then generate and issue the Digital ID that becomes visible in the youth app.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -557,25 +569,25 @@ export default function DigitalIdsPage() {
               <DigitalIdPreviewCard member={selectedMember} />
 
               {selectedMember.digitalIdStatus === 'pending_approval' ? (
-                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                <div className="admin-tone-surface admin-tone-body rounded-2xl px-4 py-3 text-sm" data-tone="info">
                   This request is waiting for superadmin issuance. The youth member will only see the Digital ID after you generate and activate it here.
                 </div>
               ) : null}
 
               {!selectedMember.emergencyContactComplete ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <div className="admin-tone-surface admin-tone-body rounded-2xl px-4 py-3 text-sm" data-tone="warning">
                   The youth member still needs to add a complete emergency contact before this Digital ID can be generated, submitted, approved, or regenerated.
                 </div>
               ) : null}
 
               {!selectedMember.signatureComplete ? (
-                <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                <div className="admin-tone-surface admin-tone-body rounded-2xl px-4 py-3 text-sm" data-tone="info">
                   The youth member still needs to save a Digital ID signature before this Digital ID can be generated, submitted, approved, or regenerated.
                 </div>
               ) : null}
 
               {!isSuperadmin && ['pending_approval', 'draft'].includes(selectedMember.digitalIdStatus) ? (
-                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                <div className="admin-tone-surface admin-tone-body rounded-2xl px-4 py-3 text-sm" data-tone="info">
                   Superadmins are responsible for issuing the Digital ID after admin verification is complete.
                 </div>
               ) : null}
@@ -636,35 +648,20 @@ function SummaryTile({
   value: number
   tone: 'draft' | 'pending' | 'active' | 'deactivated'
 }) {
-  const bg =
-    tone === 'draft'
-      ? 'bg-amber-50'
-      : tone === 'pending'
-        ? 'bg-[color:var(--accent-soft)]'
-        : tone === 'active'
-          ? 'bg-green-50'
-          : 'bg-red-50'
-
   return (
-    <div className={cn('admin-card px-4 py-4', bg)}>
-      <p className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>{label}</p>
-      <p className="mt-2 text-2xl font-black" style={{ color: 'var(--ink)' }}>{value.toLocaleString()}</p>
+    <div className="admin-tone-surface rounded-[var(--radius-md)] px-4 py-4" data-tone={getSummaryTone(tone)}>
+      <p className="admin-tone-eyebrow text-xs font-bold uppercase tracking-[0.16em]">{label}</p>
+      <p className="admin-tone-title mt-2 text-2xl font-black">{value.toLocaleString()}</p>
     </div>
   )
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const className =
-    status === 'draft'
-      ? 'bg-amber-50 text-amber-700'
-      : status === 'pending_approval'
-        ? 'bg-sky-100 text-sky-800'
-        : status === 'active'
-          ? 'bg-green-100 text-green-700'
-          : 'bg-red-100 text-red-700'
-
   return (
-    <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', className)}>
+    <span
+      data-tone={getDigitalIdTone(status)}
+      className="admin-status-pill rounded-full px-2.5 py-1 text-xs font-semibold"
+    >
       {prettifyStatus(status)}
     </span>
   )
@@ -763,6 +760,20 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <span className="text-right text-sm" style={{ color: 'var(--accent-strong)' }}>{value}</span>
     </div>
   )
+}
+
+function getSummaryTone(tone: 'draft' | 'pending' | 'active' | 'deactivated') {
+  if (tone === 'draft') return 'warning'
+  if (tone === 'pending') return 'info'
+  if (tone === 'active') return 'success'
+  return 'danger'
+}
+
+function getDigitalIdTone(status: string) {
+  if (status === 'draft') return 'warning'
+  if (status === 'pending_approval') return 'info'
+  if (status === 'active') return 'success'
+  return 'danger'
 }
 
 function DigitalIdPreviewCard({ member }: { member: DigitalIdDetail }) {

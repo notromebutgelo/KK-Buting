@@ -1,11 +1,59 @@
 import { FieldValue } from "firebase-admin/firestore";
 
-import { db } from "../../config/firebase";
+import { auth, db } from "../../config/firebase";
 import {
   NotificationInput,
   normalizeNotificationRecord,
   sortNotificationsNewestFirst,
 } from "./notifications.helpers";
+
+function normalizeRole(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+async function listRecipientUidsFromRoleDocuments(roles: string[]) {
+  const recipientIds = new Set<string>();
+
+  await Promise.allSettled(
+    roles.map(async (role) => {
+      const snap = await db.collection("users").where("role", "==", role).get();
+      for (const doc of snap.docs) {
+        if (doc.id) {
+          recipientIds.add(doc.id);
+        }
+      }
+    })
+  );
+
+  return [...recipientIds];
+}
+
+async function listRecipientUidsFromAuthClaims(roles: string[]) {
+  if (!auth || typeof auth.listUsers !== "function") {
+    return [];
+  }
+
+  const roleSet = new Set(roles.map((role) => normalizeRole(role)).filter(Boolean));
+  if (!roleSet.size) {
+    return [];
+  }
+
+  const recipientIds = new Set<string>();
+  let pageToken: string | undefined;
+
+  do {
+    const page = await auth.listUsers(1000, pageToken);
+    for (const user of page.users || []) {
+      const role = normalizeRole(user.customClaims?.role);
+      if (roleSet.has(role) && user.uid) {
+        recipientIds.add(user.uid);
+      }
+    }
+    pageToken = page.pageToken;
+  } while (pageToken);
+
+  return [...recipientIds];
+}
 
 export async function createNotification({
   recipientUid,
@@ -38,13 +86,24 @@ export async function createNotificationsForRoles(
   roles: string[],
   notification: Omit<NotificationInput, "recipientUid">
 ) {
-  const uniqueRoles = Array.from(new Set(roles.map((role) => String(role || "").trim()).filter(Boolean)));
+  const uniqueRoles = Array.from(
+    new Set(roles.map((role) => normalizeRole(role)).filter(Boolean))
+  );
   if (!uniqueRoles.length) {
     return { notified: 0 };
   }
 
-  const usersSnap = await db.collection("users").where("role", "in", uniqueRoles.slice(0, 10)).get();
-  const recipientIds = Array.from(new Set(usersSnap.docs.map((doc) => doc.id).filter(Boolean)));
+  const [documentRecipients, authRecipients] = await Promise.allSettled([
+    listRecipientUidsFromRoleDocuments(uniqueRoles),
+    listRecipientUidsFromAuthClaims(uniqueRoles),
+  ]);
+
+  const recipientIds = Array.from(
+    new Set([
+      ...(documentRecipients.status === "fulfilled" ? documentRecipients.value : []),
+      ...(authRecipients.status === "fulfilled" ? authRecipients.value : []),
+    ])
+  );
 
   await Promise.allSettled(
     recipientIds.map((recipientUid) =>

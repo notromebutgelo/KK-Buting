@@ -152,6 +152,31 @@ function getRequiredDocumentTypes(ageGroup?: string) {
   ];
 }
 
+function hasAllRequiredDocumentsApproved(
+  profile: Record<string, any>,
+  documents: Record<string, any>[]
+) {
+  const latestByType = new Map<string, Record<string, any>>();
+
+  for (const document of [...documents].sort((a, b) =>
+    String(toIso(b.uploadedAt) || "").localeCompare(String(toIso(a.uploadedAt) || ""))
+  )) {
+    const type = String(document.documentType || "");
+    if (type && !latestByType.has(type)) {
+      latestByType.set(type, document);
+    }
+  }
+
+  return getRequiredDocumentTypes(profile.youthAgeGroup).every((type) => {
+    const document = latestByType.get(type);
+    if (!document) {
+      return false;
+    }
+
+    return normalizeDocumentStatus(document) === "approved";
+  });
+}
+
 function getDocumentLabel(type: string) {
   return DOCUMENT_LABELS[type] || type.split("_").join(" ");
 }
@@ -174,15 +199,27 @@ function getDocumentBucketCandidates() {
 }
 
 function computeQueueStatus(profile: Record<string, any>, documents: Record<string, any>[]) {
-  const explicitStatus = String(profile.verificationQueueStatus || "");
-  if (explicitStatus) return explicitStatus;
-  if (profile.status === "verified") return "verified";
-  if (profile.status === "rejected") return "rejected";
-  if (profile.verificationReferredToSuperadminAt || profile.digitalIdApprovalRequestedAt) {
+  const finalStatus = String(profile.status || "pending");
+  if (finalStatus === "rejected") return "rejected";
+  if (
+    (finalStatus === "verified" && profile.verificationReferredToSuperadminAt) ||
+    (finalStatus === "verified" && profile.digitalIdApprovalRequestedAt) ||
+    (finalStatus === "verified" &&
+      resolveDigitalIdStatus(profile) === "pending_approval" &&
+      hasAllRequiredDocumentsApproved(profile, documents))
+  ) {
     return PENDING_SUPERADMIN_ID_GENERATION;
   }
+  if (finalStatus === "verified") return "verified";
   if (documents.some((document) => normalizeDocumentStatus(document) === "resubmission_requested")) {
     return "resubmission_requested";
+  }
+  if (
+    documents.some((document) =>
+      ["approved", "rejected"].includes(normalizeDocumentStatus(document))
+    )
+  ) {
+    return "in_review";
   }
   if (documents.length > 0) return "pending";
   return "not_submitted";

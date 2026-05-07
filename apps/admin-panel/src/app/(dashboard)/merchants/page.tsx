@@ -15,7 +15,6 @@ import {
   AdminSurface,
   AdminSurfaceHeader,
   AdminTabBar,
-  AdminTableShell,
 } from '@/components/admin/workspace'
 import { DashboardMiniStat, DashboardPill } from '@/components/dashboard/primitives'
 import { cn } from '@/utils/cn'
@@ -51,7 +50,8 @@ interface MerchantTransaction {
   createdAt?: string
 }
 
-type MerchantTab = 'applications' | 'directory' | 'transactions' | 'create'
+type MerchantTab = 'directory' | 'transactions' | 'create'
+const MERCHANT_TRANSACTION_PAGE_SIZE = 6
 
 const statusOptions: Array<{ value: MerchantStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All statuses' },
@@ -88,11 +88,12 @@ export default function MerchantsPage() {
   const [merchants, setMerchants] = useState<Merchant[]>([])
   const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<MerchantTransaction[]>([])
-  const [activeTab, setActiveTab] = useState<MerchantTab>('applications')
+  const [activeTab, setActiveTab] = useState<MerchantTab>('directory')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<MerchantStatus | 'all'>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [dateJoinedFilter, setDateJoinedFilter] = useState('')
+  const [transactionPage, setTransactionPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -137,18 +138,16 @@ export default function MerchantsPage() {
         (joinedDate &&
           !Number.isNaN(joinedDate.getTime()) &&
           joinedDate.toISOString().slice(0, 10) === dateJoinedFilter)
-      const matchesTab =
-        activeTab === 'applications'
-          ? merchant.status === 'pending'
-          : activeTab === 'directory'
-            ? merchant.status !== 'pending'
-            : true
-      return matchesSearch && matchesStatus && matchesCategory && matchesDate && matchesTab
+      return matchesSearch && matchesStatus && matchesCategory && matchesDate
     })
-  }, [activeTab, categoryFilter, dateJoinedFilter, merchants, search, statusFilter])
+  }, [categoryFilter, dateJoinedFilter, merchants, search, statusFilter])
 
   const selectedMerchant =
-    merchants.find((merchant) => merchant.id === selectedMerchantId) || filteredMerchants[0] || null
+    filteredMerchants.find((merchant) => merchant.id === selectedMerchantId) ||
+    merchants.find((merchant) => merchant.id === selectedMerchantId) ||
+    filteredMerchants[0] ||
+    merchants[0] ||
+    null
 
   const categoryOptions = useMemo(
     () =>
@@ -157,6 +156,19 @@ export default function MerchantsPage() {
       ),
     [merchants]
   )
+
+  useEffect(() => {
+    if (!filteredMerchants.length) {
+      setSelectedMerchantId(null)
+      return
+    }
+
+    setSelectedMerchantId((current) =>
+      current && filteredMerchants.some((merchant) => merchant.id === current)
+        ? current
+        : filteredMerchants[0]?.id || null
+    )
+  }, [filteredMerchants])
 
   useEffect(() => {
     let mounted = true
@@ -215,6 +227,10 @@ export default function MerchantsPage() {
       mounted = false
     }
   }, [selectedMerchant])
+
+  useEffect(() => {
+    setTransactionPage(1)
+  }, [activeTab, selectedMerchantId])
 
   async function refreshMerchants(preferredId?: string | null) {
     const res = await api.get('/admin/merchants')
@@ -338,20 +354,45 @@ export default function MerchantsPage() {
   }
 
   const counts = {
-    applications: merchants.filter((merchant) => merchant.status === 'pending').length,
+    total: merchants.length,
+    pending: merchants.filter((merchant) => merchant.status === 'pending').length,
     active: merchants.filter((merchant) => merchant.status === 'approved').length,
     suspended: merchants.filter((merchant) => merchant.status === 'suspended').length,
     transactions: transactions.length,
   }
 
   const tabs: Array<{ id: MerchantTab; label: string; count?: number }> = [
-    { id: 'applications', label: 'Applications', count: counts.applications },
-    { id: 'directory', label: 'Directory', count: merchants.filter((merchant) => merchant.status !== 'pending').length },
+    { id: 'directory', label: 'Directory', count: counts.total },
     { id: 'transactions', label: 'Transactions', count: counts.transactions },
     ...(isSuperadmin ? [{ id: 'create' as const, label: 'Create merchant' }] : []),
   ]
 
   const messageTone = message.toLowerCase().includes('could not') || message.toLowerCase().includes('failed') ? 'danger' : 'success'
+  const isTransactionsTab = activeTab === 'transactions'
+  const listSurfaceTitle = isTransactionsTab ? 'Merchant transaction selector' : 'Merchant directory'
+  const listSurfaceDescription = isTransactionsTab
+    ? 'Choose a merchant on the left, then review their paginated QR and points-award history on the right.'
+    : 'Use the list to select a merchant record, then maintain storefront details, status, and policy copy from the detail panel.'
+
+  const transactionPageCount = Math.max(1, Math.ceil(transactions.length / MERCHANT_TRANSACTION_PAGE_SIZE))
+  const paginatedTransactions = useMemo(() => {
+    const start = (transactionPage - 1) * MERCHANT_TRANSACTION_PAGE_SIZE
+    return transactions.slice(start, start + MERCHANT_TRANSACTION_PAGE_SIZE)
+  }, [transactionPage, transactions])
+  const transactionPages = useMemo(
+    () => buildPaginationPages(transactionPage, transactionPageCount),
+    [transactionPage, transactionPageCount]
+  )
+  const transactionRangeStart = transactions.length
+    ? (transactionPage - 1) * MERCHANT_TRANSACTION_PAGE_SIZE + 1
+    : 0
+  const transactionRangeEnd = transactions.length
+    ? transactionRangeStart + paginatedTransactions.length - 1
+    : 0
+
+  useEffect(() => {
+    setTransactionPage((current) => Math.min(current, transactionPageCount))
+  }, [transactionPageCount])
 
   return (
     <>
@@ -364,23 +405,23 @@ export default function MerchantsPage() {
       <div className="flex flex-col gap-6">
         <AdminPageIntro
           eyebrow="Merchant operations"
-          title="Handle merchant onboarding, storefront policy cleanup, and lifecycle actions from one calmer workspace."
-          description="This page now separates queue review from merchant detail work, so you can scan applications quickly and still get a strong side panel for profile editing, status actions, and transaction context."
+          title="Manage merchant records, storefront details, and transaction activity from one calmer workspace."
+          description="Merchant accounts are provisioned manually by superadmin from this page, so the workspace now focuses on directory maintenance, transaction review, and lifecycle controls instead of application intake."
           pills={[
             <DashboardPill key="role" tone={isSuperadmin ? 'soft' : 'default'}>
               {isSuperadmin ? 'Superadmin controls enabled' : 'Admin access'}
             </DashboardPill>,
-            <DashboardPill key="queue" tone={counts.applications > 0 ? 'warning' : 'default'}>
-              {counts.applications > 0 ? 'Applications waiting' : 'Queue clear'}
+            <DashboardPill key="queue" tone={counts.pending > 0 ? 'warning' : 'default'}>
+              {counts.pending > 0 ? 'Pending merchant records' : 'Manual creation flow'}
             </DashboardPill>,
           ]}
           aside={
             <div className="grid grid-cols-2 gap-3">
               <DashboardMiniStat
-                label="Pending apps"
-                value={counts.applications.toLocaleString()}
-                meta="Merchants waiting for review"
-                tone={counts.applications > 0 ? 'warning' : 'soft'}
+                label="Merchant records"
+                value={counts.total.toLocaleString()}
+                meta="Profiles stored in the directory"
+                tone="soft"
               />
               <DashboardMiniStat
                 label="Active merchants"
@@ -394,28 +435,28 @@ export default function MerchantsPage() {
 
         <AdminStatGrid>
         <AdminStatCard
-          label="Applications queue"
-          value={counts.applications.toLocaleString()}
-          meta="Incoming merchants that still need a decision."
-          accent="var(--accent-warm)"
-        />
-        <AdminStatCard
-          label="Active directory"
-          value={counts.active.toLocaleString()}
-          meta="Approved merchants currently able to operate in the ecosystem."
+          label="Merchant records"
+          value={counts.total.toLocaleString()}
+          meta="Every merchant profile currently stored in the directory."
           accent="var(--accent)"
         />
         <AdminStatCard
-          label="Suspended"
-          value={counts.suspended.toLocaleString()}
-          meta="Partners temporarily paused from normal activity."
-          accent="rgba(1, 67, 132, 0.34)"
+          label="Active merchants"
+          value={counts.active.toLocaleString()}
+          meta="Approved merchants currently able to operate in the ecosystem."
+          accent="var(--accent-strong)"
+        />
+        <AdminStatCard
+          label="Pending status review"
+          value={counts.pending.toLocaleString()}
+          meta="Legacy or imported merchant records that still need a decision."
+          accent="var(--accent-warm)"
         />
         <AdminStatCard
           label="Selected transactions"
           value={counts.transactions.toLocaleString()}
-          meta="Recent QR and points-award activity for the merchant you are reviewing."
-          accent="var(--accent-strong)"
+          meta="QR and points-award activity for the merchant currently in focus."
+          accent="rgba(1, 67, 132, 0.34)"
         />
         </AdminStatGrid>
 
@@ -468,7 +509,7 @@ export default function MerchantsPage() {
               <AdminSurface>
                 <AdminSurfaceHeader
                   title="Create merchant account"
-                  description="Generate a merchant login and register the business in one step. This route is intended for superadmin-led onboarding."
+                  description="Provision a merchant login and register the business in one step. Merchant accounts are created manually from this workspace."
                   action={<DashboardPill tone="soft">Immediate activation</DashboardPill>}
                 />
 
@@ -589,11 +630,11 @@ export default function MerchantsPage() {
             )}
           </div>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-[1.16fr_0.84fr]">
-            <AdminSurface>
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(360px,0.88fr)]">
+            <AdminSurface className="h-full">
               <AdminSurfaceHeader
-                title={activeTab === 'applications' ? 'Merchant applications' : activeTab === 'directory' ? 'Merchant directory' : 'Merchants and transactions'}
-                description="The left side stays focused on selection and queue scanning, while detailed editing and actions stay on the right."
+                title={listSurfaceTitle}
+                description={listSurfaceDescription}
                 action={<DashboardPill tone="default">{filteredMerchants.length} shown</DashboardPill>}
               />
 
@@ -667,250 +708,85 @@ export default function MerchantsPage() {
                     description="Adjust the search, status, category, or date filters to surface more merchant records."
                   />
                 ) : (
-                  <AdminTableShell minWidth="860px">
-                    <table className="w-full">
-                      <thead style={{ background: 'var(--accent-soft)' }}>
-                        <tr>
-                          {['Merchant', 'Category', 'Status', 'Owner', 'Date Joined', 'Points Rate'].map((heading, index) => (
-                            <th
-                              key={heading}
-                              className={cn(
-                                'px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em]',
-                                index === 5 ? 'text-right' : 'text-left'
-                              )}
-                              style={{ color: 'var(--muted)' }}
-                            >
-                              {heading}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y" style={{ borderColor: 'var(--stroke)' }}>
-                        {filteredMerchants.map((merchant) => {
-                          const isSelected = selectedMerchant?.id === merchant.id
-                          return (
-                            <tr
-                              key={merchant.id}
-                              onClick={() => setSelectedMerchantId(merchant.id)}
-                              className="cursor-pointer transition-colors"
-                              style={{
-                                background: isSelected ? 'color-mix(in srgb, var(--accent-soft) 88%, transparent)' : 'transparent',
-                              }}
-                              onMouseEnter={(event) => {
-                                if (!isSelected) {
-                                  ;(event.currentTarget as HTMLElement).style.background =
-                                    'color-mix(in srgb, var(--surface-muted) 76%, transparent)'
-                                }
-                              }}
-                              onMouseLeave={(event) => {
-                                if (!isSelected) {
-                                  ;(event.currentTarget as HTMLElement).style.background = 'transparent'
-                                }
-                              }}
-                            >
-                              <td className="px-5 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl"
-                                    style={{ background: 'var(--surface-muted)' }}
-                                  >
-                                    {merchant.logoUrl || merchant.imageUrl ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
-                                        src={merchant.logoUrl || merchant.imageUrl}
-                                        alt={merchant.name}
-                                        className="h-full w-full object-cover"
-                                      />
-                                    ) : (
-                                      <span className="text-sm font-bold" style={{ color: 'var(--muted)' }}>
-                                        {getInitials(merchant.name)}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="truncate text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                                      {merchant.name}
-                                    </p>
-                                    <p className="truncate text-xs" style={{ color: 'var(--muted)' }}>
-                                      {merchant.description || 'No business description yet'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
-                                {merchant.category || 'Uncategorized'}
-                              </td>
-                              <td className="px-5 py-4">
-                                <StatusPill status={merchant.status} />
-                              </td>
-                              <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
-                                <p>{merchant.ownerName || 'Unknown owner'}</p>
-                                <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                                  {merchant.ownerEmail || 'No email saved'}
-                                </p>
-                              </td>
-                              <td className="px-5 py-4 text-sm" style={{ color: 'var(--muted)' }}>
-                                {merchant.createdAt ? new Date(merchant.createdAt).toLocaleDateString('en-PH') : '—'}
-                              </td>
-                              <td className="px-5 py-4 text-right text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
-                                PHP {Number(merchant.pointsRate || 10).toLocaleString()} = 1 pt
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </AdminTableShell>
+                  <div
+                    className={cn(
+                      'grid gap-3',
+                      isTransactionsTab ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2'
+                    )}
+                  >
+                    {filteredMerchants.map((merchant) => (
+                      <MerchantSelectionCard
+                        key={merchant.id}
+                        merchant={merchant}
+                        selected={selectedMerchant?.id === merchant.id}
+                        mode={isTransactionsTab ? 'transactions' : 'directory'}
+                        transactionSummary={
+                          isTransactionsTab
+                            ? selectedMerchant?.id === merchant.id
+                              ? isDetailLoading
+                                ? 'Loading activity...'
+                                : `${transactions.length} transaction${transactions.length === 1 ? '' : 's'} ready`
+                              : 'Open this merchant to review activity'
+                            : undefined
+                        }
+                        onSelect={() => setSelectedMerchantId(merchant.id)}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             </AdminSurface>
 
-            <AdminSurface tone="neutral">
+            <AdminSurface tone="neutral" className="xl:sticky xl:top-6">
               {selectedMerchant ? (
-                <>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--accent-strong)' }}>
-                        Merchant profile
-                      </p>
-                      <h2 className="mt-2 text-xl font-semibold" style={{ color: 'var(--ink)' }}>
-                        {selectedMerchant.name}
-                      </h2>
-                      <p className="mt-1 text-sm leading-6" style={{ color: 'var(--muted)' }}>
-                        {selectedMerchant.address || 'Address not provided'}
-                      </p>
-                    </div>
-                    <StatusPill status={selectedMerchant.status} />
-                  </div>
+                isTransactionsTab ? (
+                  <>
+                    <AdminSurfaceHeader
+                      title="Transaction history"
+                      description="Review paginated QR awards and points activity for the merchant currently in focus."
+                      action={<DashboardPill tone="default">{transactions.length} records</DashboardPill>}
+                    />
 
-                  {message ? <div className="mt-5"><AdminNotice tone={messageTone}>{message}</AdminNotice></div> : null}
-
-                  <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
-                    <div className="grid gap-3">
-                      <DetailRow label="Business category" value={selectedMerchant.category || 'Uncategorized'} />
-                      <DetailRow label="Owner" value={selectedMerchant.ownerName || 'Unknown owner'} />
-                      <DetailRow label="Email" value={selectedMerchant.ownerEmail || 'No owner email'} />
-                      <DetailRow
-                        label="Date joined"
-                        value={selectedMerchant.createdAt ? new Date(selectedMerchant.createdAt).toLocaleString('en-PH') : '—'}
-                      />
-                      <DetailRow
-                        label="Business info"
-                        value={selectedMerchant.businessInfo || selectedMerchant.description || 'No business info yet'}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                          Discount and terms
-                        </h3>
-                        <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
-                          Admin can update these merchant-facing details on behalf of the partner.
-                        </p>
+                    <div
+                      className="mt-5 rounded-2xl border p-4"
+                      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p
+                            className="text-xs font-semibold uppercase tracking-[0.16em]"
+                            style={{ color: 'var(--accent-strong)' }}
+                          >
+                            Merchant in focus
+                          </p>
+                          <h2 className="mt-2 text-xl font-semibold" style={{ color: 'var(--ink)' }}>
+                            {selectedMerchant.name}
+                          </h2>
+                          <p className="mt-1 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+                            {selectedMerchant.address || 'Address not provided'}
+                          </p>
+                        </div>
+                        <StatusPill status={selectedMerchant.status} />
                       </div>
-                      <DashboardPill tone={isSuperadmin ? 'soft' : 'default'}>
-                        {isSuperadmin ? 'Superadmin access' : 'Admin access'}
-                      </DashboardPill>
-                    </div>
 
-                    <div className="mt-4 grid gap-3">
-                      <textarea
-                        value={editor.discountInfo}
-                        onChange={(e) => setEditor((current) => ({ ...current, discountInfo: e.target.value }))}
-                        rows={3}
-                        placeholder="Discount information for youth members"
-                        className={inputClass}
-                      />
-                      <textarea
-                        value={editor.termsAndConditions}
-                        onChange={(e) => setEditor((current) => ({ ...current, termsAndConditions: e.target.value }))}
-                        rows={4}
-                        placeholder="Terms and conditions shown to the merchant and youth members"
-                        className={inputClass}
-                      />
-                      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                        <input
-                          type="number"
-                          min="1"
-                          value={editor.pointsRate}
-                          onChange={(e) => setEditor((current) => ({ ...current, pointsRate: e.target.value }))}
-                          className={inputClass}
-                          placeholder="Points rate in pesos"
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <DetailTile label="Owner" value={selectedMerchant.ownerName || 'Unknown owner'} />
+                        <DetailTile label="Email" value={selectedMerchant.ownerEmail || 'No owner email'} />
+                        <DetailTile label="Category" value={selectedMerchant.category || 'Uncategorized'} />
+                        <DetailTile label="Date joined" value={formatDateTime(selectedMerchant.createdAt)} />
+                        <DetailTile
+                          label="Points rate"
+                          value={`PHP ${Number(selectedMerchant.pointsRate || 10).toLocaleString()} = 1 pt`}
                         />
-                        <button
-                          type="button"
-                          onClick={() => void handleSaveMerchantProfile()}
-                          disabled={isSaving}
-                          className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                          style={{ background: 'var(--accent)' }}
-                        >
-                          Save details
-                        </button>
+                        <DetailTile
+                          label="Business info"
+                          value={selectedMerchant.businessInfo || selectedMerchant.description || 'No business info yet'}
+                          fullWidth
+                        />
                       </div>
-                      <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
-                        Default conversion is PHP 100 = 10 points.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                          Lifecycle actions
-                        </h3>
-                        <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
-                          Approval, rejection, suspension, and reactivation controls live here.
-                        </p>
-                      </div>
-                      {!isSuperadmin ? <DashboardPill tone="danger">Superadmin only</DashboardPill> : null}
                     </div>
 
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <ActionButton
-                        label="Approve merchant"
-                        tone="green"
-                        disabled={!isSuperadmin || selectedMerchant.status === 'approved' || isSaving}
-                        onClick={() => void handleMerchantAction('approve')}
-                      />
-                      <ActionButton
-                        label="Reject merchant"
-                        tone="red"
-                        disabled={!isSuperadmin || selectedMerchant.status === 'rejected' || isSaving}
-                        onClick={() => void handleMerchantAction('reject')}
-                      />
-                      <ActionButton
-                        label="Suspend merchant"
-                        tone="amber"
-                        disabled={!isSuperadmin || selectedMerchant.status !== 'approved' || isSaving}
-                        onClick={() => void handleMerchantAction('suspend')}
-                      />
-                      <ActionButton
-                        label="Reactivate merchant"
-                        tone="blue"
-                        disabled={!isSuperadmin || selectedMerchant.status !== 'suspended' || isSaving}
-                        onClick={() => void handleMerchantAction('reactivate')}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                          Transaction history
-                        </h3>
-                        <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
-                          Every QR award event or points-related scan recorded for this merchant.
-                        </p>
-                      </div>
-                      <DashboardPill tone="default">{transactions.length} records</DashboardPill>
-                    </div>
-
-                    <div className="mt-4">
+                    <div className="mt-5">
                       {isDetailLoading ? (
                         <div className="flex justify-center py-10">
                           <div className="h-5 w-5 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
@@ -921,54 +797,257 @@ export default function MerchantsPage() {
                           description="Once this merchant starts awarding points, their activity log will appear here."
                         />
                       ) : (
-                        <div className="flex flex-col gap-3">
-                          {transactions.slice(0, 8).map((transaction) => (
-                            <div
-                              key={transaction.id}
-                              className="rounded-2xl border px-4 py-3"
-                              style={{
-                                background: 'color-mix(in srgb, var(--surface-muted) 76%, transparent)',
-                                borderColor: 'var(--stroke)',
-                              }}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                                    {transaction.userName}
-                                  </p>
-                                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                                    {transaction.userEmail || 'No email saved'}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
-                                    +{transaction.pointsGiven} pts
-                                  </p>
-                                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                                    {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString('en-PH') : '—'}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="mt-2 flex items-center justify-between gap-3 text-xs" style={{ color: 'var(--muted)' }}>
-                                <span>Type: {transaction.type}</span>
-                                <span>
-                                  Amount:{' '}
-                                  {transaction.amountSpent != null
-                                    ? `PHP ${Number(transaction.amountSpent).toLocaleString()}`
-                                    : 'Not captured'}
-                                </span>
-                              </div>
+                        <>
+                          <div className="space-y-3">
+                            {paginatedTransactions.map((transaction) => (
+                              <TransactionHistoryCard key={transaction.id} transaction={transaction} />
+                            ))}
+                          </div>
+
+                          <div
+                            className="mt-4 flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                            style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                          >
+                            <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+                              Showing {transactionRangeStart}-{transactionRangeEnd} of {transactions.length} transaction
+                              {transactions.length === 1 ? '' : 's'}
+                            </p>
+
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <PaginationButton
+                                label="Prev"
+                                active={false}
+                                disabled={transactionPage === 1}
+                                onClick={() => setTransactionPage((current) => Math.max(1, current - 1))}
+                              />
+                              {transactionPages.map((page, index) =>
+                                page === 'ellipsis' ? (
+                                  <span
+                                    key={`ellipsis-${index}`}
+                                    className="px-2 py-1 text-sm font-semibold"
+                                    style={{ color: 'var(--muted)' }}
+                                  >
+                                    ...
+                                  </span>
+                                ) : (
+                                  <PaginationButton
+                                    key={page}
+                                    label={String(page)}
+                                    active={page === transactionPage}
+                                    disabled={false}
+                                    onClick={() => setTransactionPage(page)}
+                                  />
+                                )
+                              )}
+                              <PaginationButton
+                                label="Next"
+                                active={false}
+                                disabled={transactionPage === transactionPageCount}
+                                onClick={() => setTransactionPage((current) => Math.min(transactionPageCount, current + 1))}
+                              />
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        </>
                       )}
                     </div>
-                  </div>
-                </>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p
+                          className="text-xs font-semibold uppercase tracking-[0.18em]"
+                          style={{ color: 'var(--accent-strong)' }}
+                        >
+                          Merchant profile
+                        </p>
+                        <h2 className="mt-2 text-xl font-semibold" style={{ color: 'var(--ink)' }}>
+                          {selectedMerchant.name}
+                        </h2>
+                        <p className="mt-1 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+                          {selectedMerchant.address || 'Address not provided'}
+                        </p>
+                      </div>
+                      <StatusPill status={selectedMerchant.status} />
+                    </div>
+
+                    {message ? (
+                      <div className="mt-5">
+                        <AdminNotice tone={messageTone}>{message}</AdminNotice>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-5 space-y-4">
+                      <div
+                        className="rounded-2xl border p-4"
+                        style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                              Merchant basics
+                            </h3>
+                            <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                              Core owner, category, address, and points-conversion details for the selected merchant.
+                            </p>
+                          </div>
+                          <DashboardPill tone="soft">Directory view</DashboardPill>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <DetailTile label="Business category" value={selectedMerchant.category || 'Uncategorized'} />
+                          <DetailTile label="Owner" value={selectedMerchant.ownerName || 'Unknown owner'} />
+                          <DetailTile label="Email" value={selectedMerchant.ownerEmail || 'No owner email'} />
+                          <DetailTile label="Date joined" value={formatDateTime(selectedMerchant.createdAt)} />
+                          <DetailTile
+                            label="Points rate"
+                            value={`PHP ${Number(selectedMerchant.pointsRate || 10).toLocaleString()} = 1 pt`}
+                          />
+                          <DetailTile label="Address" value={selectedMerchant.address || 'Address not provided'} fullWidth />
+                        </div>
+                      </div>
+
+                      <div
+                        className="rounded-2xl border p-4"
+                        style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                              Storefront snapshot
+                            </h3>
+                            <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                              A read-only summary of what youth members currently see for this merchant.
+                            </p>
+                          </div>
+                          <DashboardPill tone="default">Customer-facing copy</DashboardPill>
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                          <DetailRow
+                            label="Business info"
+                            value={selectedMerchant.businessInfo || selectedMerchant.description || 'No business info yet'}
+                          />
+                          <DetailRow label="Discount info" value={selectedMerchant.discountInfo || 'No discount copy yet'} />
+                          <DetailRow
+                            label="Terms"
+                            value={selectedMerchant.termsAndConditions || 'No terms and conditions added yet'}
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        className="rounded-2xl border p-4"
+                        style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                              Discount and terms
+                            </h3>
+                            <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                              Admin can update these merchant-facing details on behalf of the partner.
+                            </p>
+                          </div>
+                          <DashboardPill tone={isSuperadmin ? 'soft' : 'default'}>
+                            {isSuperadmin ? 'Superadmin access' : 'Admin access'}
+                          </DashboardPill>
+                        </div>
+
+                        <div className="mt-4 grid gap-3">
+                          <textarea
+                            value={editor.discountInfo}
+                            onChange={(e) => setEditor((current) => ({ ...current, discountInfo: e.target.value }))}
+                            rows={3}
+                            placeholder="Discount information for youth members"
+                            className={inputClass}
+                          />
+                          <textarea
+                            value={editor.termsAndConditions}
+                            onChange={(e) => setEditor((current) => ({ ...current, termsAndConditions: e.target.value }))}
+                            rows={4}
+                            placeholder="Terms and conditions shown to the merchant and youth members"
+                            className={inputClass}
+                          />
+                          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                            <input
+                              type="number"
+                              min="1"
+                              value={editor.pointsRate}
+                              onChange={(e) => setEditor((current) => ({ ...current, pointsRate: e.target.value }))}
+                              className={inputClass}
+                              placeholder="Points rate in pesos"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveMerchantProfile()}
+                              disabled={isSaving}
+                              className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                              style={{ background: 'var(--accent)' }}
+                            >
+                              Save details
+                            </button>
+                          </div>
+                          <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                            Default conversion is PHP 100 = 10 points.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div
+                        className="rounded-2xl border p-4"
+                        style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                              Lifecycle actions
+                            </h3>
+                            <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                              Approval, rejection, suspension, and reactivation controls live here.
+                            </p>
+                          </div>
+                          {!isSuperadmin ? <DashboardPill tone="danger">Superadmin only</DashboardPill> : null}
+                        </div>
+
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                          <ActionButton
+                            label="Approve merchant"
+                            tone="green"
+                            disabled={!isSuperadmin || selectedMerchant.status === 'approved' || isSaving}
+                            onClick={() => void handleMerchantAction('approve')}
+                          />
+                          <ActionButton
+                            label="Reject merchant"
+                            tone="red"
+                            disabled={!isSuperadmin || selectedMerchant.status === 'rejected' || isSaving}
+                            onClick={() => void handleMerchantAction('reject')}
+                          />
+                          <ActionButton
+                            label="Suspend merchant"
+                            tone="amber"
+                            disabled={!isSuperadmin || selectedMerchant.status !== 'approved' || isSaving}
+                            onClick={() => void handleMerchantAction('suspend')}
+                          />
+                          <ActionButton
+                            label="Reactivate merchant"
+                            tone="blue"
+                            disabled={!isSuperadmin || selectedMerchant.status !== 'suspended' || isSaving}
+                            onClick={() => void handleMerchantAction('reactivate')}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )
               ) : (
                 <AdminEmptyState
                   title="Select a merchant"
-                  description="Choose a merchant from the left table to review their profile, actions, and transaction history."
+                  description={
+                    isTransactionsTab
+                      ? 'Choose a merchant on the left to review their paginated transaction history.'
+                      : 'Choose a merchant on the left to review their profile, storefront copy, and lifecycle actions.'
+                  }
                 />
               )}
             </AdminSurface>
@@ -1033,13 +1112,228 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
         {label}
       </span>
-      <span className="max-w-[240px] text-right text-sm leading-6 font-medium" style={{ color: 'var(--ink)' }}>
+      <span className="max-w-[240px] text-right text-sm font-medium leading-6" style={{ color: 'var(--ink)' }}>
         {value}
       </span>
     </div>
   )
 }
 
+function DetailTile({
+  label,
+  value,
+  fullWidth = false,
+}: {
+  label: string
+  value: string
+  fullWidth?: boolean
+}) {
+  return (
+    <div
+      className={cn('rounded-2xl border px-4 py-3', fullWidth ? 'sm:col-span-2' : '')}
+      style={{
+        borderColor: 'var(--stroke)',
+        background: 'color-mix(in srgb, var(--surface-muted) 70%, transparent)',
+      }}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-medium leading-6" style={{ color: 'var(--ink)' }}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function MerchantSelectionCard({
+  merchant,
+  selected,
+  mode,
+  transactionSummary,
+  onSelect,
+}: {
+  merchant: Merchant
+  selected: boolean
+  mode: 'directory' | 'transactions'
+  transactionSummary?: string
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full rounded-2xl border px-3.5 py-3 text-left transition hover:-translate-y-0.5"
+      style={{
+        borderColor: selected ? 'color-mix(in srgb, var(--accent) 42%, var(--stroke) 58%)' : 'var(--stroke)',
+        background: selected
+          ? 'color-mix(in srgb, var(--accent-soft) 72%, var(--card-solid) 28%)'
+          : 'color-mix(in srgb, var(--card-solid) 84%, var(--surface-muted) 16%)',
+        boxShadow: selected ? '0 12px 28px rgba(1, 67, 132, 0.1)' : '0 6px 18px rgba(15, 23, 42, 0.04)',
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border"
+          style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}
+        >
+          {merchant.logoUrl || merchant.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={merchant.logoUrl || merchant.imageUrl}
+              alt={merchant.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="text-sm font-bold" style={{ color: 'var(--muted)' }}>
+              {getInitials(merchant.name)}
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="truncate text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+              {merchant.name}
+            </h3>
+            <StatusPill status={merchant.status} />
+            {merchant.category ? <DashboardPill tone="default">{merchant.category}</DashboardPill> : null}
+          </div>
+
+          <p className="mt-1.5 line-clamp-1 text-[13px] leading-5" style={{ color: 'var(--muted)' }}>
+            {merchant.businessInfo || merchant.description || 'No business description yet'}
+          </p>
+
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] leading-5">
+            <p style={{ color: 'var(--ink-soft)' }}>
+              <span className="font-semibold" style={{ color: 'var(--muted)' }}>
+                Owner:
+              </span>{' '}
+              {merchant.ownerName || 'Unknown owner'}
+            </p>
+            <p style={{ color: 'var(--ink-soft)' }}>
+              <span className="font-semibold" style={{ color: 'var(--muted)' }}>
+                Joined:
+              </span>{' '}
+              {formatDate(merchant.createdAt)}
+            </p>
+            <p className="max-w-full truncate" style={{ color: 'var(--ink-soft)' }}>
+              <span className="font-semibold" style={{ color: 'var(--muted)' }}>
+                Email:
+              </span>{' '}
+              {merchant.ownerEmail || 'No email saved'}
+            </p>
+            <p className="max-w-full truncate" style={{ color: 'var(--ink-soft)' }}>
+              <span className="font-semibold" style={{ color: 'var(--muted)' }}>
+                {mode === 'transactions' ? 'Activity:' : 'Address:'}
+              </span>{' '}
+              {mode === 'transactions' ? transactionSummary || 'Open to review activity' : merchant.address || 'Address not provided'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function TransactionHistoryCard({ transaction }: { transaction: MerchantTransaction }) {
+  return (
+    <div
+      className="rounded-2xl border px-4 py-3"
+      style={{
+        background: 'color-mix(in srgb, var(--surface-muted) 76%, transparent)',
+        borderColor: 'var(--stroke)',
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            {transaction.userName}
+          </p>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            {transaction.userEmail || 'No email saved'}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
+            +{transaction.pointsGiven} pts
+          </p>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            {formatDateTime(transaction.createdAt)}
+          </p>
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs" style={{ color: 'var(--muted)' }}>
+        <span>Type: {transaction.type}</span>
+        <span>
+          Amount:{' '}
+          {transaction.amountSpent != null ? `PHP ${Number(transaction.amountSpent).toLocaleString()}` : 'Not captured'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function PaginationButton({
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  disabled: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45"
+      style={{
+        borderColor: active ? 'var(--accent)' : 'var(--stroke)',
+        background: active ? 'var(--accent)' : 'var(--surface-muted)',
+        color: active ? '#ffffff' : 'var(--ink-soft)',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
+function buildPaginationPages(current: number, total: number): Array<number | 'ellipsis'> {
+  if (total <= 5) {
+    return Array.from({ length: total }, (_, index) => index + 1)
+  }
+
+  const pages: Array<number | 'ellipsis'> = [1]
+  const start = Math.max(2, current - 1)
+  const end = Math.min(total - 1, current + 1)
+
+  if (start > 2) pages.push('ellipsis')
+  for (let page = start; page <= end; page += 1) pages.push(page)
+  if (end < total - 1) pages.push('ellipsis')
+  pages.push(total)
+
+  return pages
+}
+
+function formatDate(value?: string) {
+  if (!value) return 'Not recorded'
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'Not recorded'
+  return parsed.toLocaleDateString('en-PH')
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return 'Not recorded'
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'Not recorded'
+  return parsed.toLocaleString('en-PH')
+}
 function CredentialRow({
   label,
   value,
@@ -1068,7 +1362,7 @@ function CredentialRow({
       </span>
       <div className="flex items-center gap-2">
         <span className="max-w-[240px] truncate text-right font-mono text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          {secret && !revealed ? '••••••••••••' : value}
+          {secret && !revealed ? '************' : value}
         </span>
         {secret ? (
           <button type="button" onClick={() => setRevealed((value) => !value)} className="text-xs" style={{ color: 'var(--muted)' }}>

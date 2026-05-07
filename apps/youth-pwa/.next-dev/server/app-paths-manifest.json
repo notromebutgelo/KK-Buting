@@ -1,7 +1,9 @@
 {
-  "/(main)/scanner/page": "app/(main)/scanner/page.js",
+  "/icon.png/route": "app/icon.png/route.js",
   "/(main)/home/page": "app/(main)/home/page.js",
-  "/(main)/vouchers/page": "app/(main)/vouchers/page.js",
+  "/(main)/scanner/page": "app/(main)/scanner/page.js",
   "/(main)/merchants/page": "app/(main)/merchants/page.js",
+  "/(main)/scanner/digital-id/page": "app/(main)/scanner/digital-id/page.js",
+  "/(main)/vouchers/page": "app/(main)/vouchers/page.js",
   "/(main)/merchants/[merchantId]/page": "app/(main)/merchants/[merchantId]/page.js"
 }

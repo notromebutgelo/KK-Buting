@@ -39,7 +39,7 @@ export default function VerificationStatusPage() {
       title: 'Profile Verified!',
       desc: digitalIdIssued
         ? 'Congratulations! Your profile is verified and your Digital ID is active.'
-        : 'Congratulations! Your profile is verified. Rewards access is available, and your Digital ID is waiting for superadmin issuance.',
+        : 'Congratulations! Your profile is verified. Rewards access is available, and your Digital ID is waiting for superadmin generation.',
       color: 'bg-green-50 border-green-200',
     },
     rejected: {

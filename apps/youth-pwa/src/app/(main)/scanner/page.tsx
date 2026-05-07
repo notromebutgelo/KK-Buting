@@ -207,7 +207,7 @@ export default function ScannerPage() {
                     : digitalIdStatus === 'deactivated'
                       ? 'Digital ID Inactive'
                     : isVerified
-                      ? 'Awaiting ID Activation'
+                      ? 'Awaiting Superadmin ID Generation'
                       : 'Verification Required'}
                 </span>
               </div>

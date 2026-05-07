@@ -406,6 +406,107 @@ const tests = [
     },
   },
   {
+    name: "admin document review route returns the review success payload",
+    async run() {
+      const calls = [];
+      const router = loadDistModuleWithMocks("dist/src/modules/admin/admin.routes", {
+        "dist/src/middleware/verifyToken": {
+          verifyToken: createVerifyTokenMock(),
+        },
+        "dist/src/modules/admin/admin.controller": {
+          getDashboard: async (_req, res) => res.json({}),
+          listVerificationProfiles: async (_req, res) => res.json({ profiles: [] }),
+          getVerificationProfileHandler: async (_req, res) => res.json({ profile: {} }),
+          approveVerificationHandler: async (_req, res) => res.json({ message: "ok" }),
+          rejectVerificationHandler: async (_req, res) => res.json({ message: "ok" }),
+          reviewVerificationDocumentHandler: async (req, res) => {
+            calls.push({
+              userId: req.params.userId,
+              documentId: req.params.documentId,
+              action: req.body.action,
+              note: req.body.note,
+            });
+            res.json({
+              message: "Document review updated",
+              review: {
+                userId: req.params.userId,
+                documentId: req.params.documentId,
+                action: req.body.action,
+                note: req.body.note,
+              },
+            });
+          },
+          requestVerificationResubmissionHandler: async (_req, res) => res.json({ message: "ok" }),
+          bulkApproveVerificationHandler: async (_req, res) => res.json({ approved: 1 }),
+          listRewards: async (_req, res) => res.json({ rewards: [] }),
+          addReward: async (_req, res) => res.status(201).json({ id: "reward-1" }),
+          updateRewardHandler: async (_req, res) => res.json({ message: "ok" }),
+          listRewardRedemptionsHandler: async (_req, res) => res.json({ redemptions: [] }),
+          markRewardRedemptionClaimedHandler: async (_req, res) => res.json({ message: "ok" }),
+          listMerchants: async (_req, res) => res.json({ merchants: [] }),
+          getMerchantHandler: async (_req, res) => res.json({ merchant: {} }),
+          listPendingMerchants: async (_req, res) => res.json({ merchants: [] }),
+          approveMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
+          updateMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
+          updateMerchantStatusHandler: async (_req, res) => res.json({ message: "ok" }),
+          listMerchantTransactionsHandler: async (_req, res) => res.json({ transactions: [] }),
+          getPointsTransactionsOverviewHandler: async (_req, res) => res.json({ transactions: [] }),
+          updatePointsConversionRateHandler: async (_req, res) => res.json({ message: "ok" }),
+          listYouth: async (_req, res) => res.json({ users: [] }),
+          getYouthHandler: async (_req, res) => res.json({ user: {} }),
+          updateYouthProfileHandler: async (_req, res) => res.json({ message: "ok" }),
+          updateYouthStatusHandler: async (_req, res) => res.json({ message: "ok" }),
+          archiveYouthHandler: async (_req, res) => res.json({ message: "ok" }),
+          adjustYouthPointsHandler: async (_req, res) => res.json({ message: "ok" }),
+          listDigitalIds: async (_req, res) => res.json({ members: [] }),
+          getDigitalIdMemberHandler: async (_req, res) => res.json({ member: {} }),
+          generateDigitalIdHandler: async (_req, res) => res.status(201).json({ memberId: "user-1" }),
+          submitDigitalIdForApprovalHandler: async (_req, res) => res.json({ message: "ok" }),
+          approveDigitalIdHandler: async (_req, res) => res.json({ message: "ok" }),
+          deactivateDigitalIdHandler: async (_req, res) => res.json({ message: "ok" }),
+          regenerateDigitalIdHandler: async (_req, res) => res.json({ memberId: "user-1" }),
+          getReportsHandler: async (_req, res) => res.json({}),
+          createMerchantAccountHandler: async (_req, res) => res.status(201).json({ merchant: { merchantId: "merchant-1" } }),
+        },
+      }).default;
+
+      await withExpressServer(router, async (baseUrl) => {
+        const response = await requestJson(baseUrl, "/verification/user-1/documents/doc-1/review", {
+          method: "PATCH",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "admin",
+            "x-test-email": "admin@example.com",
+          },
+          body: {
+            action: "approved",
+            note: "Looks good",
+          },
+        });
+
+        assert.equal(response.status, 200);
+        assert.deepEqual(response.body, {
+          message: "Document review updated",
+          review: {
+            userId: "user-1",
+            documentId: "doc-1",
+            action: "approved",
+            note: "Looks good",
+          },
+        });
+      });
+
+      assert.deepEqual(calls, [
+        {
+          userId: "user-1",
+          documentId: "doc-1",
+          action: "approved",
+          note: "Looks good",
+        },
+      ]);
+    },
+  },
+  {
     name: "merchant profile update accepts text terms and conditions payloads",
     async run() {
       let controllerCalled = false;

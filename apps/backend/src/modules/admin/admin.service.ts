@@ -53,6 +53,13 @@ const REQUIRED_DOCUMENTS_BY_GROUP: Record<string, string[]> = {
 };
 
 const PENDING_SUPERADMIN_ID_GENERATION = "pending_superadmin_id_generation";
+const NOTIFICATION_DATE_FORMATTER = new Intl.DateTimeFormat("en-PH", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 function toIso(value: any): string | undefined {
   if (!value) return undefined;
@@ -75,12 +82,83 @@ function serializeRecord<T extends AnyRecord>(record: T): T {
   return next;
 }
 
+function omitUndefined<T extends AnyRecord>(record: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(record).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
+}
+
 function normalizeString(value: any) {
   return String(value || "").trim().toLowerCase();
 }
 
 function normalizeOptionalString(value: any) {
   return String(value || "").trim();
+}
+
+function formatNotificationDateTime(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return NOTIFICATION_DATE_FORMATTER.format(date);
+}
+
+function buildDigitalIdGenerationNotification({
+  userId,
+  memberName,
+  memberEmail,
+  approvedBy,
+  referredBy,
+  approvedAt,
+  referredAt,
+  isReminder = false,
+}: {
+  userId: string;
+  memberName: string;
+  memberEmail?: string;
+  approvedBy: string;
+  referredBy: string;
+  approvedAt: string;
+  referredAt: string;
+  isReminder?: boolean;
+}) {
+  const displayName = memberName || memberEmail || "A verified youth member";
+  const title = isReminder
+    ? `Reminder: ${displayName} is waiting for Digital ID generation`
+    : `Digital ID generation requested for ${displayName}`;
+
+  const body = isReminder
+    ? `${displayName}'s documents were already approved. ${referredBy} resent the Digital ID generation request on ${formatNotificationDateTime(
+        referredAt
+      )}. The member is still waiting in the superadmin issuance queue.`
+    : `${displayName}'s documents were approved by ${approvedBy} on ${formatNotificationDateTime(
+        approvedAt
+      )} and referred by ${referredBy} on ${formatNotificationDateTime(
+        referredAt
+      )}. The member is now waiting for Digital ID generation.`;
+
+  return {
+    audience: "admin" as const,
+    type: "info" as const,
+    title,
+    body,
+    link: `/digital-ids?member=${userId}`,
+    metadata: {
+      notificationKind: isReminder
+        ? "digital_id_generation_reminder"
+        : "digital_id_generation_request",
+      userId,
+      memberName: displayName,
+      memberEmail: memberEmail || null,
+      approvedBy,
+      referredBy,
+      approvedAt,
+      referredAt,
+      verificationStatus: "verified",
+      queueStatus: PENDING_SUPERADMIN_ID_GENERATION,
+    },
+  };
 }
 
 function hasIssuedDigitalId(profile: AnyRecord) {
@@ -246,21 +324,20 @@ function hasAllRequiredDocumentsApproved(profile: AnyRecord, documents: AnyRecor
 }
 
 function computeQueueStatus(profile: AnyRecord, documents: AnyRecord[]) {
-  const explicitStatus = String(profile?.verificationQueueStatus || "").trim();
-  if (explicitStatus) return explicitStatus;
-
   const finalStatus = String(profile?.status || "pending");
-  if (finalStatus === "verified") return "verified";
   if (finalStatus === "rejected") return "rejected";
 
   if (
-    profile?.verificationReferredToSuperadminAt ||
-    profile?.digitalIdApprovalRequestedAt ||
-    (resolveDigitalIdStatus(profile) === "pending_approval" &&
+    (finalStatus === "verified" && profile?.verificationReferredToSuperadminAt) ||
+    (finalStatus === "verified" && profile?.digitalIdApprovalRequestedAt) ||
+    (finalStatus === "verified" &&
+      resolveDigitalIdStatus(profile) === "pending_approval" &&
       hasAllRequiredDocumentsApproved(profile, documents))
   ) {
     return PENDING_SUPERADMIN_ID_GENERATION;
   }
+
+  if (finalStatus === "verified") return "verified";
 
   if (documents.some((document) => normalizeDocumentStatus(document) === "resubmission_requested")) {
     return "resubmission_requested";
@@ -747,20 +824,28 @@ export async function approveVerification(userId: string, adminEmail: string) {
   }
 
   const existingDigitalIdStatus = resolveDigitalIdStatus(verificationProfileRecord);
-  const nextDigitalIdStatus = existingDigitalIdStatus || "pending_approval";
-  const shouldQueueForSuperadmin = nextDigitalIdStatus === "pending_approval";
-
+  const nextDigitalIdStatus = existingDigitalIdStatus === "active" ? "active" : "pending_approval";
   const verificationUpdate: AnyRecord = {
     verified: true,
     status: "verified",
-    verificationQueueStatus: "verified",
-    verifiedAt: FieldValue.serverTimestamp(),
+    verificationQueueStatus: PENDING_SUPERADMIN_ID_GENERATION,
+    verifiedAt:
+      verificationProfileRecord.verifiedAt || FieldValue.serverTimestamp(),
     verificationActionAt: FieldValue.serverTimestamp(),
     verificationActionBy: adminEmail,
-    verificationLastAction: "approved",
+    verificationLastAction: "approved_and_referred_to_superadmin",
     verificationRejectReason: null,
     verificationRejectNote: null,
     verificationResubmissionMessage: null,
+    verificationDocumentsApprovedAt:
+      verificationProfileRecord.verificationDocumentsApprovedAt ||
+      FieldValue.serverTimestamp(),
+    verificationDocumentsApprovedBy:
+      verificationProfileRecord.verificationDocumentsApprovedBy || adminEmail,
+    verificationReferredToSuperadminAt: FieldValue.serverTimestamp(),
+    verificationReferredToSuperadminBy: adminEmail,
+    digitalIdApprovalRequestedAt: FieldValue.serverTimestamp(),
+    digitalIdApprovalRequestedBy: adminEmail,
     digitalIdStatus: nextDigitalIdStatus,
   };
 
@@ -773,11 +858,33 @@ export async function approveVerification(userId: string, adminEmail: string) {
     recipientUid: userId,
     audience: "youth",
     type: "success",
-    title: "Verification approved",
-    body: shouldQueueForSuperadmin
-      ? "Your verification has been approved. Rewards access is now available, and your Digital ID is waiting for superadmin issuance."
-      : "Your verification has been approved. Rewards access is available, and your Digital ID remains active.",
+    title: "Verification complete",
+    body:
+      nextDigitalIdStatus === "active"
+        ? "Your verification is complete and your Digital ID remains active."
+        : "Your verification is complete. Your Digital ID is being prepared by the superadmin.",
     link: "/scanner/digital-id",
+  });
+
+  const memberLabel =
+    verificationProfile.fullName ||
+    [verificationProfileRecord.firstName, verificationProfileRecord.middleName, verificationProfileRecord.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    String(verificationProfileRecord.email || "").trim() ||
+    "A verified youth member";
+
+  await createNotificationsForRoles(["superadmin"], {
+    ...buildDigitalIdGenerationNotification({
+      userId,
+      memberName: memberLabel,
+      memberEmail: normalizeOptionalString(verificationProfileRecord.email) || undefined,
+      approvedBy: verificationUpdate.verificationDocumentsApprovedBy,
+      referredBy: adminEmail,
+      approvedAt: new Date().toISOString(),
+      referredAt: new Date().toISOString(),
+    }),
   });
 }
 
@@ -818,6 +925,14 @@ export async function reviewVerificationDocument(
   adminEmail: string,
   note?: string
 ) {
+  if (!userId || !documentId) {
+    throw new Error("userId and documentId are required");
+  }
+
+  if (!["approved", "rejected"].includes(action)) {
+    throw new Error("action must be approved or rejected");
+  }
+
   const documentRef = db.collection("documents").doc(documentId);
   const documentSnap = await documentRef.get();
 
@@ -841,13 +956,28 @@ export async function reviewVerificationDocument(
     { merge: true }
   );
 
-  await db.collection("kkProfiling").doc(userId).set(
-    {
-      verificationQueueStatus: action === "rejected" ? "in_review" : "in_review",
+  const verificationUpdate = omitUndefined({
+      verified: action === "rejected" ? false : undefined,
+      status: action === "rejected" ? "pending" : undefined,
+      verificationQueueStatus: "in_review",
       verificationLastAction: "document_reviewed",
       verificationActionAt: FieldValue.serverTimestamp(),
       verificationActionBy: adminEmail,
-    },
+      verificationResubmissionMessage: action === "rejected" ? null : undefined,
+      verificationDocumentsApprovedAt: action === "rejected" ? null : undefined,
+      verificationDocumentsApprovedBy: action === "rejected" ? null : undefined,
+      verificationReferredToSuperadminAt: action === "rejected" ? null : undefined,
+      verificationReferredToSuperadminBy: action === "rejected" ? null : undefined,
+      digitalIdApprovalRequestedAt: action === "rejected" ? null : undefined,
+      digitalIdApprovalRequestedBy: action === "rejected" ? null : undefined,
+      digitalIdStatus: action === "rejected" ? "draft" : undefined,
+      verifiedAt: action === "rejected" ? null : undefined,
+      verificationRejectReason: action === "rejected" ? null : undefined,
+      verificationRejectNote: action === "rejected" ? null : undefined,
+    });
+
+  await db.collection("kkProfiling").doc(userId).set(
+    verificationUpdate,
     { merge: true }
   );
 }
@@ -1648,12 +1778,7 @@ export async function getYouthMember(userId: string) {
     .sort((a, b) => String(b.uploadedAt || "").localeCompare(String(a.uploadedAt || "")))
     .map((doc) => ({
       ...doc,
-      status:
-        member.profile?.status === "verified"
-          ? "approved"
-          : member.profile?.status === "rejected"
-            ? "rejected"
-            : "pending",
+      status: normalizeDocumentStatus(doc),
     }));
 
   const transactions: AnyRecord[] = transactionsSnap.docs
@@ -1731,12 +1856,14 @@ export async function updateYouthVerificationStatus(
   reason?: string,
   note?: string
 ) {
+  const profileRef = db.collection("kkProfiling").doc(userId);
   const payload: AnyRecord = {
     status,
     verified: status === "verified",
     verificationActionAt: FieldValue.serverTimestamp(),
     verificationActionBy: adminEmail,
     verificationLastAction: status,
+    verificationQueueStatus: status === "verified" ? "verified" : status === "rejected" ? "rejected" : null,
     verificationRejectReason: status === "rejected" ? reason || null : null,
     verificationRejectNote: status === "rejected" ? note || null : null,
   };
@@ -1747,9 +1874,42 @@ export async function updateYouthVerificationStatus(
 
   if (status === "pending") {
     payload.verifiedAt = null;
+    payload.verificationResubmissionMessage = null;
+    payload.verificationDocumentsApprovedAt = null;
+    payload.verificationDocumentsApprovedBy = null;
+    payload.verificationReferredToSuperadminAt = null;
+    payload.verificationReferredToSuperadminBy = null;
+    payload.digitalIdApprovalRequestedAt = null;
+    payload.digitalIdApprovalRequestedBy = null;
+    payload.digitalIdStatus = "draft";
+    payload.verificationRejectReason = null;
+    payload.verificationRejectNote = null;
   }
 
-  await db.collection("kkProfiling").doc(userId).set(payload, { merge: true });
+  if (status === "pending") {
+    const documentsSnap = await db.collection("documents").where("profileId", "==", userId).get();
+    const batch = db.batch();
+
+    for (const document of documentsSnap.docs) {
+      batch.set(
+        document.ref,
+        {
+          reviewStatus: "pending",
+          reviewNote: null,
+          reviewedAt: null,
+          reviewedBy: null,
+          reviewRequestedAt: null,
+        },
+        { merge: true }
+      );
+    }
+
+    batch.set(profileRef, payload, { merge: true });
+    await batch.commit();
+    return;
+  }
+
+  await profileRef.set(payload, { merge: true });
 }
 
 export async function archiveYouthMember(userId: string, adminEmail: string, note?: string) {
@@ -1989,10 +2149,15 @@ export async function submitDigitalIdForApproval(userId: string, adminEmail: str
     }
   }
 
+  const nextDigitalIdStatus =
+    resolveDigitalIdStatus(profile) === "active" ? "active" : "pending_approval";
+
   await profileRef.set(
     {
-      digitalIdStatus:
-        resolveDigitalIdStatus(profile) === "active" ? "active" : "pending_approval",
+      verified: true,
+      status: "verified",
+      verifiedAt: profile.verifiedAt || FieldValue.serverTimestamp(),
+      digitalIdStatus: nextDigitalIdStatus,
       verificationQueueStatus: PENDING_SUPERADMIN_ID_GENERATION,
       verificationDocumentsApprovedAt:
         profile.verificationDocumentsApprovedAt || FieldValue.serverTimestamp(),
@@ -2005,6 +2170,9 @@ export async function submitDigitalIdForApproval(userId: string, adminEmail: str
       verificationActionAt: FieldValue.serverTimestamp(),
       verificationActionBy: adminEmail,
       verificationLastAction: "referred_to_superadmin",
+      verificationRejectReason: null,
+      verificationRejectNote: null,
+      verificationResubmissionMessage: null,
     },
     { merge: true }
   );
@@ -2015,15 +2183,17 @@ export async function submitDigitalIdForApproval(userId: string, adminEmail: str
     "A verified youth member";
 
   await createNotificationsForRoles(["superadmin"], {
-    audience: "admin",
-    type: "info",
-    title: "Verification referred for Digital ID generation",
-    body: `${memberLabel} was approved by admin review and is now waiting for superadmin Digital ID generation.`,
-    link: `/verification/${userId}`,
-    metadata: {
+    ...buildDigitalIdGenerationNotification({
       userId,
+      memberName: memberLabel,
+      memberEmail: normalizeOptionalString(profile.email) || undefined,
+      approvedBy: String(profile.verificationDocumentsApprovedBy || adminEmail),
       referredBy: adminEmail,
-    },
+      approvedAt:
+        toIso(profile.verificationDocumentsApprovedAt) || new Date().toISOString(),
+      referredAt: new Date().toISOString(),
+      isReminder: true,
+    }),
   });
 }
 
@@ -2050,7 +2220,7 @@ export async function approveDigitalId(userId: string, adminEmail: string) {
       verifiedAt: profile.verifiedAt || FieldValue.serverTimestamp(),
       verificationActionAt: FieldValue.serverTimestamp(),
       verificationActionBy: adminEmail,
-      verificationLastAction: "digital_id_approved",
+      verificationLastAction: "digital_id_issued",
       verificationRejectReason: null,
       verificationRejectNote: null,
       verificationResubmissionMessage: null,
@@ -2070,6 +2240,15 @@ export async function approveDigitalId(userId: string, adminEmail: string) {
     },
     { merge: true }
   );
+
+  await createNotification({
+    recipientUid: userId,
+    audience: "youth",
+    type: "success",
+    title: "Digital ID issued",
+    body: "Your Digital ID is now active and available in the youth app.",
+    link: "/scanner/digital-id",
+  });
 }
 
 export async function deactivateDigitalId(userId: string, adminEmail: string, reason?: string) {

@@ -15,6 +15,7 @@ interface Notification {
   readAt: string | null;
   createdAt: string;
   link: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface TopbarProps {
@@ -46,6 +47,46 @@ function formatRelativeTime(value: string) {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+
+function formatNotificationDateTime(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function getNotificationDetailLines(notification: Notification) {
+  const metadata = notification.metadata || null;
+  if (!metadata) return [];
+
+  const memberName = typeof metadata.memberName === 'string' ? metadata.memberName.trim() : '';
+  const memberEmail = typeof metadata.memberEmail === 'string' ? metadata.memberEmail.trim() : '';
+  const approvedBy = typeof metadata.approvedBy === 'string' ? metadata.approvedBy.trim() : '';
+  const referredBy = typeof metadata.referredBy === 'string' ? metadata.referredBy.trim() : '';
+  const approvedAt = formatNotificationDateTime(metadata.approvedAt);
+  const referredAt = formatNotificationDateTime(metadata.referredAt);
+
+  const lines: string[] = [];
+
+  if (memberName || memberEmail) {
+    lines.push(`Member: ${memberName || memberEmail}${memberName && memberEmail ? ` · ${memberEmail}` : ''}`);
+  }
+
+  if (approvedBy || approvedAt) {
+    lines.push(`Approved by: ${approvedBy || 'Admin'}${approvedAt ? ` · ${approvedAt}` : ''}`);
+  }
+
+  if (referredBy || referredAt) {
+    lines.push(`Referred by: ${referredBy || 'Admin'}${referredAt ? ` · ${referredAt}` : ''}`);
+  }
+
+  return lines;
 }
 
 function notifDotColor(type: string) {
@@ -108,7 +149,7 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
     }
 
     syncNotifications();
-    const interval = window.setInterval(syncNotifications, 30000);
+    const interval = window.setInterval(syncNotifications, 10000);
     window.addEventListener('focus', syncNotifications);
 
     return () => {
@@ -339,6 +380,9 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
                         background: notif.read ? 'color-mix(in srgb, var(--bg) 88%, #d8dde6 12%)' : 'var(--accent-soft)',
                       }}
                     >
+                      {(() => {
+                        const detailLines = getNotificationDetailLines(notif);
+                        return (
                       <button
                         type="button"
                         onClick={() => handleNotificationClick(notif)}
@@ -363,8 +407,27 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
                           <p className="mt-1 text-xs leading-relaxed" style={{ color: notif.read ? 'color-mix(in srgb, var(--muted) 86%, #8b96a9 14%)' : 'var(--muted)' }}>
                             {notif.body}
                           </p>
+                          {detailLines.length > 0 ? (
+                            <div
+                              className="mt-2 space-y-1 rounded-xl border px-3 py-2"
+                              style={{
+                                borderColor: 'var(--stroke)',
+                                background: notif.read
+                                  ? 'color-mix(in srgb, var(--card) 84%, transparent)'
+                                  : 'color-mix(in srgb, var(--card) 74%, var(--accent-soft) 26%)',
+                              }}
+                            >
+                              {detailLines.map((line) => (
+                                <p key={line} className="text-[11px] leading-relaxed" style={{ color: notif.read ? 'var(--muted)' : 'var(--ink-soft)' }}>
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       </button>
+                        );
+                      })()}
                     </li>
                   ))}
                 </ul>

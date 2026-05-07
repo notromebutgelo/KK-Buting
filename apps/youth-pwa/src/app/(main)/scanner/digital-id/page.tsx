@@ -67,7 +67,7 @@ export default function DigitalIDPage() {
   const digitalIdPhotoUrl = idData?.photoUrl || profile?.idPhotoUrl || null
   const digitalIdSignatureUrl = idData?.digitalIdSignatureUrl || profile?.digitalIdSignatureUrl || null
   const awaitingSuperadminTitle =
-    digitalIdStatus === 'deactivated' ? 'Digital ID Deactivated' : 'Awaiting Superadmin Approval'
+    digitalIdStatus === 'deactivated' ? 'Digital ID Deactivated' : 'Awaiting Superadmin ID Generation'
   const awaitingSuperadminMessage =
     digitalIdStatus === 'deactivated'
       ? 'Your Digital ID is currently inactive. Please contact your SK office if it needs to be restored.'
@@ -256,7 +256,7 @@ export default function DigitalIDPage() {
 
             <p className="mt-4 max-w-[290px] text-[13px] leading-[1.6] text-[#6f87a8]">
               {isVerified
-                ? 'Your verification is already complete. Once you save these details, your Digital ID can continue through the final admin approval flow.'
+                ? 'Your verification is already complete. Once you save these details, your Digital ID can continue through the superadmin ID generation flow.'
                 : 'You can add this now so your Digital ID will be ready to move forward as soon as your verification is completed.'}
             </p>
 
@@ -407,7 +407,7 @@ export default function DigitalIDPage() {
             <p className="mt-8 max-w-[290px] text-[13px] leading-[1.6] text-[#d69b13]">
               We&apos;ll send you a notification as soon as your verification
               decision is ready. Rewards unlock after approval, and your Digital
-              ID appears after final superadmin issuance.
+              ID appears after superadmin ID generation.
             </p>
           </div>
         ) : !isVerified ? (

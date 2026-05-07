@@ -73,6 +73,62 @@ const initialConversionRate: ConversionRate = {
   updatedBy: null,
 }
 
+const TRANSACTION_PAGE_SIZE = 8
+
+type SummaryTone = 'issued' | 'redeemed' | 'balance'
+
+const SUMMARY_CARD_PALETTES: Record<
+  SummaryTone,
+  {
+    eyebrow: string
+    border: string
+    background: string
+    glow: string
+    pillBg: string
+    pillFg: string
+    title: string
+    value: string
+    detail: string
+  }
+> = {
+  issued: {
+    eyebrow: 'Issued',
+    border: 'rgba(5, 114, 220, 0.22)',
+    background:
+      'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(238,246,255,0.96) 100%)',
+    glow: 'rgba(5, 114, 220, 0.24)',
+    pillBg: 'rgba(5, 114, 220, 0.12)',
+    pillFg: '#0453a6',
+    title: 'rgba(1, 67, 132, 0.78)',
+    value: '#012c58',
+    detail: 'rgba(1, 67, 132, 0.68)',
+  },
+  redeemed: {
+    eyebrow: 'Redeemed',
+    border: 'rgba(252, 179, 21, 0.28)',
+    background:
+      'linear-gradient(180deg, rgba(255,253,247,0.98) 0%, rgba(255,247,230,0.96) 100%)',
+    glow: 'rgba(252, 179, 21, 0.24)',
+    pillBg: 'rgba(252, 179, 21, 0.18)',
+    pillFg: '#a15a00',
+    title: 'rgba(122, 82, 0, 0.82)',
+    value: '#4f2d00',
+    detail: 'rgba(138, 75, 0, 0.72)',
+  },
+  balance: {
+    eyebrow: 'Live Balance',
+    border: 'rgba(1, 67, 132, 0.18)',
+    background:
+      'linear-gradient(180deg, rgba(247,251,255,0.98) 0%, rgba(235,244,252,0.96) 100%)',
+    glow: 'rgba(4, 83, 166, 0.18)',
+    pillBg: 'rgba(1, 67, 132, 0.1)',
+    pillFg: '#014384',
+    title: 'rgba(1, 67, 132, 0.78)',
+    value: '#013f7d',
+    detail: 'rgba(1, 67, 132, 0.68)',
+  },
+}
+
 export default function PointsTransactionsPage() {
   const [adminRole, setAdminRole] = useState('admin')
   const [data, setData] = useState<PointsOverviewResponse>({
@@ -96,6 +152,7 @@ export default function PointsTransactionsPage() {
     maxPoints: '',
   })
   const [conversionRateInput, setConversionRateInput] = useState('10')
+  const [transactionPage, setTransactionPage] = useState(1)
 
   const isSuperadmin = adminRole === 'superadmin'
 
@@ -115,6 +172,7 @@ export default function PointsTransactionsPage() {
         const nextData = overviewRes.data as PointsOverviewResponse
         setData(nextData)
         setConversionRateInput(String(nextData.conversionRate?.pesosPerPoint || 10))
+        setTransactionPage(1)
         setAdminRole(meRes.data?.role || window.localStorage.getItem('kk-admin-role') || 'admin')
       } catch {
         if (!mounted) return
@@ -157,6 +215,7 @@ export default function PointsTransactionsPage() {
     const res = await api.get('/admin/points-transactions', { params })
     const nextData = res.data as PointsOverviewResponse
     setData(nextData)
+    setTransactionPage(1)
   }
 
   async function handleApplyFilters() {
@@ -192,6 +251,7 @@ export default function PointsTransactionsPage() {
       const nextData = res.data as PointsOverviewResponse
       setData(nextData)
       setConversionRateInput(String(nextData.conversionRate?.pesosPerPoint || 10))
+      setTransactionPage(1)
     } catch (error: any) {
       setMessage(error?.response?.data?.error || 'We could not reset the filters right now.')
     } finally {
@@ -222,6 +282,32 @@ export default function PointsTransactionsPage() {
     () => data.leaderboard.slice(0, 10),
     [data.leaderboard]
   )
+
+  const transactionPageCount = Math.max(
+    1,
+    Math.ceil(data.transactionLog.length / TRANSACTION_PAGE_SIZE)
+  )
+
+  const paginatedTransactionLog = useMemo(() => {
+    const start = (transactionPage - 1) * TRANSACTION_PAGE_SIZE
+    return data.transactionLog.slice(start, start + TRANSACTION_PAGE_SIZE)
+  }, [data.transactionLog, transactionPage])
+
+  const transactionVisiblePages = useMemo(
+    () => buildPaginationPages(transactionPage, transactionPageCount),
+    [transactionPage, transactionPageCount]
+  )
+
+  const transactionRangeStart = data.transactionLog.length
+    ? (transactionPage - 1) * TRANSACTION_PAGE_SIZE + 1
+    : 0
+  const transactionRangeEnd = data.transactionLog.length
+    ? transactionRangeStart + paginatedTransactionLog.length - 1
+    : 0
+
+  useEffect(() => {
+    setTransactionPage((current) => Math.min(current, transactionPageCount))
+  }, [transactionPageCount])
 
   if (isLoading) {
     return (
@@ -256,28 +342,40 @@ export default function PointsTransactionsPage() {
           title="Total Points Issued"
           value={formatPoints(data.summary.totalIssued)}
           detail="Successful earn transactions across all merchants"
-          accent="bg-[linear-gradient(135deg,#014384_0%,#0B69C7_100%)]"
+          tone="issued"
         />
         <SummaryCard
           title="Total Points Redeemed"
           value={formatPoints(data.summary.totalRedeemed)}
           detail="Rewards redeemed by verified youth members"
-          accent="bg-[linear-gradient(135deg,#F39C12_0%,#FCB315_100%)]"
+          tone="redeemed"
         />
         <SummaryCard
           title="Outstanding Balance"
           value={formatPoints(data.summary.outstandingBalance)}
           detail="Current live balance across all youth wallets"
-          accent="bg-[linear-gradient(135deg,#0F9D58_0%,#38C172_100%)]"
+          tone="balance"
         />
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="admin-panel">
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-black text-gray-900">Transaction Log</h2>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>Filter QR scan events by merchant, user, status, date, and points range.</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-gray-900">Transaction Log</h2>
+                <p className="text-sm" style={{ color: 'var(--muted)' }}>Filter QR scan events by merchant, user, status, date, and points range.</p>
+              </div>
+              <span
+                className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.14em]"
+                style={{
+                  borderColor: 'rgba(5, 114, 220, 0.18)',
+                  background: 'color-mix(in srgb, var(--accent-soft) 72%, white 28%)',
+                  color: 'var(--accent-strong)',
+                }}
+              >
+                {data.transactionLog.length.toLocaleString()} records
+              </span>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -370,8 +468,8 @@ export default function PointsTransactionsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[color:var(--stroke)] bg-white">
-                  {data.transactionLog.length ? (
-                    data.transactionLog.map((transaction) => (
+                {paginatedTransactionLog.length ? (
+                    paginatedTransactionLog.map((transaction) => (
                       <tr key={transaction.id} className="align-top hover:bg-[color:var(--accent-soft)]">
                         <td className="px-4 py-3">
                           <p className="font-semibold text-gray-900">{transaction.userName}</p>
@@ -407,6 +505,62 @@ export default function PointsTransactionsPage() {
                 </tbody>
               </table>
             </div>
+            {data.transactionLog.length ? (
+              <div
+                className="flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                style={{ borderColor: 'var(--stroke)', background: 'color-mix(in srgb, var(--card) 92%, transparent)' }}
+              >
+                <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                  Showing <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{transactionRangeStart}-{transactionRangeEnd}</span> of{' '}
+                  <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{data.transactionLog.length.toLocaleString()}</span> transactions
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTransactionPage((current) => Math.max(1, current - 1))}
+                    disabled={transactionPage === 1}
+                    className="admin-action-button rounded-xl px-3 py-2 text-sm font-semibold"
+                    data-variant="outline"
+                  >
+                    Previous
+                  </button>
+                  {transactionVisiblePages.map((page, index) =>
+                    page === 'ellipsis' ? (
+                      <span
+                        key={`ellipsis-${index}`}
+                        className="px-2 text-[0px] font-semibold leading-none after:text-sm after:leading-none after:content-['...']"
+                        style={{ color: 'var(--muted)' }}
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={`page-${page}`}
+                        type="button"
+                        onClick={() => setTransactionPage(page)}
+                        className="admin-action-button min-w-[42px] rounded-xl px-3 py-2 text-sm font-semibold"
+                        data-variant={page === transactionPage ? 'primary' : 'outline'}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTransactionPage((current) =>
+                        Math.min(transactionPageCount, current + 1)
+                      )
+                    }
+                    disabled={transactionPage === transactionPageCount}
+                    className="admin-action-button rounded-xl px-3 py-2 text-sm font-semibold"
+                    data-variant="outline"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -554,21 +708,96 @@ function SummaryCard({
   title,
   value,
   detail,
-  accent,
+  tone,
 }: {
   title: string
   value: string
   detail: string
-  accent: string
+  tone: SummaryTone
+}) {
+  const palette = SUMMARY_CARD_PALETTES[tone]
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-[28px] border p-5 shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+      style={{ borderColor: palette.border, background: palette.background }}
+    >
+      <div
+        className="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full blur-3xl"
+        style={{ background: palette.glow }}
+      />
+      <span
+        className="relative inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em]"
+        style={{ background: palette.pillBg, color: palette.pillFg }}
+      >
+        {palette.eyebrow}
+      </span>
+      <p className="relative mt-4 text-sm font-semibold" style={{ color: palette.title }}>{title}</p>
+      <p className="relative mt-3 text-3xl font-black" style={{ color: palette.value }}>{value}</p>
+      <p className="relative mt-2 max-w-xs text-sm leading-relaxed" style={{ color: palette.detail }}>{detail}</p>
+    </div>
+  )
+}
+
+function buildPaginationPages(currentPage: number, totalPages: number) {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const candidatePages = new Set<number>([
+    1,
+    totalPages,
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+  ])
+
+  const pages = [...candidatePages]
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b)
+
+  const visible: Array<number | 'ellipsis'> = []
+
+  pages.forEach((page, index) => {
+    if (index > 0 && page - pages[index - 1] > 1) {
+      visible.push('ellipsis')
+    }
+    visible.push(page)
+  })
+
+  return visible
+}
+
+function PaginationEllipsis({ index }: { index: number }) {
+  return (
+    <span
+      key={`ellipsis-${index}`}
+      className="px-2 text-sm font-semibold"
+      style={{ color: 'var(--muted)' }}
+    >
+      …
+    </span>
+  )
+}
+
+function PaginationPageButton({
+  page,
+  isActive,
+  onClick,
+}: {
+  page: number
+  isActive: boolean
+  onClick: () => void
 }) {
   return (
-    <div className={cn('overflow-hidden rounded-[28px] p-[1px] shadow-[0_18px_40px_rgba(15,23,42,0.08)]', accent)}>
-      <div className="rounded-[27px] bg-white/96 p-5 backdrop-blur">
-        <p className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>{title}</p>
-        <p className="mt-3 text-3xl font-black text-gray-900">{value}</p>
-        <p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>{detail}</p>
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="admin-action-button min-w-[42px] rounded-xl px-3 py-2 text-sm font-semibold"
+      data-variant={isActive ? 'primary' : 'outline'}
+    >
+      {page}
+    </button>
   )
 }
 

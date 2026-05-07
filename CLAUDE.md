@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-05-06
+Last updated: 2026-05-08
 
 ## What This Repository Is
 
@@ -205,6 +205,10 @@ The current live points default in code is now:
   - that admin-to-superadmin handoff is now stored as a first-class workflow stage instead of just loose wording: `verificationQueueStatus` can now move into a dedicated pending-superadmin Digital ID generation state, with saved admin handoff metadata for who cleared the documents, who referred the case upward, and when each step happened
   - the admin verification queue, admin verification detail page, superadmin Digital IDs workspace, and youth verification-status messaging now all surface that same handoff state more clearly through updated badges, workflow copy, and approval metadata such as `Approved by Admin`, `Referred by Admin`, and their timestamps
   - the superadmin verification/detail experience now treats referred submissions as a distinct issuance step with a dedicated `Generate Digital ID` action, while row/table labels and status copy were retuned so document review, final superadmin review, and Digital ID issuance read as separate responsibilities instead of one blended approval event
+  - the verification workflow was then simplified again around a stricter ownership split: admin now owns the full verification decision, and the main admin-side action is a single `Approve Verification and Refer to Superadmin` handoff once required documents are approved
+  - that one admin action now marks the member verified immediately, stores `Approved by Admin`, `Approved At`, `Referred by`, and `Referred At`, and notifies superadmin that the member is ready for Digital ID generation
+  - the redundant superadmin `Verify Submission` step was removed from the verification workspace, so superadmin now uses the Digital IDs page as the issuance queue and only completes the final `Generate and Issue Digital ID` action there
+  - the Digital IDs workspace now accepts a `?member=` deep link from the verification queue/detail page, which makes the admin-to-superadmin handoff feel like one connected flow instead of sending staff into a generic list view
   - the admin Digital IDs workspace now treats pending issuance as a superadmin-only approval/activation step, and superadmin activation can generate the missing member ID details on approval when the record was only waiting for issuance
   - the youth/admin Digital ID back emergency-contact lines now render in proper title-style capitalization instead of forced all-caps, and the youth/admin PDF exporters now rasterize the member photo more reliably before embedding it so saved PDFs keep the photo visible with steadier front-card positioning
   - signature export from the pad now trims excess transparent canvas space around the actual strokes so the signature sits more naturally on the card line
@@ -217,6 +221,28 @@ The current live points default in code is now:
   - the modal uses a dedicated shared component at `apps/youth-pwa/src/components/ui/AuthProgressModal.tsx` and keeps the auth screens aligned with the same blue-gold KK visual language already used elsewhere in the app
   - auth form inputs and social buttons now stay disabled while the modal is open so duplicate taps do not trigger overlapping sign-in attempts
   - the youth login and register screens now keep only the Google social sign-in option, and that remaining Google CTA is centered as a single deliberate action instead of sitting in the earlier multi-provider icon row
+- admin verification state reset and review responsiveness are now more consistent across Youth Members and Verification
+  - manual status changes back to `pending` through `apps/backend/src/modules/admin/admin.service.ts` now also rewind the member's verification handoff metadata and reset all related `documents` review states back to `pending`, so a member no longer stays visually `verified` in the Verification queue after being moved back to pending in Youth Members
+  - verification queue status computation in both `apps/backend/src/modules/admin/admin.service.ts` and `apps/backend/src/modules/digital-id/digitalId.service.ts` now recomputes from the current member status plus live document states instead of blindly trusting stale saved queue labels
+  - the admin youth detail payload now exposes each uploaded document's real review status instead of forcing every item to mirror the profile status
+  - the admin verification detail page at `apps/admin-panel/src/app/(dashboard)/verification/[userId]/page.tsx` now applies document approve/reject results in-place after the API call succeeds, removes the blocking loading modal for per-document review actions, and updates the queue badge/checklist live without a full screen refresh
+  - backend verification for the reset flow now includes a dedicated fake-Firestore integration case in `apps/backend/tests/backend.integration.test.js`
+- the admin verification detail workflow is now less brittle around flagged documents and superadmin handoff
+  - flagged / rejected documents on `apps/admin-panel/src/app/(dashboard)/verification/[userId]/page.tsx` now automatically count as resubmission targets, so `Request Resubmission` becomes actionable as soon as the admin adds a message instead of depending on a hidden extra checkbox step
+  - sending a resubmission request now updates the current verification detail screen in place to `resubmission_requested` without requiring a browser refresh
+  - once all required documents are approved, the same verification detail page now surfaces a clear forward action again for the admin: either `Approve Verification and Refer to Superadmin` for pending records or `Refer to Superadmin` for already-verified records that have not been queued yet
+  - backend document flagging now also clears stale verification / Digital ID handoff state so the workflow cards no longer keep showing completed issuance states after a required document has been marked with an issue
+- backend document review writes are now Firestore-safe for admin verification actions
+  - `apps/backend/src/modules/admin/admin.service.ts` now strips `undefined` keys before writing document-review side effects into `kkProfiling`, preventing the `/api/admin/verification/:userId/documents/:documentId/review` endpoint from failing with Firestore `undefined`-value errors when an admin approves a document
+  - the same review service now explicitly guards required identifiers and allowed actions before writing, while `apps/backend/src/modules/admin/admin.controller.ts` returns a clearer success payload with the reviewed `userId`, `documentId`, `action`, and `note`
+  - the admin verification detail page continues to send a fully defined `{ action, note }` payload and updates the reviewed document status live after success
+  - route coverage for that success envelope was added in `apps/backend/tests/backend.routes.test.js`
+- the superadmin Merchants workspace now separates merchant directory maintenance from transaction review more clearly
+  - the misleading `Applications` tab was removed because merchant accounts in this repo are manually created by superadmin instead of coming through a registration queue
+  - `apps/admin-panel/src/app/(dashboard)/merchants/page.tsx` now uses a more balanced two-column card layout with a merchant-selection stack on the left and a purpose-specific detail pane on the right
+  - the `Directory` tab now focuses on merchant profile, storefront, and lifecycle management only
+  - the `Transactions` tab now owns the merchant transaction history view, including its own merchant summary context plus paginated transaction cards so long activity logs no longer force one long scroll inside the profile pane
+  - the merchant-selection cards were then tightened again into a denser dashboard-style row treatment with smaller padding, a reduced logo block, single-line descriptions, and responsive multi-column wrapping on wider screens so the directory no longer feels dominated by oversized cards
 - backend seed defaults for privileged web accounts now use live-style email addresses instead of `.test`
   - `apps/backend/utils/seedAdmin.js` now defaults to `admin@kkbapp-buting.com`
   - `apps/backend/utils/seedSuperadmin.js` now defaults to `superadmin@kkbapp-buting.com`
@@ -304,6 +330,21 @@ The current live points default in code is now:
 - the admin and superadmin UI palette now uses the newer blue-gold system instead of the earlier green-led accent set
   - core admin theme variables in `apps/admin-panel/src/app/globals.css` now center on `#014384`, `#0572DC`, `#FCB315`, `#FCBA2C`, and `#F0F0F0`
   - shared dashboard/workspace primitives and the redesigned `/dashboard`, `/verification`, `/merchants`, `/promotions`, and `/reports` pages were updated so cards, charts, pills, notices, and primary actions follow the new palette consistently
+  - the superadmin `Points & Transactions` page now uses calmer summary-card colors that stay inside the same blue-gold brand family instead of the earlier louder blue / yellow / green block treatment, which makes the top KPI cards feel more cohesive with the rest of the admin interface
+  - the `Transaction Log` on that same page now paginates the filtered transaction results in-page, so superadmins can move through older records with page controls instead of scrolling through one long table
+- superadmin notification delivery for Digital ID referrals is now more reliable and more informative
+  - the shared backend notification fan-out helper in `apps/backend/src/modules/notifications/notifications.service.ts` now resolves role recipients from both Firestore user-role documents and Firebase Auth custom claims, which prevents superadmin reminder/referral notifications from silently missing accounts that only had the role in Auth
+  - admin referral and reminder actions for Digital ID generation now send richer superadmin notifications with member name/email, approving admin, referring admin, approval time, referral time, and a direct deep link into the Digital IDs workspace for that member
+  - the admin-panel Topbar notification bell now refreshes more frequently and renders those Digital ID referral details inline inside the dropdown, so superadmins can see who was approved, who referred the case, and when, without refreshing the page
+- admin and superadmin dark mode contrast is now safer on the verification and Digital ID workflows
+  - `apps/admin-panel/src/app/globals.css` now exposes theme-aware tone surface and status-pill styles for success, info, warning, and danger states so dark mode no longer reuses washed-out light-mode card backgrounds with low-contrast text
+  - the verification queue, verification detail workflow cards, referral callouts, and superadmin Digital IDs summary / issuance callouts now use those shared tone styles instead of hardcoded `bg-*-50` / `text-*-800` combinations
+  - this specifically fixes the unreadable light cards seen on the dark-mode verification detail page while keeping the same status language visible for both admin and superadmin roles
+  - the same shared admin theme file now also provides contrast-safe action-button variants for outline, primary, neutral, success, and danger actions, and the verification detail page now uses those buttons for document review, resubmission, referral, reminder, Digital ID workspace navigation, and submission rejection so dark-mode disabled states no longer wash out labels like `Send Reminder to Superadmin`
+  - the neutral button variant now uses a dedicated navy control color instead of inheriting the theme text token, and the reminder / issuance metadata cards now use the shared info-tone surface, which fixes the case where the dark-mode `Send Reminder to Superadmin` button and its surrounding summary card still looked washed out or nearly the same color as the page
+- the shared admin loading modal is now more readable and visually aligned with the blue-gold system
+  - `apps/admin-panel/src/components/ui/LoadingModal.tsx` now uses a stronger themed overlay, a polished card background, darker title/body contrast, roomier spacing, and a clearer loading hierarchy instead of the earlier washed-out white modal with barely visible helper text
+  - the modal continues to power shared admin and superadmin loading states such as dashboard navigation, member updates, merchant creation, and verification actions, so this polish now carries across those flows without per-page overrides
 - the admin-panel Digital IDs screen now uses a more physical-card-inspired back design in both the live preview and exported PDF
   - the back side now follows an off-white bordered layout with centered emergency contact details, terms and conditions copy, validity date, and signatory block inspired by the provided reference card
   - the QR block was removed from the back side entirely so the card reads more like a traditional printed ID back instead of a mixed print-and-tech layout

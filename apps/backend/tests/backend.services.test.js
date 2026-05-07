@@ -124,6 +124,68 @@ const tests = [
     },
   },
   {
+    name: "notifications.service also resolves role recipients from auth claims when Firestore role docs are missing",
+    async run() {
+      const addedRecipients = [];
+      const db = {
+        collection(name) {
+          if (name === "notifications") {
+            return {
+              add: async (payload) => {
+                addedRecipients.push(payload.recipientUid);
+                return { id: `notif-${addedRecipients.length}` };
+              },
+            };
+          }
+
+          if (name === "users") {
+            return {
+              where(field, operator, value) {
+                assert.equal(field, "role");
+                assert.equal(operator, "==");
+                assert.equal(value, "superadmin");
+                return {
+                  async get() {
+                    return { docs: [] };
+                  },
+                };
+              },
+            };
+          }
+
+          throw new Error(`Unexpected collection ${name}`);
+        },
+      };
+
+      const service = loadDistModuleWithMocks("dist/src/modules/notifications/notifications.service", {
+        "dist/src/config/firebase": {
+          db,
+          auth: {
+            listUsers: async () => ({
+              users: [
+                { uid: "super-1", customClaims: { role: "superadmin" } },
+                { uid: "admin-1", customClaims: { role: "admin" } },
+              ],
+              pageToken: undefined,
+            }),
+          },
+        },
+      });
+
+      const result = await service.createNotificationsForRoles(["superadmin"], {
+        audience: "admin",
+        type: "info",
+        title: "Digital ID generation requested",
+        body: "A member is waiting for issuance.",
+        link: "/digital-ids?member=youth-1",
+        metadata: { userId: "youth-1" },
+      });
+
+      assert.deepEqual(result, { notified: 1 });
+      assert.deepEqual(addedRecipients, ["super-1"]);
+    },
+  },
+  {
     name: "qr.service awards points for a valid merchant QR redemption",
     async run() {
       const addPointsCalls = [];

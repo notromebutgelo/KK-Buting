@@ -81,7 +81,7 @@ export async function approveVerificationHandler(req: AuthRequest, res: Response
   const { userId } = req.params;
   try {
     await approveVerification(userId, req.user!.email || "admin");
-    return res.json({ message: "Verification approved" });
+    return res.json({ message: "Verification approved and referred to superadmin for Digital ID generation" });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -114,7 +114,15 @@ export async function reviewVerificationDocumentHandler(req: AuthRequest, res: R
       req.user!.email || "admin",
       note
     );
-    return res.json({ message: "Document review updated" });
+    return res.json({
+      message: "Document review updated",
+      review: {
+        userId: req.params.userId,
+        documentId: req.params.documentId,
+        action,
+        note: typeof note === "string" ? note : "",
+      },
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -443,7 +451,7 @@ export async function getDigitalIdMemberHandler(req: AuthRequest, res: Response)
 export async function submitDigitalIdForApprovalHandler(req: AuthRequest, res: Response) {
   try {
     await submitDigitalIdForApproval(req.params.userId, req.user?.email || "admin");
-    return res.json({ message: "Digital ID sent for approval" });
+    return res.json({ message: "Reminder sent to superadmin for Digital ID generation" });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -452,7 +460,7 @@ export async function submitDigitalIdForApprovalHandler(req: AuthRequest, res: R
 export async function approveDigitalIdHandler(req: AuthRequest, res: Response) {
   try {
     await approveDigitalId(req.params.userId, req.user?.email || "superadmin");
-    return res.json({ message: "Digital ID approved" });
+    return res.json({ message: "Digital ID generated and issued" });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

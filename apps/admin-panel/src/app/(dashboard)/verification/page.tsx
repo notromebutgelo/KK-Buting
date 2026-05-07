@@ -89,7 +89,6 @@ const PAGE_SIZE = 10
 
 export default function VerificationPage() {
   const [profiles, setProfiles] = useState<QueueProfile[]>([])
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [ageGroup, setAgeGroup] = useState('all')
@@ -97,7 +96,6 @@ export default function VerificationPage() {
   const [dateSubmitted, setDateSubmitted] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
-  const [isBulkApproving, setIsBulkApproving] = useState(false)
   const [message, setMessage] = useState('')
   const [adminRole, setAdminRole] = useState('admin')
   const [pagination, setPagination] = useState<QueueResponse['pagination']>({
@@ -180,61 +178,6 @@ export default function VerificationPage() {
     }
   }, [queryParams])
 
-  const allVisibleSelected =
-    profiles.length > 0 && profiles.every((profile) => selectedIds.includes(profile.userId))
-
-  const readyToApproveIds = profiles
-    .filter((profile) => isEligibleForVerification(profile))
-    .map((profile) => profile.userId)
-
-  const readySelectedCount = profiles.filter(
-    (profile) => selectedIds.includes(profile.userId) && isEligibleForVerification(profile)
-  ).length
-
-  const toggleSelectAllVisible = () => {
-    if (allVisibleSelected) {
-      setSelectedIds((current) => current.filter((id) => !profiles.some((profile) => profile.userId === id)))
-      return
-    }
-
-    setSelectedIds((current) => [
-      ...Array.from(new Set([...current, ...profiles.map((profile) => profile.userId)])),
-    ])
-  }
-
-  const toggleSelectOne = (userId: string) => {
-    setSelectedIds((current) =>
-      current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId]
-    )
-  }
-
-  const handleBulkApprove = async () => {
-    setIsBulkApproving(true)
-    setMessage('')
-    try {
-      const selectedReadyIds = profiles
-        .filter((profile) => selectedIds.includes(profile.userId) && isEligibleForVerification(profile))
-        .map((profile) => profile.userId)
-
-      const res = await api.post('/admin/verification/bulk-approve', {
-        userIds: selectedReadyIds,
-      })
-
-      const approvedCount = res.data.approved?.length || 0
-      const failedCount = res.data.failed?.length || 0
-      setMessage(`Bulk approval finished. Approved: ${approvedCount}. Failed: ${failedCount}.`)
-      setSelectedIds([])
-      const queueRes = await api.get<QueueResponse>('/admin/verification', { params: queryParams })
-      setProfiles(queueRes.data.profiles || [])
-      setPagination(queueRes.data.pagination)
-      setSummary(queueRes.data.summary || summary)
-    } catch (error: any) {
-      setMessage(error?.response?.data?.error || 'Bulk approval failed.')
-    } finally {
-      setIsBulkApproving(false)
-    }
-  }
-
   const messageTone = message.toLowerCase().includes('fail') ? 'danger' : 'success'
 
   return (
@@ -245,7 +188,7 @@ export default function VerificationPage() {
         description="This queue is now structured around what matters most: how much work is waiting, which submissions are ready, and which members need resubmission support before they can move forward."
         pills={[
           <DashboardPill key="role" tone={isSuperadmin ? 'soft' : 'default'}>
-            {isSuperadmin ? 'Bulk approval enabled' : 'Admin review mode'}
+            {isSuperadmin ? 'Use Digital IDs for issuance' : 'Admin review mode'}
           </DashboardPill>,
           <DashboardPill key="queue" tone={(summary?.pending || 0) > 0 ? 'warning' : 'default'}>
             {(summary?.pending || 0) > 0 ? 'Queue active' : 'Queue calm'}
@@ -254,20 +197,16 @@ export default function VerificationPage() {
         aside={
           <div className="grid grid-cols-2 gap-3">
             <DashboardMiniStat
-              label="Ready selected"
-              value={readySelectedCount.toLocaleString()}
-              meta={
-                isSuperadmin
-                  ? 'Chosen submissions that can move into final superadmin review'
-                  : 'Chosen submissions that are ready to be referred upward'
-              }
-              tone={readySelectedCount > 0 ? 'soft' : 'neutral'}
+              label="In review"
+              value={(summary?.inReview || 0).toLocaleString()}
+              meta="Members already moving through document review."
+              tone={(summary?.inReview || 0) > 0 ? 'soft' : 'neutral'}
             />
             <DashboardMiniStat
-              label="Resubmission"
-              value={(summary?.resubmissionRequested || 0).toLocaleString()}
-              meta="Members who need another pass"
-              tone={summary?.resubmissionRequested ? 'warning' : 'neutral'}
+              label="Pending issuance"
+              value={(summary?.pendingSuperadmin || 0).toLocaleString()}
+              meta="Admin-cleared cases now waiting in the superadmin ID queue."
+              tone={(summary?.pendingSuperadmin || 0) > 0 ? 'warning' : 'neutral'}
             />
           </div>
         }
@@ -289,7 +228,7 @@ export default function VerificationPage() {
         <AdminStatCard
           label="Pending superadmin"
           value={(summary?.pendingSuperadmin || 0).toLocaleString()}
-          meta="Submissions already cleared by admin review and waiting for superadmin issuance."
+          meta="Submissions already cleared by admin review and waiting for superadmin ID generation."
           accent="var(--accent-strong)"
         />
         <AdminStatCard
@@ -306,22 +245,7 @@ export default function VerificationPage() {
         <AdminSurfaceHeader
           title="Queue filters"
           description="Use the filters to narrow the queue without drowning out the work itself."
-          action={
-            <button
-              type="button"
-              disabled={
-                !isSuperadmin ||
-                isBulkApproving ||
-                selectedIds.length === 0 ||
-                selectedIds.every((id) => !readyToApproveIds.includes(id))
-              }
-              onClick={handleBulkApprove}
-              className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
-              style={{ background: 'var(--accent)' }}
-            >
-              {isBulkApproving ? 'Bulk approving...' : 'Bulk approve ready'}
-            </button>
-          }
+          action={<DashboardPill tone="default">{isSuperadmin ? 'Verification queue is read-only for issuance' : 'Open each submission to review documents'}</DashboardPill>}
         />
 
         <div className="mt-5">
@@ -419,9 +343,6 @@ export default function VerificationPage() {
               <table className="w-full">
                 <thead style={{ background: 'var(--accent-soft)' }}>
                   <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} />
-                    </th>
                     {['Youth Member', 'Age Group', 'Required Documents', 'Queue Status', 'Submitted', 'Actions'].map((heading) => (
                       <th
                         key={heading}
@@ -439,13 +360,6 @@ export default function VerificationPage() {
                       key={profile.userId}
                       className="transition-colors hover:bg-[color:var(--accent-soft)]"
                     >
-                      <td className="px-4 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(profile.userId)}
-                          onChange={() => toggleSelectOne(profile.userId)}
-                        />
-                      </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-[color:var(--accent-soft)]">
@@ -486,7 +400,7 @@ export default function VerificationPage() {
                             </div>
                           ))}
                           {profile.missingDocuments.length > 0 ? (
-                            <p className="text-xs font-medium text-red-600">
+                            <p className="text-xs font-medium" style={{ color: 'var(--danger)' }}>
                               Missing: {profile.missingDocuments.map((document) => document.label).join(', ')}
                             </p>
                           ) : null}
@@ -513,16 +427,31 @@ export default function VerificationPage() {
                       <td className="px-5 py-4">
                         <div className="flex flex-col items-start gap-2">
                           <Link
-                            href={`/verification/${profile.userId}`}
+                            href={
+                              isSuperadmin && profile.queueStatus === 'pending_superadmin_id_generation'
+                                ? `/digital-ids?member=${profile.userId}`
+                                : `/verification/${profile.userId}`
+                            }
                             className="font-semibold text-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
                           >
-                            {profile.queueStatus === 'pending_superadmin_id_generation'
-                              ? 'Open superadmin handoff'
+                            {isSuperadmin && profile.queueStatus === 'pending_superadmin_id_generation'
+                              ? 'Open ID generation queue'
                               : 'Review submission'}
                           </Link>
-                          {isEligibleForVerification(profile) ? (
-                            <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
-                              {isSuperadmin ? 'Ready for final review' : 'Ready for superadmin referral'}
+                          {!isSuperadmin && isEligibleForVerification(profile) ? (
+                            <span
+                              data-tone="success"
+                              className="admin-status-pill rounded-full px-2.5 py-1 text-xs font-semibold"
+                            >
+                              Ready for admin approval and referral
+                            </span>
+                          ) : null}
+                          {isSuperadmin && profile.queueStatus === 'pending_superadmin_id_generation' ? (
+                            <span
+                              data-tone="info"
+                              className="admin-status-pill rounded-full px-2.5 py-1 text-xs font-semibold"
+                            >
+                              Generate from Digital IDs
                             </span>
                           ) : null}
                         </div>
@@ -572,40 +501,22 @@ export default function VerificationPage() {
 }
 
 function QueueStatusBadge({ status }: { status: string }) {
-  const className =
-    status === 'pending'
-      ? 'bg-amber-50 text-amber-700'
-      : status === 'in_review'
-        ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
-        : status === 'pending_superadmin_id_generation'
-          ? 'bg-sky-100 text-sky-800'
-        : status === 'resubmission_requested'
-          ? 'bg-red-100 text-red-700'
-          : status === 'verified'
-            ? 'bg-green-100 text-green-700'
-            : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
-
   return (
-    <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', className)}>
+    <span
+      data-tone={getQueueTone(status)}
+      className="admin-status-pill rounded-full px-2.5 py-1 text-xs font-semibold"
+    >
       {getQueueStatusLabel(status)}
     </span>
   )
 }
 
 function DocumentStatusBadge({ status }: { status: string }) {
-  const className =
-    status === 'approved'
-      ? 'bg-green-100 text-green-700'
-      : status === 'rejected'
-        ? 'bg-red-100 text-red-700'
-        : status === 'resubmission_requested'
-          ? 'bg-red-50 text-red-700'
-          : status === 'missing'
-            ? 'bg-slate-100 text-slate-600'
-            : 'bg-amber-50 text-amber-700'
-
   return (
-    <span className={cn('inline-flex rounded-full px-2 py-1 text-[11px] font-semibold', className)}>
+    <span
+      data-tone={getDocumentTone(status)}
+      className="admin-status-pill rounded-full px-2 py-1 text-[11px] font-semibold"
+    >
       {getDocumentStatusLabel(status)}
     </span>
   )
@@ -625,6 +536,21 @@ function getDocumentStatusLabel(value: string) {
   if (value === 'rejected') return 'Flagged'
   if (value === 'pending') return 'Needs Review'
   return getQueueStatusLabel(value)
+}
+
+function getQueueTone(status: string) {
+  if (status === 'pending' || status === 'in_review') return 'warning'
+  if (status === 'pending_superadmin_id_generation') return 'info'
+  if (status === 'resubmission_requested' || status === 'rejected') return 'danger'
+  if (status === 'verified') return 'success'
+  return 'neutral'
+}
+
+function getDocumentTone(status: string) {
+  if (status === 'approved') return 'success'
+  if (status === 'rejected' || status === 'resubmission_requested') return 'danger'
+  if (status === 'pending') return 'warning'
+  return 'neutral'
 }
 
 function prettifyOption(value: string) {

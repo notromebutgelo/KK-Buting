@@ -65,9 +65,9 @@ const superadminOnly = [verifyToken, requireRole("superadmin")];
 
 router.get("/dashboard", ...adminOrSuperadmin, getDashboard);
 router.get("/verification", ...adminOrSuperadmin, listVerificationProfiles);
-router.post("/verification/bulk-approve", ...superadminOnly, validateRequest(validateBulkUserIdsRequest), bulkApproveVerificationHandler);
+router.post("/verification/bulk-approve", ...adminOrSuperadmin, validateRequest(validateBulkUserIdsRequest), bulkApproveVerificationHandler);
 router.get("/verification/:userId", ...adminOrSuperadmin, getVerificationProfileHandler);
-router.patch("/verification/:userId/approve", ...superadminOnly, approveVerificationHandler);
+router.patch("/verification/:userId/approve", ...adminOrSuperadmin, approveVerificationHandler);
 router.patch("/verification/:userId/reject", ...superadminOnly, validateRequest(validateVerificationRejectRequest), rejectVerificationHandler);
 router.patch(
   "/verification/:userId/documents/:documentId/review",

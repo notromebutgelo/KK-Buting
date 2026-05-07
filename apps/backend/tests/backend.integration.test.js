@@ -47,6 +47,26 @@ async function loadPointsService(db) {
   });
 }
 
+async function loadAdminService(db) {
+  return loadDistModuleWithMocks("dist/src/modules/admin/admin.service", {
+    "dist/src/config/firebase": createFirebaseConfigMock(db),
+    "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+    "dist/src/modules/auth/user.service": {
+      setUserRole: async () => undefined,
+    },
+    "dist/src/modules/auth/merchantPasswordPolicy.service": {
+      createMerchantTemporaryPasswordPolicy: async () => undefined,
+    },
+    "dist/src/modules/merchants/merhcants.service": {
+      getMerchantById: async () => null,
+    },
+    "dist/src/modules/notifications/notifications.service": {
+      createNotification: async () => undefined,
+      createNotificationsForRoles: async () => undefined,
+    },
+  });
+}
+
 const tests = [
   {
     name: "notifications integration writes, lists, and marks records as read in fake Firestore",
@@ -275,6 +295,94 @@ const tests = [
       const stored = db.getDocData("merchants", "merchant-1");
       assert.equal(stored.imageUrl, "https://cdn.example.com/banner.png");
       assert.equal(stored.shortDescription, "Neighborhood cafe favorites");
+    },
+  },
+  {
+    name: "admin verification reset to pending rewinds document review statuses and queue state",
+    async run() {
+      const db = new FakeFirestore({
+        users: {
+          "youth-1": {
+            role: "youth",
+            UserName: "Jerome Alison",
+            email: "jerome@example.com",
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            firstName: "Jerome",
+            lastName: "Alison",
+            youthAgeGroup: "Core Youth",
+            documentsSubmitted: true,
+            submittedAt: "2026-05-06T04:01:37.000Z",
+            status: "verified",
+            verified: true,
+            verificationQueueStatus: "verified",
+            verificationDocumentsApprovedAt: "2026-05-06T04:10:00.000Z",
+            verificationDocumentsApprovedBy: "admin@kk.local",
+            verificationReferredToSuperadminAt: "2026-05-06T04:11:00.000Z",
+            verificationReferredToSuperadminBy: "admin@kk.local",
+            digitalIdApprovalRequestedAt: "2026-05-06T04:11:00.000Z",
+            digitalIdApprovalRequestedBy: "admin@kk.local",
+          },
+        },
+        documents: {
+          "doc-1": {
+            profileId: "youth-1",
+            documentType: "proof_of_voter_registration",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:00.000Z",
+          },
+          "doc-2": {
+            profileId: "youth-1",
+            documentType: "valid_government_id",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:01.000Z",
+          },
+          "doc-3": {
+            profileId: "youth-1",
+            documentType: "id_photo",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:02.000Z",
+          },
+        },
+      });
+
+      const adminService = await loadAdminService(db);
+
+      await adminService.updateYouthVerificationStatus(
+        "youth-1",
+        "pending",
+        "admin@kk.local"
+      );
+
+      const profile = db.getDocData("kkProfiling", "youth-1");
+      assert.equal(profile.status, "pending");
+      assert.equal(profile.verified, false);
+      assert.equal(profile.verifiedAt, null);
+      assert.equal(profile.verificationQueueStatus, null);
+      assert.equal(profile.verificationDocumentsApprovedAt, null);
+      assert.equal(profile.verificationReferredToSuperadminAt, null);
+      assert.equal(profile.digitalIdApprovalRequestedAt, null);
+
+      const docs = db.listDocData("documents");
+      assert.equal(docs.length, 3);
+      for (const document of docs) {
+        assert.equal(document.reviewStatus, "pending");
+        assert.equal(document.reviewNote, null);
+        assert.equal(document.reviewedAt, null);
+        assert.equal(document.reviewedBy, null);
+        assert.equal(document.reviewRequestedAt, null);
+      }
+
+      const queue = await adminService.getVerificationProfiles({ pageSize: 10 });
+      assert.equal(queue.profiles.length, 1);
+      assert.equal(queue.profiles[0].status, "pending");
+      assert.equal(queue.profiles[0].queueStatus, "pending");
+      assert.deepEqual(
+        queue.profiles[0].requiredDocuments.map((document) => document.reviewStatus),
+        ["pending", "pending", "pending"]
+      );
     },
   },
 ];
