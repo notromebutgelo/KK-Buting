@@ -3,6 +3,8 @@ node_modules/
 
 .next/
 **/.next/
+.next-dev/
+**/.next-dev/
 out/
 **/out/
 dist/

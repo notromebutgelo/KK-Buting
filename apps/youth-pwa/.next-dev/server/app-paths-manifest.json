@@ -1,8 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/(auth)/register/page": "app/(auth)/register/page.js",
-  "/(onboarding)/profiling/step-1/page": "app/(onboarding)/profiling/step-1/page.js",
-  "/(onboarding)/profiling/step-2/page": "app/(onboarding)/profiling/step-2/page.js",
-  "/(onboarding)/profiling/step-4/page": "app/(onboarding)/profiling/step-4/page.js",
-  "/(onboarding)/profiling/step-3/page": "app/(onboarding)/profiling/step-3/page.js"
-}
