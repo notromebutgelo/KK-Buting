@@ -203,6 +203,24 @@ const MONTH_OPTIONS = [
 ] as const;
 
 const DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => String(index + 1));
+const AGE_1_TO_35_OPTIONS = Array.from({ length: 35 }, (_, index) => String(index + 1));
+const CHILD_COUNT_1_TO_20_OPTIONS = Array.from({ length: 20 }, (_, index) => String(index + 1));
+const NOT_APPLICABLE_OPTION = "Not Applicable";
+const PREFER_NOT_TO_SAY_OPTION = "Prefer not to say (Mas gusto kong huwag sabihin)";
+const AGE_1_TO_35_WITH_NOT_APPLICABLE_OPTIONS = [
+  ...AGE_1_TO_35_OPTIONS,
+  NOT_APPLICABLE_OPTION,
+];
+const AGE_1_TO_35_WITH_FALLBACK_OPTIONS = [
+  ...AGE_1_TO_35_OPTIONS,
+  NOT_APPLICABLE_OPTION,
+  PREFER_NOT_TO_SAY_OPTION,
+];
+const CHILD_COUNT_WITH_FALLBACK_OPTIONS = [
+  ...CHILD_COUNT_1_TO_20_OPTIONS,
+  NOT_APPLICABLE_OPTION,
+  PREFER_NOT_TO_SAY_OPTION,
+];
 
 const PASIG_BARANGAY_OPTIONS = [
   "Bagong Ilog",
@@ -662,7 +680,8 @@ function hasSexExperience(draft: ProfilingDraft) {
 
   if (
     rawValue === "not applicable" ||
-    rawValue.includes("wala pang sex experience")
+    rawValue.includes("wala pang sex experience") ||
+    rawValue.includes("prefer not to say")
   ) {
     return false;
   }
@@ -1084,12 +1103,12 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
           {
             key: "ageFirstEmployed",
             label: "How old were you when you were first employed? (Ilang taon ka noong ikaw ay unang nagtrabaho?)",
-            type: "text",
+            type: "select",
             required: true,
-            placeholder: 'Halimbawa: 22 o "Not Applicable"',
+            options: AGE_1_TO_35_WITH_NOT_APPLICABLE_OPTIONS,
+            placeholder: "Select age or Not Applicable",
             helperText:
-              'Ilagay ang "Not Applicable" kung hindi ka pa nagka-trabaho o nagtrabaho.',
-            inputMode: "numeric",
+              'Piliin ang "Not Applicable" kung hindi ka pa nagka-trabaho o nagtrabaho.',
           },
         ],
       },
@@ -1302,13 +1321,13 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
           {
             key: "smokingStartAge",
             label: "How old were you when you started smoking? (Anong edad ka unang nanigarilyo?)",
-            type: "text",
+            type: "select",
             required: true,
             showIf: hasSmokingHistory,
-            placeholder: 'Example: 18 o "Not Applicable"',
+            options: AGE_1_TO_35_WITH_NOT_APPLICABLE_OPTIONS,
+            placeholder: "Select age or Not Applicable",
             helperText:
-              'Ilagay ang "Not Applicable" kung ikaw ay hindi pa naninigarilyo.',
-            inputMode: "numeric",
+              'Piliin ang "Not Applicable" kung ikaw ay hindi pa naninigarilyo.',
           },
           {
             key: "thinksSmokingIsBad",
@@ -1331,13 +1350,13 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             key: "alcoholStartAge",
             label:
               "How old were you when you started consuming alcoholic drinks? (Anong edad ka unang uminom ng mga inuming may alcohol?)",
-            type: "text",
+            type: "select",
             required: true,
             showIf: hasAlcoholHistory,
-            placeholder: 'Example: 18 o "Not Applicable"',
+            options: AGE_1_TO_35_WITH_NOT_APPLICABLE_OPTIONS,
+            placeholder: "Select age or Not Applicable",
             helperText:
-              'Ilagay ang "Not Applicable" kung ikaw ay hindi pa nakakainom ng mga alcoholic drinks.',
-            inputMode: "numeric",
+              'Piliin ang "Not Applicable" kung ikaw ay hindi pa nakakainom ng mga alcoholic drinks.',
           },
           {
             key: "thinksAlcoholIsBad",
@@ -1355,45 +1374,45 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
           {
             key: "ageAtFirstSexExperience",
             label: "Age at first sex experience (Ano ang iyong edad noong ikaw ay unang nakipagtalik?)",
-            type: "text",
+            type: "select",
             required: true,
-            placeholder: 'Example: 18 o "Not Applicable"',
+            options: AGE_1_TO_35_WITH_FALLBACK_OPTIONS,
+            placeholder: "Select age or an option",
             helperText:
-              'Ilagay ang "Not Applicable" kung ikaw ay wala pang sex experience. Maaari ring ilagay ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
-            inputMode: "numeric",
+              'Piliin ang "Not Applicable" kung ikaw ay wala pang sex experience. Maaari ring piliin ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
           },
           {
             key: "numberOfChildren",
             label: "How many children do you have? (Ilan na ang iyong mga anak?)",
-            type: "text",
+            type: "select",
             required: true,
-            placeholder: 'Example: 3 o "Not Applicable"',
+            options: CHILD_COUNT_WITH_FALLBACK_OPTIONS,
+            placeholder: "Select number of children or an option",
             helperText:
-              'Ilagay ang "Not Applicable" kung ikaw ay wala pang anak. Maaari ring ilagay ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
-            inputMode: "numeric",
+              'Piliin ang "Not Applicable" kung ikaw ay wala pang anak. Maaari ring piliin ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
           },
           {
             key: "ageAtFirstPregnancy",
             label: "For females only: Age at first pregnancy (Anong edad ka unang nabuntis?)",
-            type: "text",
+            type: "select",
             required: true,
             showIf: femaleWithSexExperience,
-            placeholder: 'Example: 21 o "Not Applicable"',
+            options: AGE_1_TO_35_WITH_FALLBACK_OPTIONS,
+            placeholder: "Select age or an option",
             helperText:
-              'Ilagay ang "Not Applicable" kung ikaw ay hindi pa nabubuntis o kung ikaw ay isang lalaki. Maaari ring ilagay ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
-            inputMode: "numeric",
+              'Piliin ang "Not Applicable" kung ikaw ay hindi pa nabubuntis o kung ikaw ay isang lalaki. Maaari ring piliin ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
           },
           {
             key: "ageAtFirstImpregnation",
             label:
               "For males only: At what age did you first impregnate a girl or woman? (Sa anong edad ka unang nakabuntis?)",
-            type: "text",
+            type: "select",
             required: true,
             showIf: maleWithSexExperience,
-            placeholder: 'Example: 21 o "Not Applicable"',
+            options: AGE_1_TO_35_WITH_FALLBACK_OPTIONS,
+            placeholder: "Select age or an option",
             helperText:
-              'Ilagay ang "Not Applicable" kung ikaw ay hindi pa nakakabuntis o kung ikaw ay isang babae. Maaari ring ilagay ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
-            inputMode: "numeric",
+              'Piliin ang "Not Applicable" kung ikaw ay hindi pa nakakabuntis o kung ikaw ay isang babae. Maaari ring piliin ang "Prefer not to say (Mas gusto kong huwag sabihin)."',
           },
           {
             key: "soloParent",
@@ -1757,6 +1776,21 @@ function getClearedFieldValue(field: ProfilingFieldConfig) {
   return (field.type === "checkbox" ? [] : "") as ProfilingDraft[keyof ProfilingDraft];
 }
 
+function hasAllowedSingleChoiceValue(
+  field: ProfilingFieldConfig,
+  value: ProfilingDraft[keyof ProfilingDraft]
+) {
+  if ((field.type !== "radio" && field.type !== "select") || !field.options?.length) {
+    return true;
+  }
+
+  if (typeof value !== "string") {
+    return isBlank(value);
+  }
+
+  return !value || field.options.includes(value);
+}
+
 export function sanitizeDraftForVisibility(draft: ProfilingDraft) {
   const nextDraft: ProfilingDraft = { ...draft };
   const allFields = PROFILING_STEPS.flatMap((step) =>
@@ -1790,6 +1824,25 @@ export function sanitizeDraftForVisibility(draft: ProfilingDraft) {
           changed = true;
         }
 
+        continue;
+      }
+
+      if (!hasAllowedSingleChoiceValue(field, nextDraft[field.key])) {
+        setDraftField(
+          nextDraft,
+          field.key,
+          getClearedFieldValue(field) as ProfilingDraft[typeof field.key]
+        );
+
+        if (field.otherKey && !isBlank(nextDraft[field.otherKey])) {
+          setDraftField(
+            nextDraft,
+            field.otherKey,
+            "" as ProfilingDraft[typeof field.otherKey]
+          );
+        }
+
+        changed = true;
         continue;
       }
 
@@ -1827,6 +1880,7 @@ function isFieldComplete(field: ProfilingFieldConfig, draft: ProfilingDraft) {
 
   const value = draft[field.key];
   if (isBlank(value)) return false;
+  if (!hasAllowedSingleChoiceValue(field, value)) return false;
 
   if (field.otherKey && isOtherOptionSelected(field, draft)) {
     return !isBlank(draft[field.otherKey]);

@@ -1,9 +1,8 @@
 {
-  "/icon.png/route": "app/icon.png/route.js",
-  "/(main)/home/page": "app/(main)/home/page.js",
-  "/(main)/scanner/page": "app/(main)/scanner/page.js",
-  "/(main)/merchants/page": "app/(main)/merchants/page.js",
-  "/(main)/scanner/digital-id/page": "app/(main)/scanner/digital-id/page.js",
-  "/(main)/vouchers/page": "app/(main)/vouchers/page.js",
-  "/(main)/merchants/[merchantId]/page": "app/(main)/merchants/[merchantId]/page.js"
+  "/page": "app/page.js",
+  "/(auth)/register/page": "app/(auth)/register/page.js",
+  "/(onboarding)/profiling/step-1/page": "app/(onboarding)/profiling/step-1/page.js",
+  "/(onboarding)/profiling/step-2/page": "app/(onboarding)/profiling/step-2/page.js",
+  "/(onboarding)/profiling/step-4/page": "app/(onboarding)/profiling/step-4/page.js",
+  "/(onboarding)/profiling/step-3/page": "app/(onboarding)/profiling/step-3/page.js"
 }

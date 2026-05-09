@@ -19,16 +19,21 @@ export function readProfilingDraft(): ProfilingDraft {
     const sessionValue = sessionStorage.getItem(PROFILING_STORAGE_KEY);
     const rawValue = localValue || sessionValue || "{}";
     const parsed = JSON.parse(rawValue);
+    const sanitizedDraft =
+      parsed && typeof parsed === "object"
+        ? sanitizeDraftForVisibility(parsed as ProfilingDraft)
+        : {};
+    const serializedDraft = JSON.stringify(sanitizedDraft);
 
-    if (!localValue && sessionValue) {
-      localStorage.setItem(PROFILING_STORAGE_KEY, sessionValue);
+    if (localValue !== serializedDraft) {
+      localStorage.setItem(PROFILING_STORAGE_KEY, serializedDraft);
     }
 
-    if (!sessionValue && localValue) {
-      sessionStorage.setItem(PROFILING_STORAGE_KEY, localValue);
+    if (sessionValue !== serializedDraft) {
+      sessionStorage.setItem(PROFILING_STORAGE_KEY, serializedDraft);
     }
 
-    return parsed;
+    return sanitizedDraft;
   } catch {
     return {};
   }
@@ -240,6 +245,7 @@ export function SelectField({
     () => options.find((option) => option === value) || "",
     [options, value]
   );
+  const hasSelectedOption = Boolean(selectedLabel);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -282,7 +288,7 @@ export function SelectField({
       >
         <button
           type="button"
-          className={`pf-select-trigger${value ? "" : " placeholder"}`}
+          className={`pf-select-trigger${hasSelectedOption ? "" : " placeholder"}`}
           onClick={() => setIsOpen((current) => !current)}
           aria-expanded={isOpen}
           aria-haspopup="listbox"

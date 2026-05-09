@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 
 ## What This Repository Is
 
@@ -221,6 +221,10 @@ The current live points default in code is now:
   - the modal uses a dedicated shared component at `apps/youth-pwa/src/components/ui/AuthProgressModal.tsx` and keeps the auth screens aligned with the same blue-gold KK visual language already used elsewhere in the app
   - auth form inputs and social buttons now stay disabled while the modal is open so duplicate taps do not trigger overlapping sign-in attempts
   - the youth login and register screens now keep only the Google social sign-in option, and that remaining Google CTA is centered as a single deliberate action instead of sitting in the earlier multi-provider icon row
+- the youth PWA KK Profiling flow now uses controlled selects for the questionnaire's bounded age/count follow-up fields instead of free text/number inputs where the guide allowed `Not Applicable`
+  - `ageFirstEmployed`, `smokingStartAge`, `alcoholStartAge`, `ageAtFirstSexExperience`, `numberOfChildren`, `ageAtFirstPregnancy`, and `ageAtFirstImpregnation` now use dropdowns backed by bounded option lists, while keeping the saved Firestore field keys unchanged in `kkProfiling`
+  - age-based dropdowns now use `1` through `35` with `Not Applicable`, and the reproductive-health fields that already documented it also keep `Prefer not to say (Mas gusto kong huwag sabihin)` as a selectable option
+  - onboarding draft sanitization and step validation now clear or block stale single-choice values that are no longer valid options, so old free-text answers like unsupported entries cannot silently pass the updated select-based flow
 - admin verification state reset and review responsiveness are now more consistent across Youth Members and Verification
   - manual status changes back to `pending` through `apps/backend/src/modules/admin/admin.service.ts` now also rewind the member's verification handoff metadata and reset all related `documents` review states back to `pending`, so a member no longer stays visually `verified` in the Verification queue after being moved back to pending in Youth Members
   - verification queue status computation in both `apps/backend/src/modules/admin/admin.service.ts` and `apps/backend/src/modules/digital-id/digitalId.service.ts` now recomputes from the current member status plus live document states instead of blindly trusting stale saved queue labels

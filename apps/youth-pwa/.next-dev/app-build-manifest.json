@@ -75,6 +75,42 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(main)/merchants/[merchantId]/page.js"
+    ],
+    "/(onboarding)/intro/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(onboarding)/intro/page.js"
+    ],
+    "/(onboarding)/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(onboarding)/loading.js"
+    ],
+    "/(onboarding)/profiling/step-1/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(onboarding)/profiling/step-1/page.js"
+    ],
+    "/(onboarding)/profiling/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/(onboarding)/profiling/layout.css",
+      "static/chunks/app/(onboarding)/profiling/layout.js"
+    ],
+    "/(onboarding)/profiling/step-2/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(onboarding)/profiling/step-2/page.js"
+    ],
+    "/(onboarding)/profiling/step-3/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(onboarding)/profiling/step-3/page.js"
+    ],
+    "/(onboarding)/profiling/step-4/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(onboarding)/profiling/step-4/page.js"
     ]
   }
 }
