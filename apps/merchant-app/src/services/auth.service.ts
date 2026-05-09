@@ -2,7 +2,6 @@ import axios from 'axios'
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updatePassword,
@@ -77,10 +76,6 @@ export async function getCurrentMerchant() {
 
 export async function signOut() {
   await firebaseSignOut(auth)
-}
-
-export async function resetPassword(email: string) {
-  await sendPasswordResetEmail(auth, email.trim())
 }
 
 export async function changePassword(currentPassword: string, nextPassword: string) {

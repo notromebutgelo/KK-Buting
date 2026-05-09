@@ -16,6 +16,7 @@ import ForcePasswordChangeScreen from '../screens/auth/ForcePasswordChangeScreen
 export type RootStackParamList = {
   Login: undefined
   ForcePasswordChange: undefined
+  ChangePassword: undefined
   MerchantTabs: undefined
   Transactions: undefined
   Promotions: undefined
@@ -56,6 +57,7 @@ export default function AppNavigator() {
         ) : (
           <>
             <Stack.Screen name="MerchantTabs" component={BottomTabNavigator} />
+            <Stack.Screen name="ChangePassword" component={ForcePasswordChangeScreen} />
             <Stack.Screen name="Transactions" component={TransactionScreen} />
             <Stack.Screen name="Promotions" component={PromotionsScreen} />
             <Stack.Screen name="Products" component={ProductMenuScreen} />

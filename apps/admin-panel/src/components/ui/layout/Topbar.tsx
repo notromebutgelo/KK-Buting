@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
 import { Bell, Command, Menu, Search } from 'lucide-react';
@@ -124,6 +124,23 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const hasUnreadNotifications = unreadCount > 0;
+
+  const refreshNotifications = useCallback(
+    async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
+      if (showLoading) setNotifLoading(true);
+
+      try {
+        const res = await api.get<{ notifications: Notification[] }>('/notifications/me');
+        setNotifications(res.data.notifications || []);
+      } catch {
+        // Keep the last successful state so the bell does not flash empty.
+      } finally {
+        if (showLoading) setNotifLoading(false);
+      }
+    },
+    []
+  );
 
   // Find page metadata
   const navMeta = Object.entries(NAV_META).find(([path]) => pathname.startsWith(path))?.[1];
@@ -135,29 +152,20 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
   }, []);
 
   useEffect(() => {
-    let active = true;
-
-    async function syncNotifications() {
-      try {
-        const res = await api.get<{ notifications: Notification[] }>('/notifications/me');
-        if (active) {
-          setNotifications(res.data.notifications || []);
-        }
-      } catch {
-        // Keep the last successful state so the bell does not flash empty.
-      }
-    }
-
-    syncNotifications();
-    const interval = window.setInterval(syncNotifications, 10000);
-    window.addEventListener('focus', syncNotifications);
+    refreshNotifications();
+    const interval = window.setInterval(() => {
+      void refreshNotifications();
+    }, 10000);
+    const handleWindowFocus = () => {
+      void refreshNotifications();
+    };
+    window.addEventListener('focus', handleWindowFocus);
 
     return () => {
-      active = false;
       window.clearInterval(interval);
-      window.removeEventListener('focus', syncNotifications);
+      window.removeEventListener('focus', handleWindowFocus);
     };
-  }, []);
+  }, [refreshNotifications]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -179,12 +187,7 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
       setNotifPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
     }
     setNotifOpen(true);
-    setNotifLoading(true);
-    try {
-      const res = await api.get<{ notifications: Notification[] }>('/notifications/me');
-      setNotifications(res.data.notifications || []);
-    } catch { /* keep existing */ }
-    finally { setNotifLoading(false); }
+    await refreshNotifications({ showLoading: true });
   };
 
   const handleMarkAllRead = async () => {
@@ -282,22 +285,17 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
               onClick={handleBellClick}
               className="relative grid h-10 w-10 place-items-center rounded-xl border transition-colors hover:bg-[color:var(--accent-soft)]"
               style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)', background: 'var(--card)' }}
-              aria-label="Notifications"
+              aria-label={hasUnreadNotifications ? `Notifications, ${unreadCount} unread` : 'Notifications'}
             >
               <Bell size={17} />
-              {unreadCount > 0 ? (
+              {hasUnreadNotifications ? (
                 <span
                   className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black text-white"
                   style={{ background: 'var(--accent)' }}
                 >
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
-              ) : (
-                <span
-                  className="absolute right-1 top-1 h-2 w-2 rounded-full"
-                  style={{ background: 'var(--accent)' }}
-                />
-              )}
+              ) : null}
             </button>
 
             {/* User pill */}
@@ -342,10 +340,10 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
               <div>
                 <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Notifications</p>
                 <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                  {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+                  {hasUnreadNotifications ? `${unreadCount} unread` : 'All caught up'}
                 </p>
               </div>
-              {unreadCount > 0 && (
+              {hasUnreadNotifications && (
                 <button
                   type="button"
                   onClick={handleMarkAllRead}

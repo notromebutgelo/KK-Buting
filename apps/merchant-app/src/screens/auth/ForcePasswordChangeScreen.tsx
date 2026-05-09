@@ -11,16 +11,22 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useNavigation, useRoute } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
-import { changePassword, resetPassword, signOut } from '../../services/auth.service'
+import type { RootStackParamList } from '../../navigation/AppNavigator'
+import { changePassword, signOut } from '../../services/auth.service'
 import { useAuthStore } from '../../store/authStore'
 
 export default function ForcePasswordChangeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
+  const route = useRoute<any>()
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const setToken = useAuthStore((state) => state.setToken)
   const logout = useAuthStore((state) => state.logout)
+  const isForcedFlow = route.name === 'ForcePasswordChange'
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -56,7 +62,20 @@ export default function ForcePasswordChangeScreen() {
       const payload = await changePassword(currentPassword, newPassword)
       setToken(payload.token)
       setUser(payload.user)
-      Alert.alert('Password updated', 'Your password has been changed. You can now access the merchant workspace.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+
+      if (isForcedFlow) {
+        Alert.alert('Password updated', 'Your password has been changed. You can now access the merchant workspace.')
+      } else {
+        Alert.alert('Password updated', 'Your merchant password was changed inside the app.', [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ])
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to change password.'
       Alert.alert('Password change failed', message)
@@ -90,9 +109,11 @@ export default function ForcePasswordChangeScreen() {
             <View style={styles.heroIcon}>
               <MaterialCommunityIcons name="shield-key-outline" size={34} color="#014384" />
             </View>
-            <Text style={styles.title}>Change Temporary Password</Text>
+            <Text style={styles.title}>{isForcedFlow ? 'Change Temporary Password' : 'Change Merchant Password'}</Text>
             <Text style={styles.subtitle}>
-              This merchant account is still using the password created by the superadmin. Change it now before continuing.
+              {isForcedFlow
+                ? 'This merchant account is still using the password created by the superadmin. Change it now before continuing.'
+                : 'Keep this merchant account secure by updating the password directly inside the app.'}
             </Text>
             <View style={styles.infoPill}>
               <MaterialCommunityIcons name="email-outline" size={16} color="#014384" />
@@ -101,9 +122,11 @@ export default function ForcePasswordChangeScreen() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Set your new merchant password</Text>
+            <Text style={styles.sectionTitle}>{isForcedFlow ? 'Set your new merchant password' : 'Update your password'}</Text>
             <Text style={styles.sectionCopy}>
-              Use a new password that only you know. This password will be required the next time you sign in.
+              {isForcedFlow
+                ? 'Use a new password that only you know. This password will be required the next time you sign in.'
+                : 'Enter your current password first, then choose a new password that only your merchant team knows.'}
             </Text>
 
             <PasswordField
@@ -138,32 +161,20 @@ export default function ForcePasswordChangeScreen() {
 
             <Pressable style={styles.primaryButton} onPress={handleChangePassword} disabled={submitting}>
               <Text style={styles.primaryButtonText}>
-                {submitting ? 'Updating Password...' : 'Update Password'}
+                {submitting ? 'Updating Password...' : isForcedFlow ? 'Update Password' : 'Save New Password'}
               </Text>
             </Pressable>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Need another option?</Text>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={async () => {
-                if (!user?.email) {
-                  Alert.alert('Missing email', 'No account email is available for password reset.')
-                  return
-                }
-
-                try {
-                  await resetPassword(user.email)
-                  Alert.alert('Reset email sent', 'Check your inbox for the Firebase password reset email, then sign in again with your new password.')
-                } catch {
-                  Alert.alert('Reset failed', 'Please try again.')
-                }
-              }}
-            >
-              <MaterialCommunityIcons name="email-fast-outline" size={18} color="#014384" />
-              <Text style={styles.secondaryButtonText}>Send Password Reset Email</Text>
-            </Pressable>
+            <Text style={styles.sectionTitle}>Support guidance</Text>
+            <View style={styles.supportNotice}>
+              <MaterialCommunityIcons name="information-outline" size={18} color="#9c6500" />
+              <Text style={styles.supportNoticeText}>
+                Merchant password recovery no longer relies on Firebase reset emails. If you no longer know the current
+                password, ask the superadmin to issue a new temporary password for this account.
+              </Text>
+            </View>
 
             <Pressable style={styles.ghostButton} onPress={handleLogout}>
               <Text style={styles.ghostButtonText}>Sign Out</Text>
@@ -327,19 +338,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  secondaryButton: {
-    borderRadius: 16,
-    backgroundColor: '#eef4fb',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+  supportNotice: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    gap: 10,
+    borderRadius: 18,
+    backgroundColor: '#fff4d8',
+    padding: 15,
   },
-  secondaryButtonText: {
-    color: '#014384',
-    fontWeight: '800',
+  supportNoticeText: {
+    color: '#8b6a1f',
+    lineHeight: 20,
+    flex: 1,
   },
   ghostButton: {
     alignItems: 'center',

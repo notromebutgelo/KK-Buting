@@ -5,7 +5,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import StatusBadge from '../../components/StatusBadge'
-import { resetPassword, signOut } from '../../services/auth.service'
+import { signOut } from '../../services/auth.service'
 import { getMerchantProfile } from '../../services/merchantWorkspace.service'
 import { useAuthStore } from '../../store/authStore'
 import type { MerchantProfile } from '../../types/merchant'
@@ -76,30 +76,23 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Security & support</Text>
           <Pressable
             style={styles.secondaryButton}
-            onPress={async () => {
-              if (!user?.email) {
-                Alert.alert('Missing email', 'No account email is available for password reset.')
-                return
-              }
-
-              try {
-                await resetPassword(user.email)
-                Alert.alert('Password reset sent', 'Check your email for the Firebase password reset link.')
-              } catch {
-                Alert.alert('Reset failed', 'Please try again.')
-              }
-            }}
+            onPress={() => navigation.navigate('ChangePassword')}
           >
-            <MaterialCommunityIcons name="lock-reset" size={18} color="#014384" />
-            <Text style={styles.secondaryButtonText}>Send Password Reset Email</Text>
+            <MaterialCommunityIcons name="shield-key-outline" size={18} color="#014384" />
+            <Text style={styles.secondaryButtonText}>Change Password In App</Text>
           </Pressable>
 
           <View style={styles.notice}>
             <MaterialCommunityIcons name="information-outline" size={18} color="#9c6500" />
             <Text style={styles.noticeText}>
-              Need admin help? Contact SK Buting admin for account approval, suspension, or policy concerns.
+              Merchant passwords are updated inside the app. If you no longer know the current password, ask the
+              superadmin to issue a new temporary password for this account.
             </Text>
           </View>
+
+          <Text style={styles.supportCopy}>
+            Need account help? Contact SK Buting admin for approval, suspension, or merchant-policy concerns.
+          </Text>
         </View>
 
         <Pressable style={styles.button} onPress={handleLogout}>
@@ -284,6 +277,10 @@ const styles = StyleSheet.create({
     color: '#8b6a1f',
     lineHeight: 20,
     flex: 1,
+  },
+  supportCopy: {
+    color: '#60748f',
+    lineHeight: 20,
   },
   button: {
     paddingVertical: 15,

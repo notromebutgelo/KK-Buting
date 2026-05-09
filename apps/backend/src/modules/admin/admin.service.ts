@@ -38,6 +38,15 @@ interface VerificationQueueFilters {
   pageSize?: number;
 }
 
+interface ReportsFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  barangay?: string;
+  ageGroup?: string;
+  gender?: string;
+  status?: string;
+}
+
 const DOCUMENT_LABELS: Record<string, string> = {
   certificate_of_residency: "Certificate of Residency",
   school_id: "School ID",
@@ -206,6 +215,122 @@ function normalizeYouthAgeGroup(ageGroup?: string) {
   }
 
   return value;
+}
+
+function deriveWorkStatusFromProfile(profile: AnyRecord) {
+  const savedStatus = normalizeOptionalString(profile?.workStatus);
+  if (savedStatus) {
+    return savedStatus;
+  }
+
+  const employmentStatus = String(profile?.employmentStatus || "").trim();
+
+  if (
+    employmentStatus ===
+    "Yes, I am currently employed (Oo, ako ay kasalukuyang employed)"
+  ) {
+    return "Employed";
+  }
+
+  if (
+    employmentStatus ===
+    "No, but I am currently looking for work (Hindi, ngunit ako ay kasalukuyang naghahanap ng trabaho)"
+  ) {
+    return "Looking for Work";
+  }
+
+  if (
+    employmentStatus ===
+    "No, I am currently not employed (Hindi, ako ay kasalukuyang hindi employed)"
+  ) {
+    return "Unemployed";
+  }
+
+  return "";
+}
+
+function normalizeReportGender(profile: AnyRecord) {
+  return (
+    normalizeOptionalString(profile?.gender) ||
+    normalizeOptionalString(profile?.sexAssignedAtBirth) ||
+    "Unspecified"
+  );
+}
+
+function getReportBarangay(profile: AnyRecord) {
+  return (
+    normalizeOptionalString(profile?.barangay) ||
+    normalizeOptionalString(profile?.currentAddressBarangay) ||
+    "Unknown"
+  );
+}
+
+function buildReportDate(value?: string, endOfDay = false) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function matchesReportsFilters(profile: AnyRecord, filters: ReportsFilters) {
+  const normalizedBarangay = normalizeString(filters.barangay);
+  const normalizedAgeGroup = normalizeString(filters.ageGroup);
+  const normalizedGender = normalizeString(filters.gender);
+  const normalizedStatus = normalizeString(filters.status);
+
+  const profileDateValue =
+    toIso(profile.submittedAt) || toIso(profile.verifiedAt) || toIso(profile.createdAt);
+  const profileDate = profileDateValue ? new Date(profileDateValue) : null;
+  const dateFrom = buildReportDate(filters.dateFrom);
+  const dateTo = buildReportDate(filters.dateTo, true);
+
+  if (dateFrom || dateTo) {
+    if (!profileDate || Number.isNaN(profileDate.getTime())) {
+      return false;
+    }
+    if (dateFrom && profileDate < dateFrom) {
+      return false;
+    }
+    if (dateTo && profileDate > dateTo) {
+      return false;
+    }
+  }
+
+  if (
+    normalizedBarangay &&
+    normalizedBarangay !== "all" &&
+    normalizeString(getReportBarangay(profile)) !== normalizedBarangay
+  ) {
+    return false;
+  }
+
+  if (
+    normalizedAgeGroup &&
+    normalizedAgeGroup !== "all" &&
+    normalizeString(normalizeYouthAgeGroup(profile.youthAgeGroup)) !== normalizedAgeGroup
+  ) {
+    return false;
+  }
+
+  if (
+    normalizedGender &&
+    normalizedGender !== "all" &&
+    normalizeString(normalizeReportGender(profile)) !== normalizedGender
+  ) {
+    return false;
+  }
+
+  if (
+    normalizedStatus &&
+    normalizedStatus !== "all" &&
+    normalizeString(profile.status) !== normalizedStatus
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function hasCompleteEmergencyContact(profile: AnyRecord) {
@@ -2297,13 +2422,18 @@ export async function regenerateDigitalId(userId: string, adminEmail: string) {
   return memberId;
 }
 
-export async function getReports() {
-  const { profiles } = await getUsersAndProfiles();
+export async function getReports(filters: ReportsFilters = {}) {
+  const [{ users, profiles }, merchantsSnap] = await Promise.all([
+    getUsersAndProfiles(),
+    db.collection("merchants").get(),
+  ]);
+
+  const filteredProfiles = profiles.filter((profile) => matchesReportsFilters(profile, filters));
 
   const countBy = (key: string) => {
     const counts = new Map<string, number>();
 
-    for (const profile of profiles) {
+    for (const profile of filteredProfiles) {
       const value = String(profile[key] || "Unknown");
       counts.set(value, (counts.get(value) || 0) + 1);
     }
@@ -2311,42 +2441,246 @@ export async function getReports() {
     return [...counts.entries()].map(([name, value]) => ({ name, value }));
   };
 
-  const monthly = new Map<string, { month: string; registered: number; verified: number }>();
+  const countByResolver = (resolver: (profile: AnyRecord) => string) => {
+    const counts = new Map<string, number>();
 
-  for (const profile of profiles) {
+    for (const profile of filteredProfiles) {
+      const value = normalizeOptionalString(resolver(profile)) || "Unknown";
+      counts.set(value, (counts.get(value) || 0) + 1);
+    }
+
+    return [...counts.entries()].map(([name, value]) => ({ name, value }));
+  };
+
+  const isAffirmative = (value: any) => normalizeString(value).startsWith("yes");
+  const isNegative = (value: any) => normalizeString(value).startsWith("no");
+  const sortDesc = (items: Array<{ name: string; value: number }>) =>
+    [...items].sort((a, b) => b.value - a.value);
+
+  const monthly = new Map<
+    string,
+    { sortKey: string; month: string; registered: number; verified: number }
+  >();
+
+  for (const profile of filteredProfiles) {
     const submittedAt = toIso(profile.submittedAt);
     const verifiedAt = toIso(profile.verifiedAt);
 
     if (submittedAt) {
-      const month = new Date(submittedAt).toLocaleString("en-US", { month: "short" });
-      const current = monthly.get(month) || { month, registered: 0, verified: 0 };
-      current.registered += 1;
-      monthly.set(month, current);
+      const submittedDate = new Date(submittedAt);
+      if (!Number.isNaN(submittedDate.getTime())) {
+        const sortKey = `${submittedDate.getFullYear()}-${String(
+          submittedDate.getMonth() + 1
+        ).padStart(2, "0")}`;
+        const month = submittedDate.toLocaleString("en-US", {
+          month: "short",
+          year: "numeric",
+        });
+        const current = monthly.get(sortKey) || {
+          sortKey,
+          month,
+          registered: 0,
+          verified: 0,
+        };
+        current.registered += 1;
+        monthly.set(sortKey, current);
+      }
     }
 
     if (verifiedAt) {
-      const month = new Date(verifiedAt).toLocaleString("en-US", { month: "short" });
-      const current = monthly.get(month) || { month, registered: 0, verified: 0 };
-      current.verified += 1;
-      monthly.set(month, current);
+      const verifiedDate = new Date(verifiedAt);
+      if (!Number.isNaN(verifiedDate.getTime())) {
+        const sortKey = `${verifiedDate.getFullYear()}-${String(
+          verifiedDate.getMonth() + 1
+        ).padStart(2, "0")}`;
+        const month = verifiedDate.toLocaleString("en-US", {
+          month: "short",
+          year: "numeric",
+        });
+        const current = monthly.get(sortKey) || {
+          sortKey,
+          month,
+          registered: 0,
+          verified: 0,
+        };
+        current.verified += 1;
+        monthly.set(sortKey, current);
+      }
     }
   }
 
+  const totalRegisteredUsers = filteredProfiles.length;
+  const totalVerifiedUsers = filteredProfiles.filter(
+    (profile) => normalizeString(profile.status) === "verified"
+  ).length;
+  const pendingVerifications = filteredProfiles.filter(
+    (profile) => normalizeString(profile.status) === "pending"
+  ).length;
+  const submittedProfiles = filteredProfiles.filter((profile) => Boolean(toIso(profile.submittedAt))).length;
+  const surveyCompletionRate = totalRegisteredUsers
+    ? Math.round((submittedProfiles / totalRegisteredUsers) * 100)
+    : 0;
+  const activeMerchants = merchantsSnap.docs.filter(
+    (doc) => normalizeString(doc.data().status) === "approved"
+  ).length;
+
+  const sortedMonthlySummary = [...monthly.values()]
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    .map(({ sortKey: _sortKey, ...item }) => item);
+  const latestMonth = sortedMonthlySummary[sortedMonthlySummary.length - 1];
+  const previousMonth = sortedMonthlySummary[sortedMonthlySummary.length - 2];
+  const monthlyGrowthPercent =
+    latestMonth && previousMonth
+      ? Math.round(
+          ((latestMonth.registered - previousMonth.registered) /
+            Math.max(previousMonth.registered, 1)) *
+            100
+        )
+      : 0;
+  const verificationRate = totalRegisteredUsers
+    ? Math.round((totalVerifiedUsers / totalRegisteredUsers) * 100)
+    : 0;
+
+  const civicEngagement = [
+    {
+      name: "2023 SK voters",
+      value: filteredProfiles.filter(
+        (profile) =>
+          profile.registeredSkVoter === true ||
+          isAffirmative(profile.votedDuring2023BarangayAndSkElections)
+      ).length,
+    },
+    {
+      name: "2025 local voters",
+      value: filteredProfiles.filter(
+        (profile) =>
+          profile.registeredNationalVoter === true ||
+          isAffirmative(profile.votedDuring2025MidtermAndLocalElections)
+      ).length,
+    },
+    {
+      name: "KK assembly attendees",
+      value: filteredProfiles.filter(
+        (profile) =>
+          profile.attendedKkAssembly === true ||
+          isAffirmative(profile.attendedKkAssemblySinceJanuary2024)
+      ).length,
+    },
+    {
+      name: "CSO volunteers",
+      value: filteredProfiles.filter((profile) => isAffirmative(profile.csoMemberOrVolunteer)).length,
+    },
+  ];
+
+  const byStudyStatus = [
+    {
+      name: "In-school / enrolled",
+      value: filteredProfiles.filter((profile) => isAffirmative(profile.currentlyStudyingOrEnrolled)).length,
+    },
+    {
+      name: "Out-of-school / not enrolled",
+      value: filteredProfiles.filter((profile) => isNegative(profile.currentlyStudyingOrEnrolled)).length,
+    },
+  ];
+
+  const outOfSchoolReasons = countByResolver((profile) => {
+    if (!isNegative(profile.currentlyStudyingOrEnrolled)) {
+      return "";
+    }
+
+    return profile.mainReasonNotInSchool || "Reason not captured";
+  }).filter((item) => item.name !== "Unknown");
+
+  const hasVocationalCourse = (value: any) => {
+    const normalized = normalizeString(value);
+    return Boolean(normalized && !normalized.startsWith("not applicable"));
+  };
+
+  const learningPathways = [
+    {
+      name: "Scholarship-supported",
+      value: filteredProfiles.filter((profile) => isAffirmative(profile.scholarshipProgram)).length,
+    },
+    {
+      name: "Academic track",
+      value: filteredProfiles.filter((profile) =>
+        normalizeString(profile.seniorHighSchoolTrack).includes("academic track")
+      ).length,
+    },
+    {
+      name: "TVL or vocational",
+      value: filteredProfiles.filter(
+        (profile) =>
+          normalizeString(profile.seniorHighSchoolTrack).includes(
+            "technical-vocational-livelihood"
+          ) || hasVocationalCourse(profile.vocationalTradeCourse)
+      ).length,
+    },
+    {
+      name: "Business aspirants",
+      value: filteredProfiles.filter((profile) => {
+        const normalized = normalizeString(profile.wantsToStartBusiness);
+        return normalized.startsWith("yes") || normalized.includes("mayroon na");
+      }).length,
+    },
+  ];
+
   return {
-    byAgeGroup: (() => {
+    summary: {
+      totalRegisteredUsers,
+      verifiedUsers: totalVerifiedUsers,
+      pendingVerifications,
+      activeMerchants,
+      monthlyGrowthPercent,
+      surveyCompletionRate,
+      verificationRate,
+      currentMonthRegistered: latestMonth?.registered || 0,
+      currentMonthVerified: latestMonth?.verified || 0,
+      currentMonthLabel: latestMonth?.month || "Latest reporting month",
+    },
+    filters: {
+      applied: {
+        dateFrom: filters.dateFrom || "",
+        dateTo: filters.dateTo || "",
+        barangay: filters.barangay || "all",
+        ageGroup: filters.ageGroup || "all",
+        gender: filters.gender || "all",
+        status: filters.status || "all",
+      },
+      options: {
+        barangays: [...new Set(profiles.map((profile) => getReportBarangay(profile)).filter(Boolean))].sort(),
+        ageGroups: [...new Set(profiles.map((profile) => normalizeYouthAgeGroup(profile.youthAgeGroup)).filter(Boolean))].sort(),
+        genders: [...new Set(profiles.map((profile) => normalizeReportGender(profile)).filter(Boolean))].sort(),
+        statuses: [...new Set(profiles.map((profile) => normalizeOptionalString(profile.status)).filter(Boolean))].sort(),
+      },
+    },
+    byAgeGroup: sortDesc((() => {
       const counts = new Map<string, number>();
 
-      for (const profile of profiles) {
+      for (const profile of filteredProfiles) {
         const value = normalizeYouthAgeGroup(profile.youthAgeGroup) || "Unknown";
         counts.set(value, (counts.get(value) || 0) + 1);
       }
 
       return [...counts.entries()].map(([name, value]) => ({ name, value }));
-    })(),
-    byStatus: countBy("status"),
-    byClassification: countBy("youthClassification"),
-    byEducation: countBy("educationalBackground"),
-    monthlySummary: [...monthly.values()],
+    })()),
+    byStatus: sortDesc(countBy("status")),
+    byClassification: sortDesc(countBy("youthClassification")),
+    byEducation: sortDesc(countBy("educationalBackground")),
+    byGender: sortDesc(countByResolver(
+      (profile) => normalizeReportGender(profile)
+    )),
+    byWorkStatus: sortDesc(countByResolver(
+      (profile) => deriveWorkStatusFromProfile(profile) || "Unknown"
+    )),
+    byStudyStatus,
+    byBarangay: sortDesc(
+      countByResolver((profile) => getReportBarangay(profile) || "Unknown")
+    ),
+    outOfSchoolReasons: sortDesc(outOfSchoolReasons),
+    learningPathways,
+    civicEngagement: sortDesc(civicEngagement),
+    monthlySummary: sortedMonthlySummary,
   };
 }
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   KeyboardAvoidingView,
@@ -17,6 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import QRFrame from '../../components/QRFrame'
+import ScannerNoticeModal from '../../components/ScannerNoticeModal'
 import StatusBanner from '../../components/StatusBanner'
 import type { RootStackParamList } from '../../navigation/AppNavigator'
 import { getMerchantProfile } from '../../services/merchantWorkspace.service'
@@ -35,6 +36,9 @@ export default function ScanScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cameraReady, setCameraReady] = useState(true)
   const [profile, setProfile] = useState<MerchantProfile | null>(null)
+  const [duplicateModalVisible, setDuplicateModalVisible] = useState(false)
+  const scanLockRef = useRef(false)
+  const lastHandledTokenRef = useRef<string | null>(null)
   const pesosPerPoint = 10
 
   useFocusEffect(
@@ -45,6 +49,7 @@ export default function ScanScreen() {
         if (active) {
           setProfile(merchantProfile)
           setCameraReady(true)
+          scanLockRef.current = false
         }
       })
 
@@ -60,20 +65,63 @@ export default function ScanScreen() {
     return Math.max(1, Math.floor(numericAmount / pesosPerPoint))
   }, [amountSpent])
 
-  const processToken = async (rawToken: string) => {
-    if (!rawToken.trim()) {
+  const dismissDuplicateModal = () => {
+    setDuplicateModalVisible(false)
+    setCameraReady(true)
+    scanLockRef.current = false
+  }
+
+  const resetScannerSession = () => {
+    lastHandledTokenRef.current = null
+    setDuplicateModalVisible(false)
+    setCameraReady(true)
+    scanLockRef.current = false
+  }
+
+  const showDuplicateScanModal = () => {
+    setDuplicateModalVisible(true)
+    setCameraReady(false)
+    scanLockRef.current = false
+  }
+
+  const isDuplicateScanToken = (rawToken: string) => {
+    const normalizedToken = rawToken.trim()
+    return Boolean(normalizedToken && normalizedToken === lastHandledTokenRef.current)
+  }
+
+  const isDuplicateScanError = (message: string) => {
+    const normalizedMessage = message.toLowerCase()
+    return (
+      normalizedMessage.includes('already scanned') ||
+      normalizedMessage.includes('already redeemed') ||
+      normalizedMessage.includes('already used')
+    )
+  }
+
+  const processToken = async (rawToken: string, source: 'camera' | 'manual' = 'manual') => {
+    const normalizedToken = rawToken.trim()
+
+    if (!normalizedToken) {
+      scanLockRef.current = false
       Alert.alert('Missing QR value', 'Paste a QR token or scan a member QR code.')
       return
     }
 
     if (profile?.status && profile.status !== 'active') {
+      scanLockRef.current = false
       Alert.alert('Scanning locked', profile.adminNote)
       return
     }
 
     const numericAmount = Number(amountSpent || 0)
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      scanLockRef.current = false
       Alert.alert('Amount required', 'Enter the purchase amount so points can follow the PHP 100 = 10 points rule.')
+      return
+    }
+
+    if (isDuplicateScanToken(normalizedToken)) {
+      showDuplicateScanModal()
       return
     }
 
@@ -81,9 +129,10 @@ export default function ScanScreen() {
       setIsSubmitting(true)
       const response = await scanMemberQr({
         user,
-        token: rawToken.trim(),
+        token: normalizedToken,
         amountSpent: Number.isFinite(numericAmount) ? numericAmount : 0,
       })
+      lastHandledTokenRef.current = normalizedToken
       navigation.navigate('ScanSuccess', {
         points: response.transaction.pointsAwarded,
         memberLabel: response.transaction.memberLabel,
@@ -93,18 +142,27 @@ export default function ScanScreen() {
       setToken('')
       setAmountSpent('')
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Scan failed'
+
+      if (source === 'camera' && isDuplicateScanError(message)) {
+        showDuplicateScanModal()
+        return
+      }
+
       navigation.navigate('ScanFailed', {
-        message: error instanceof Error ? error.message : 'Scan failed',
+        message,
       })
     } finally {
       setIsSubmitting(false)
+      scanLockRef.current = false
     }
   }
 
   const handleBarcodeScanned = ({ data }: { data: string }) => {
-    if (isSubmitting || !cameraReady) return
+    if (isSubmitting || !cameraReady || scanLockRef.current) return
+    scanLockRef.current = true
     setCameraReady(false)
-    void processToken(data)
+    void processToken(data, 'camera')
   }
 
   return (
@@ -201,17 +259,24 @@ export default function ScanScreen() {
           />
 
           <View style={styles.buttonRow}>
-            <Pressable style={styles.button} onPress={() => void processToken(token)} disabled={isSubmitting}>
+            <Pressable style={styles.button} onPress={() => void processToken(token, 'manual')} disabled={isSubmitting}>
               <Text style={styles.buttonText}>{isSubmitting ? 'Processing...' : 'Validate Scan'}</Text>
             </Pressable>
 
-            <Pressable style={styles.secondaryButton} onPress={() => setCameraReady(true)}>
+            <Pressable style={styles.secondaryButton} onPress={resetScannerSession}>
               <Text style={styles.secondaryButtonText}>Reset Scanner</Text>
             </Pressable>
           </View>
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
+
+      <ScannerNoticeModal
+        visible={duplicateModalVisible}
+        title="QR Already Scanned"
+        message="This member QR was already scanned in the current scanner session. To avoid duplicate point awards, scan a different QR or tap Reset Scanner before trying this code again."
+        onClose={dismissDuplicateModal}
+      />
     </SafeAreaView>
   )
 }

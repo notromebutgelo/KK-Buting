@@ -385,6 +385,188 @@ const tests = [
       );
     },
   },
+  {
+    name: "reports integration returns demographic, employment, civic, and month-sorted profiling analytics",
+    async run() {
+      const db = new FakeFirestore({
+        kkProfiling: {
+          "youth-1": {
+            youthAgeGroup: "Core Youth",
+            status: "verified",
+            educationalBackground: "College Graduate",
+            gender: "Male",
+            barangay: "Buting",
+            workStatus: "Employed",
+            registeredSkVoter: true,
+            registeredNationalVoter: true,
+            attendedKkAssembly: true,
+            csoMemberOrVolunteer: "Yes (Oo)",
+            submittedAt: "2026-03-05T08:00:00.000Z",
+            verifiedAt: "2026-03-10T08:00:00.000Z",
+          },
+          "youth-2": {
+            youthAgeGroup: "Child Youth",
+            status: "pending",
+            educationalBackground: "Senior High School Graduate",
+            gender: "Female",
+            barangay: "Bagong Katipunan",
+            currentlyStudyingOrEnrolled: "No (Hindi)",
+            employmentStatus: "No, I am currently not employed (Hindi, ako ay kasalukuyang hindi employed)",
+            mainReasonNotInSchool: "Employment (Pagtatrabaho o paghahanap ng trabaho kahit hindi pa tapos sa pag-aaral)",
+            votedDuring2023BarangayAndSkElections: "No (Hindi)",
+            votedDuring2025MidtermAndLocalElections: "No (Hindi)",
+            attendedKkAssemblySinceJanuary2024: "No (Hindi)",
+            csoMemberOrVolunteer: "No (Hindi)",
+            submittedAt: "2026-02-08T08:00:00.000Z",
+          },
+          "youth-3": {
+            youthAgeGroup: "Adult Youth",
+            status: "verified",
+            educationalBackground: "College Level",
+            sexAssignedAtBirth: "Male",
+            barangay: "Buting",
+            employmentStatus: "No, but I am currently looking for work (Hindi, ngunit ako ay kasalukuyang naghahanap ng trabaho)",
+            votedDuring2023BarangayAndSkElections: "Yes (Oo)",
+            votedDuring2025MidtermAndLocalElections: "No; I was not eligible to vote yet (Hindi; Hindi pa ako eligible bumoto noon)",
+            attendedKkAssemblySinceJanuary2024: "Yes (Oo)",
+            csoMemberOrVolunteer: "No (Hindi)",
+            submittedAt: "2025-12-12T08:00:00.000Z",
+            verifiedAt: "2026-01-05T08:00:00.000Z",
+          },
+        },
+        merchants: {
+          "merchant-1": {
+            status: "approved",
+          },
+          "merchant-2": {
+            status: "paused",
+          },
+        },
+      });
+
+      const adminService = await loadAdminService(db);
+      const reports = await adminService.getReports();
+
+      assert.deepEqual(reports.summary, {
+        totalRegisteredUsers: 3,
+        verifiedUsers: 2,
+        pendingVerifications: 1,
+        activeMerchants: 1,
+        monthlyGrowthPercent: 0,
+        surveyCompletionRate: 100,
+        verificationRate: 67,
+        currentMonthRegistered: 1,
+        currentMonthVerified: 1,
+        currentMonthLabel: "Mar 2026",
+      });
+
+      assert.deepEqual(reports.filters.applied, {
+        dateFrom: "",
+        dateTo: "",
+        barangay: "all",
+        ageGroup: "all",
+        gender: "all",
+        status: "all",
+      });
+
+      assert.deepEqual(reports.filters.options, {
+        barangays: ["Bagong Katipunan", "Buting"],
+        ageGroups: ["Adult Youth", "Child Youth", "Core Youth"],
+        genders: ["Female", "Male"],
+        statuses: ["pending", "verified"],
+      });
+
+      assert.deepEqual(reports.monthlySummary.map((item) => item.month), [
+        "Dec 2025",
+        "Jan 2026",
+        "Feb 2026",
+        "Mar 2026",
+      ]);
+
+      assert.deepEqual(
+        Object.fromEntries(reports.byGender.map((item) => [item.name, item.value])),
+        {
+          Male: 2,
+          Female: 1,
+        }
+      );
+
+      assert.deepEqual(
+        Object.fromEntries(reports.byBarangay.map((item) => [item.name, item.value])),
+        {
+          Buting: 2,
+          "Bagong Katipunan": 1,
+        }
+      );
+
+      assert.deepEqual(
+        Object.fromEntries(reports.byWorkStatus.map((item) => [item.name, item.value])),
+        {
+          Employed: 1,
+          Unemployed: 1,
+          "Looking for Work": 1,
+        }
+      );
+
+      assert.deepEqual(
+        Object.fromEntries(reports.byStudyStatus.map((item) => [item.name, item.value])),
+        {
+          "In-school / enrolled": 0,
+          "Out-of-school / not enrolled": 1,
+        }
+      );
+
+      assert.deepEqual(
+        Object.fromEntries(reports.learningPathways.map((item) => [item.name, item.value])),
+        {
+          "Scholarship-supported": 0,
+          "Academic track": 0,
+          "TVL or vocational": 0,
+          "Business aspirants": 0,
+        }
+      );
+
+      assert.deepEqual(
+        Object.fromEntries(reports.civicEngagement.map((item) => [item.name, item.value])),
+        {
+          "2023 SK voters": 2,
+          "2025 local voters": 1,
+          "KK assembly attendees": 2,
+          "CSO volunteers": 1,
+        }
+      );
+
+      assert.deepEqual(
+        reports.outOfSchoolReasons.map((item) => item.name),
+        ["Employment (Pagtatrabaho o paghahanap ng trabaho kahit hindi pa tapos sa pag-aaral)"]
+      );
+
+      const filteredReports = await adminService.getReports({
+        barangay: "Buting",
+        status: "verified",
+      });
+
+      assert.deepEqual(filteredReports.summary, {
+        totalRegisteredUsers: 2,
+        verifiedUsers: 2,
+        pendingVerifications: 0,
+        activeMerchants: 1,
+        monthlyGrowthPercent: 100,
+        surveyCompletionRate: 100,
+        verificationRate: 100,
+        currentMonthRegistered: 1,
+        currentMonthVerified: 1,
+        currentMonthLabel: "Mar 2026",
+      });
+
+      assert.deepEqual(
+        Object.fromEntries(filteredReports.byBarangay.map((item) => [item.name, item.value])),
+        {
+          Buting: 2,
+        }
+      );
+    },
+  },
 ];
 
 (async () => {

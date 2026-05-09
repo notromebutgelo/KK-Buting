@@ -243,6 +243,50 @@ The current live points default in code is now:
   - the `Directory` tab now focuses on merchant profile, storefront, and lifecycle management only
   - the `Transactions` tab now owns the merchant transaction history view, including its own merchant summary context plus paginated transaction cards so long activity logs no longer force one long scroll inside the profile pane
   - the merchant-selection cards were then tightened again into a denser dashboard-style row treatment with smaller padding, a reduced logo block, single-line descriptions, and responsive multi-column wrapping on wider screens so the directory no longer feels dominated by oversized cards
+- the superadmin Reports workspace now surfaces a more useful profiling-driven analytics mix without overcrowding the page
+  - backend report aggregation in `apps/backend/src/modules/admin/admin.service.ts` now includes `byGender`, `byWorkStatus`, and `civicEngagement` in addition to the earlier age / status / education slices
+  - monthly registration vs verification reporting is now grouped and sorted by real month-year buckets such as `Mar 2026` instead of collapsing every `Mar` together across different years
+  - report aggregation now also includes `byStudyStatus`, `outOfSchoolReasons`, and `learningPathways`, which lets the reports workspace surface in-school vs out-of-school splits, reasons for being out of school, scholarship / vocational / business-interest signals, and other higher-value questionnaire insights without inventing extra datasets
+  - reports are now filterable by date range, barangay, age group, gender, and verification status, and the backend returns the matching filter-option lists together with summary/KPI totals for the currently filtered dataset
+  - the admin reports page at `apps/admin-panel/src/app/(dashboard)/reports/page.tsx` was then restructured into clearer reporting sections instead of just adding more charts on top of the old layout
+  - the top of the page now includes a dedicated report-tools surface with refresh, reset, filter, and PDF-export actions plus a clearer platform activity snapshot for the latest month and verification rate
+  - the first reporting row now follows a more dashboard-like structure with 6 KPI cards for total registered youth, verified youth, pending verifications, active merchants, monthly growth, and survey completion rate
+  - the middle reporting row now uses a large area-chart trend for registrations vs verifications over time together with a radial verification-progress snapshot and supporting monthly status stats
+  - the older verification-status pie and youth-classification chart were removed from the visual layout so the page no longer repeats the same story in slightly different formats
+  - the live charts now focus on distinct, non-duplicate reporting questions:
+    - monthly registration and verification trend
+    - age-group distribution
+    - top barangays by registered youth
+    - reported gender mix
+    - educational background
+    - employment status
+    - out-of-school youth reasons
+    - learning and skills pathways
+    - barangay engagement insights
+  - the chart palette was also refreshed away from the earlier heavier dark-toned look into a more balanced blue / teal / emerald / amber / coral / rose / violet set that stays more readable in both light and dark mode
+  - the Reports page now includes a built-in PDF report generator using `jspdf` plus `jspdf-autotable`
+    - clicking the PDF action now opens a report-builder modal first instead of downloading immediately
+    - that builder lets superadmin choose the export-specific date range, barangay, age group, gender, and verification-status filters separately from the live dashboard view
+    - the same builder also lets superadmin include or exclude individual report sections such as summary cards, executive summary, trend section, age groups, top barangays, gender mix, education, employment, out-of-school reasons, learning pathways, and civic-engagement insights
+    - the builder now also includes a report-format selector so superadmin can choose either a visual analytics PDF with charts/graphs or a cleaner plain text / tabular PDF for easier printing and archival documentation
+    - exports can now optionally include or omit the detailed answer-breakdown tables, making it easier to produce either a shorter executive report or a more documentation-heavy official PDF
+    - generated PDFs still include cleaner official-report formatting suitable for barangay documentation and presentations
+    - the visual-analytics PDF layout was then tightened so the monthly trend chart reserves enough vertical space for its bars and month labels before the next section begins, avoiding the overlapping/stacking bug that could show up in generated reports with small datasets
+    - the visual-analytics PDF renderer was then upgraded again so the sections no longer reuse the same horizontal-bar treatment all the way through
+      - monthly trend now renders as a clearer line-style trend chart
+      - age-group analytics now use vertical columns
+      - barangay concentration now uses ranked horizontal bars
+      - gender mix now uses a donut-style breakdown
+      - educational background now uses a lollipop comparison layout
+      - employment status now uses a stacked-composition bar
+      - out-of-school reasons now use stepped progress lanes
+      - learning / livelihood pathways now use clustered bubble comparisons
+      - barangay engagement now uses dot-grid comparison rows
+    - the PDF spacing and structure were then normalized again so cards, narrative blocks, chart sections, and tables keep more even padding/gaps instead of feeling cramped in some sections and too loose in others
+      - the monthly trend section now follows the same full-width chart then table rhythm as the rest of the report instead of the older tighter side-by-side layout
+      - narrative height is now calculated from the wrapped content instead of using one fixed box height, reducing awkward whitespace and preventing crowded copy blocks
+      - chart-to-table and section-to-section gaps were standardized so the generated PDF feels more consistent as a document rather than a stack of unrelated export fragments
+  - backend coverage now includes a fake-Firestore integration case that verifies the new reports payload and month sorting in `apps/backend/tests/backend.integration.test.js`
 - backend seed defaults for privileged web accounts now use live-style email addresses instead of `.test`
   - `apps/backend/utils/seedAdmin.js` now defaults to `admin@kkbapp-buting.com`
   - `apps/backend/utils/seedSuperadmin.js` now defaults to `superadmin@kkbapp-buting.com`
@@ -276,6 +320,10 @@ The current live points default in code is now:
   - the merchant app auth state now persists `mustChangePassword`, and the root navigator blocks access to the merchant workspace until that flag is cleared
   - a new forced password-change screen now reauthenticates the merchant, updates the Firebase password in-app, and notifies the backend to clear the temporary-password requirement for the current account
   - if a merchant later signs in again using the original superadmin-issued password, the backend can detect that and re-enable the forced password-change flow
+  - merchant password recovery in the Expo app no longer points merchants to Firebase reset emails, which are a poor fit for superadmin-generated merchant accounts
+  - the `Security & support` area in the merchant Account tab now routes to an in-app password-change screen instead of showing a `Send Password Reset Email` action
+  - the forced-password-change screen was also tightened so it keeps the update flow fully in-app and now tells merchants to contact the superadmin for a fresh temporary password if they no longer know their current one
+  - the merchant login screen now mirrors that same rule: `Need password help?` explains the superadmin-issued temporary-password recovery path instead of attempting email-based Firebase reset
 - backend TypeScript build is clean again after the recent merchant-password rollout
   - `apps/backend/src/modules/auth/user.service.ts` now returns a typed user record shape instead of an overly narrow `{ id: string }` inference, which keeps auth/login role handling build-safe
   - `apps/backend/src/modules/vouchers/vouchers.service.ts` now gives the youth voucher list a typed `status` + `claimedByMe` summary shape so the backend build no longer fails on the voucher filter
@@ -308,14 +356,14 @@ The current live points default in code is now:
 - the admin panel Topbar notification bell is now fully functional for both admin and superadmin roles
   - on mount, fetches `/api/notifications/me` silently to populate the unread badge count
   - clicking the bell opens a dropdown panel and re-fetches the latest notification list
-  - the badge shows the numeric unread count (capped at "9+") when unread notifications exist, or a plain dot when all are read
+  - the shared bell now only shows an indicator when unread notifications actually exist, using the numeric unread count (capped at "9+") and removing the old fallback dot when everything is already read
   - the dropdown lists each notification with title, body, relative timestamp, and a colored dot per type (success = green, error/warning = red, transaction = blue, default = primary blue)
   - unread notifications are highlighted with a light blue row background; read ones use plain white
   - a "Mark all read" button calls `/api/notifications/me/read-all` and optimistically updates the list in-place
   - clicking outside the dropdown closes it
   - empty state and loading spinner are shown appropriately
   - the existing `/api/notifications/me` endpoint works for any Firebase-authenticated user including admin UIDs, so no backend changes were needed
-  - the bell now also polls periodically and refreshes on window focus so new admin/superadmin notifications appear more reliably during active sessions
+  - the bell now also polls periodically, refreshes on window focus, and reuses the same refresh path for both admin and superadmin so unread counts and new-notification state stay in sync more reliably during active sessions
   - individual notifications are now clickable, mark themselves read through a dedicated backend route, visually gray out after being opened, and redirect admins to the linked workspace such as `/verification`, `/youth`, `/promotions`, or `/digital-ids`
   - youth account creation and completed verification-document submissions now write admin/superadmin notification records so those events actually show up in the bell for follow-up
 - the admin dashboard has been rebuilt around a shared dashboard component system with distinct admin and superadmin views
@@ -386,6 +434,7 @@ The current live points default in code is now:
 - merchant-app form and search screens now use keyboard-safe layouts, and the login screen now supports password visibility toggle
 - the merchant dashboard footer area was replaced with a more useful storefront summary panel instead of the earlier generic alignment note
 - deployment readiness was improved for the two Next.js apps by generating dedicated `package-lock.json` files inside `apps/admin-panel` and `apps/youth-pwa`
+- `apps/admin-panel/next.config.js` now also sends `next dev` output to `.next-dev` while keeping production builds on `.next`, matching the youth PWA setup so running an admin `next build` no longer corrupts a live admin `next dev` session and turn `/_next/static/*` requests into `404` HTML/MIME errors
 - the youth PWA home and merchant discovery surfaces no longer rely on sample merchant or promo content and now show backend-driven empty states when live data is unavailable
 - the youth PWA home `Partner Shops` strip now uses tighter padding and a balanced logo row so the last merchant logo sits closer to the arrow CTA instead of leaving an oversized gap before `View All Shops`
 - a root workspace setup now exists with npm workspaces plus shared root scripts for backend, admin panel, youth PWA, and merchant app tasks
@@ -455,6 +504,10 @@ The current live points default in code is now:
   - `apps/merchant-app/package.json` now uses `expo start --lan` for the default start path so Expo Go is less likely to receive a localhost-only QR target that a physical phone cannot reach
   - `npm run start:tunnel --workspace merchant-app` is now the fallback for difficult networks or machines with multiple adapters
   - `npm run start:clear --workspace merchant-app` is now the intentional cache-reset path instead of needing to remember the full Expo CLI flags manually
+- the merchant QR scanner now guards same-session duplicate scans more cleanly in the Expo app
+  - `apps/merchant-app/src/screens/scanner/ScanScreen.tsx` now uses a ref-based scan lock in addition to React state so one camera read cannot stack repeated scan actions before the UI finishes responding
+  - the scanner now remembers the most recently handled QR token for the current scan session and blocks immediate repeat scans of that exact same code unless the merchant intentionally taps `Reset Scanner`
+  - duplicate re-scans now show a branded in-app `QR Already Scanned` modal instead of stacking multiple native dismiss dialogs, which keeps the warning aligned with the merchant app theme and makes duplicate-point prevention clearer
 - current local troubleshooting setup for `apps/merchant-app/.env` now points directly to `https://kk-buting-admin-panel.onrender.com/api`
   - this is specifically to avoid Expo Go/dev sessions rewriting localhost to a LAN IP like `192.168.x.x:4000`
   - after changing the local `.env`, Expo/Metro must be restarted so the new `EXPO_PUBLIC_API_URL` is picked up

@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
-import { resetPassword, signIn } from '../../services/auth.service'
+import { signIn } from '../../services/auth.service'
 import { useAuthStore } from '../../store/authStore'
 
 export default function LoginSreen() {
@@ -113,21 +113,14 @@ export default function LoginSreen() {
 
             <Pressable
               style={styles.linkButton}
-              onPress={async () => {
-                if (!email.trim()) {
-                  Alert.alert('Enter email first', 'Add your merchant email so we know where to send the reset link.')
-                  return
-                }
-
-                try {
-                  await resetPassword(email)
-                  Alert.alert('Reset email sent', 'Check your inbox for the Firebase password reset email.')
-                } catch {
-                  Alert.alert('Reset failed', 'Please verify the email and try again.')
-                }
+              onPress={() => {
+                Alert.alert(
+                  'Password help',
+                  'Merchant passwords are changed inside the app after sign-in. If you forgot the current password, ask the superadmin to issue a new temporary password for this account.'
+                )
               }}
             >
-              <Text style={styles.linkButtonText}>Forgot password?</Text>
+              <Text style={styles.linkButtonText}>Need password help?</Text>
             </Pressable>
 
             <Text style={styles.caption}>

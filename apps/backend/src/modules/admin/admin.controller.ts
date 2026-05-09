@@ -486,7 +486,14 @@ export async function regenerateDigitalIdHandler(req: AuthRequest, res: Response
 
 export async function getReportsHandler(req: AuthRequest, res: Response) {
   try {
-    const reports = await getReports();
+    const reports = await getReports({
+      dateFrom: typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined,
+      dateTo: typeof req.query.dateTo === "string" ? req.query.dateTo : undefined,
+      barangay: typeof req.query.barangay === "string" ? req.query.barangay : undefined,
+      ageGroup: typeof req.query.ageGroup === "string" ? req.query.ageGroup : undefined,
+      gender: typeof req.query.gender === "string" ? req.query.gender : undefined,
+      status: typeof req.query.status === "string" ? req.query.status : undefined,
+    });
     return res.json(reports);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
