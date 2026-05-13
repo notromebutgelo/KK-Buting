@@ -199,6 +199,21 @@ function resolveDigitalIdStatus(profile: AnyRecord) {
   return String(profile?.idNumber || "").trim() ? "draft" : "";
 }
 
+function resolvePreviewMemberId(profile: AnyRecord, userId: string) {
+  const savedMemberId = String(profile?.idNumber || "").trim();
+
+  if (savedMemberId) {
+    return savedMemberId;
+  }
+
+  const digitalIdStatus = resolveDigitalIdStatus(profile);
+  if (!digitalIdStatus) {
+    return "";
+  }
+
+  return generateIdNumber(userId);
+}
+
 function normalizeYouthAgeGroup(ageGroup?: string) {
   const value = String(ageGroup || "").trim();
 
@@ -2119,11 +2134,13 @@ export async function getDigitalIdMembers(filters: {
         lastName: member.profile?.lastName,
         fullName: [member.profile?.firstName, member.profile?.lastName].filter(Boolean).join(" "),
         youthAgeGroup: member.profile?.youthAgeGroup,
+        contactNumber: normalizeOptionalString(member.profile?.contactNumber),
         city: member.profile?.city,
         province: member.profile?.province,
         barangay: member.profile?.barangay,
+        purok: normalizeOptionalString(member.profile?.purok),
         verifiedAt: member.profile?.verifiedAt,
-        memberId: member.profile?.idNumber,
+        memberId: resolvePreviewMemberId(member.profile || {}, member.uid),
         digitalIdStatus,
         verificationQueueStatus: computeQueueStatus(member.profile || {}, []),
         verificationDocumentsApprovedAt: member.profile?.verificationDocumentsApprovedAt,

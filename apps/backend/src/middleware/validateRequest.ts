@@ -300,6 +300,14 @@ const MERCHANT_ASSET_TYPES = ["logo", "banner"];
 const MERCHANT_STATUSES = ["approved", "rejected", "suspended"];
 const REVIEW_ACTIONS = ["approved", "rejected"];
 const YOUTH_STATUSES = ["pending", "verified", "rejected"];
+const PHYSICAL_ID_REQUEST_STATUSES = [
+  "pending",
+  "approved",
+  "processing",
+  "ready_for_pickup",
+  "completed",
+  "rejected",
+];
 
 export function validateRequest(validator: ValidationRunner) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -748,6 +756,57 @@ export function validateYouthProfileUpdateRequest(req: Request) {
   validateBoolean(errors, body, "votedLastSkElections", "votedLastSkElections");
   validateBoolean(errors, body, "registeredNationalVoter", "registeredNationalVoter");
   validateBoolean(errors, body, "attendedKkAssembly", "attendedKkAssembly");
+
+  return errors;
+}
+
+export function validatePhysicalIdRequestCreateRequest(req: Request) {
+  const errors: string[] = [];
+  const body = ensureBodyRecord(req, errors);
+  if (!body) return errors;
+
+  validateString(errors, body, "reason", "reason", {
+    required: true,
+    minLength: 4,
+    maxLength: 300,
+  });
+  validateString(errors, body, "contactNumber", "contactNumber", {
+    required: true,
+    minLength: 11,
+    maxLength: 11,
+  });
+  validateString(errors, body, "notes", "notes", {
+    maxLength: 1000,
+  });
+
+  const contactNumber = toTrimmedString(body.contactNumber);
+  if (contactNumber && !/^09\d{9}$/.test(contactNumber)) {
+    errors.push("contactNumber must be 11 digits and start with 09.");
+  }
+
+  return errors;
+}
+
+export function validatePhysicalIdRequestAdminUpdateRequest(req: Request) {
+  const errors: string[] = [];
+  const body = ensureBodyRecord(req, errors);
+  if (!body) return errors;
+
+  validateEnum(errors, body, "status", "status", PHYSICAL_ID_REQUEST_STATUSES);
+  validateString(errors, body, "adminRemarks", "adminRemarks", {
+    maxLength: 1000,
+  });
+  validateString(errors, body, "rejectionReason", "rejectionReason", {
+    maxLength: 500,
+  });
+
+  if (!hasAnyKey(body, ["status", "adminRemarks", "rejectionReason"])) {
+    errors.push("At least one request update field must be provided.");
+  }
+
+  if (body.status === "rejected" && !isNonEmptyString(body.rejectionReason)) {
+    errors.push("rejectionReason is required when rejecting a physical ID request.");
+  }
 
   return errors;
 }

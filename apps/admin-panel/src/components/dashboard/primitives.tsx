@@ -7,11 +7,11 @@ type PillTone = 'default' | 'soft' | 'success' | 'warning' | 'danger'
 type KpiTone = 'default' | 'success' | 'warning' | 'danger' | 'info'
 
 const panelStyles: Record<PanelTone, string> = {
-  default: 'var(--card)',
-  soft: 'color-mix(in srgb, var(--accent-soft) 72%, var(--card-solid) 28%)',
-  neutral: 'color-mix(in srgb, var(--surface-muted) 82%, var(--card-solid) 18%)',
-  warning: 'color-mix(in srgb, var(--warning-bg) 82%, var(--card-solid) 18%)',
-  danger: 'color-mix(in srgb, var(--danger-bg) 82%, var(--card-solid) 18%)',
+  default: 'var(--card-solid)',
+  soft: 'color-mix(in srgb, var(--card-solid) 95%, var(--accent-soft) 5%)',
+  neutral: 'color-mix(in srgb, var(--card-solid) 95%, var(--surface-muted) 5%)',
+  warning: 'color-mix(in srgb, var(--card-solid) 94%, var(--warning-bg) 6%)',
+  danger: 'color-mix(in srgb, var(--card-solid) 94%, var(--danger-bg) 6%)',
 }
 
 const pillStyles: Record<PillTone, { background: string; color: string }> = {
@@ -65,7 +65,6 @@ export function DashboardPanel({
       style={{
         background: panelStyles[tone],
         borderColor: 'var(--stroke)',
-        backdropFilter: 'blur(18px)',
       }}
     >
       {children}

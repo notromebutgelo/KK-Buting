@@ -4,9 +4,15 @@ import Image from 'next/image'
 import Link from 'next/link'
 import jsPDF from 'jspdf'
 import { useEffect, useMemo, useState } from 'react'
-import DigitalIDCard from '@/components/features/DigitalIDCard'
+import DigitalIDCard, { DigitalIdBack } from '@/components/features/DigitalIDCard'
+import PhysicalIdRequestStatusBadge, {
+  getPhysicalIdRequestStatusLabel,
+} from '@/components/features/PhysicalIdRequestStatusBadge'
 import AlertModal from '@/components/ui/AlertModal'
+import Modal from '@/components/ui/Modal'
 import Spinner from '@/components/ui/Spinner'
+import { usePhysicalIdRequests } from '@/hooks/usePhysicalIdRequests'
+import type { PhysicalIdRequest } from '@/services/physicalIdRequests.service'
 import { getDigitalID, getVerificationStatus } from '@/services/verification.service'
 import { useAuthStore } from '@/store/authStore'
 import { useUserStore } from '@/store/userStore'
@@ -15,8 +21,20 @@ interface DigitalIDData {
   status: string
   idNumber?: string
   digitalIdStatus?: string | null
+  digitalIdGeneratedAt?: string | null
+  digitalIdApprovedAt?: string | null
   qrCode?: string
   memberId?: string
+  firstName?: string
+  middleName?: string
+  lastName?: string
+  birthday?: string
+  gender?: string
+  contactNumber?: string
+  barangay?: string
+  city?: string
+  province?: string
+  purok?: string
   photoUrl?: string | null
   digitalIdSignatureUrl?: string | null
 }
@@ -26,6 +44,7 @@ const DIGITAL_ID_TERMS_TEXT =
 const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
 const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
 const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
+const REQUEST_CONTACT_NUMBER_MAX_LENGTH = 11
 
 export default function DigitalIDPage() {
   const { user } = useAuthStore()
@@ -36,6 +55,30 @@ export default function DigitalIDPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [errorTitle, setErrorTitle] = useState('Digital ID Unavailable')
   const [error, setError] = useState('')
+  const [isPhysicalRequestModalOpen, setIsPhysicalRequestModalOpen] = useState(false)
+  const [requestReason, setRequestReason] = useState('')
+  const [requestContactNumber, setRequestContactNumber] = useState('')
+  const [requestNotes, setRequestNotes] = useState('')
+  const [requestFormError, setRequestFormError] = useState('')
+  const [requestFeedback, setRequestFeedback] = useState<{
+    title: string
+    message: string
+    tone: 'success' | 'error'
+  } | null>(null)
+
+  const {
+    requests: physicalIdRequests,
+    activeRequest: activePhysicalIdRequest,
+    canRequest: canRequestPhysicalId,
+    eligibilityReason: physicalIdEligibilityReason,
+    isLoading: isPhysicalIdRequestsLoading,
+    isSubmitting: isSubmittingPhysicalIdRequest,
+    error: physicalIdRequestsError,
+    clearError: clearPhysicalIdRequestsError,
+    submitRequest: submitPhysicalIdRequest,
+  } = usePhysicalIdRequests({
+    enabled: !isProfileLoading,
+  })
 
   const displayName = useMemo(() => {
     if (!profile) {
@@ -66,6 +109,24 @@ export default function DigitalIDPage() {
   const needsResubmission = queueStatus === 'resubmission_requested'
   const digitalIdPhotoUrl = idData?.photoUrl || profile?.idPhotoUrl || null
   const digitalIdSignatureUrl = idData?.digitalIdSignatureUrl || profile?.digitalIdSignatureUrl || null
+  const requestContactNumberError = getPhysicalIdRequestContactNumberError(
+    requestContactNumber
+  )
+  const digitalIdProfile = profile
+    ? {
+        ...profile,
+        firstName: idData?.firstName || profile.firstName,
+        middleName: idData?.middleName || profile.middleName,
+        lastName: idData?.lastName || profile.lastName,
+        birthday: idData?.birthday || profile.birthday,
+        gender: idData?.gender || profile.gender,
+        contactNumber: idData?.contactNumber || profile.contactNumber,
+        barangay: idData?.barangay || profile.barangay,
+        city: idData?.city || profile.city,
+        province: idData?.province || profile.province,
+        purok: idData?.purok || profile.purok,
+      }
+    : null
   const awaitingSuperadminTitle =
     digitalIdStatus === 'deactivated' ? 'Digital ID Deactivated' : 'Awaiting Superadmin ID Generation'
   const awaitingSuperadminMessage =
@@ -74,29 +135,57 @@ export default function DigitalIDPage() {
       : digitalIdStatus === 'draft'
         ? 'Your verification is complete. Your Digital ID draft is prepared, but the superadmin still needs to issue and activate it before it appears here.'
         : 'Your verification is complete. Your Digital ID will appear here after the superadmin generates and issues it.'
+  const pageIntroTitle = isDigitalIdReady ? 'Verified Member' : 'Digital ID'
+  const pageIntroDescription = isDigitalIdReady
+    ? 'Your official Katipunan ng Kabataan credential is ready for verification, saving, and physical-copy requests.'
+    : isVerified
+      ? 'Your credential progress is visible here while your Digital ID completes the issuance flow.'
+      : 'Complete the remaining steps below to unlock your official Katipunan ng Kabataan credential.'
   const headerStatus = isDigitalIdReady
     ? {
-        dot: 'bg-[#38a169]',
         label: 'Digital ID Active',
-        text: 'text-[#38a169]',
+        pillClass: 'border border-[#cfe8d8] bg-[#edf9f2] text-[#24724a]',
       }
     : digitalIdStatus === 'deactivated'
       ? {
-          dot: 'bg-[#d64545]',
           label: 'Digital ID Inactive',
-          text: 'text-[#d64545]',
+          pillClass: 'border border-[#f3d1d1] bg-[#fff2f2] text-[#c34646]',
         }
     : isVerified
       ? {
-          dot: 'bg-[#0572DC]',
           label: 'Awaiting Superadmin',
-          text: 'text-[#0572DC]',
+          pillClass: 'border border-[#d5e7fb] bg-[#eef6ff] text-[#0f5eb3]',
         }
       : {
-          dot: 'bg-[#FCB315]',
           label: 'Not Yet Verified',
-          text: 'text-[#FCB315]',
+          pillClass: 'border border-[#f6e1b3] bg-[#fff8eb] text-[#b47c09]',
         }
+  const digitalIdIssuedAt = resolveDigitalIdIssuedAt(
+    idData?.digitalIdApprovedAt,
+    profile?.digitalIdApprovedAt,
+    idData?.digitalIdGeneratedAt,
+    profile?.digitalIdGeneratedAt,
+    digitalIdProfile?.digitalIdApprovedAt,
+    digitalIdProfile?.digitalIdGeneratedAt,
+    digitalIdProfile?.verifiedAt,
+    profile?.verifiedAt
+  )
+  const issuedSinceLabel =
+    isVerified || isDigitalIdReady ? String(extractYear(digitalIdIssuedAt)) : 'Pending'
+  const barangayLabel = digitalIdProfile?.barangay || profile?.barangay || 'Not set'
+  const emergencyContactName = formatEmergencyContactValue(
+    digitalIdProfile?.digitalIdEmergencyContactName,
+    'Not Provided Yet'
+  )
+  const emergencyContactPhone = formatEmergencyContactValue(
+    digitalIdProfile?.digitalIdEmergencyContactPhone,
+    'Not Provided Yet'
+  )
+  const emergencyContactRelationship = formatEmergencyContactValue(
+    digitalIdProfile?.digitalIdEmergencyContactRelationship,
+    'Not Provided Yet'
+  )
+  const digitalIdValidThru = getDigitalIdValidThru(digitalIdIssuedAt)
 
   useEffect(() => {
     let active = true
@@ -147,8 +236,15 @@ export default function DigitalIDPage() {
       .finally(() => setIsLoading(false))
   }, [emergencyContactComplete, isProfileLoading, isVerified, signatureComplete])
 
+  useEffect(() => {
+    const nextContactNumber = normalizePhysicalIdRequestContactNumber(
+      idData?.contactNumber || profile?.contactNumber || ''
+    )
+    setRequestContactNumber(nextContactNumber)
+  }, [idData?.contactNumber, profile?.contactNumber])
+
   async function handleSaveId() {
-    if (!profile || !idData || isSaving) {
+    if (!digitalIdProfile || !idData || isSaving) {
       return
     }
 
@@ -156,7 +252,7 @@ export default function DigitalIDPage() {
 
     try {
       const pdf = await buildDigitalIdPdf({
-        profile,
+        profile: digitalIdProfile,
         memberId: idData.memberId || idData.idNumber || '',
         photoUrl: digitalIdPhotoUrl,
         signatureUrl: digitalIdSignatureUrl,
@@ -171,48 +267,97 @@ export default function DigitalIDPage() {
     }
   }
 
+  function openPhysicalIdRequestModal() {
+    setRequestReason('')
+    setRequestNotes('')
+    setRequestFormError('')
+    setRequestContactNumber(
+      normalizePhysicalIdRequestContactNumber(
+        idData?.contactNumber || profile?.contactNumber || ''
+      )
+    )
+    setIsPhysicalRequestModalOpen(true)
+  }
+
+  async function handleSubmitPhysicalIdRequest(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault()
+    setRequestFormError('')
+
+    const trimmedReason = requestReason.trim()
+    const trimmedContactNumber = normalizePhysicalIdRequestContactNumber(
+      requestContactNumber
+    )
+    const trimmedNotes = requestNotes.trim()
+
+    if (!trimmedReason) {
+      setRequestFormError('Please tell us why you need a physical ID copy.')
+      return
+    }
+
+    if (getPhysicalIdRequestContactNumberError(trimmedContactNumber)) {
+      setRequestFormError('Contact number must be 11 digits and start with 09.')
+      return
+    }
+
+    try {
+      await submitPhysicalIdRequest({
+        reason: trimmedReason,
+        contactNumber: trimmedContactNumber,
+        notes: trimmedNotes || undefined,
+      })
+
+      setIsPhysicalRequestModalOpen(false)
+      setRequestFeedback({
+        title: 'Physical ID Request Submitted',
+        message:
+          'Your request has been submitted successfully. Physical IDs are for pick-up only, and we will notify you once the request is approved and scheduled for release.',
+        tone: 'success',
+      })
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to submit your physical ID request. Please try again.'
+      setRequestFormError(message)
+    }
+  }
+
   return (
-    <div className="min-h-screen w-full bg-[#f5f5f5] pb-28 text-[#014384]">
-      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#7fb3ec_0%,#bdd7f3_20%,#eef5fd_44%,#fff8eb_72%,#f5f5f5_100%)] px-5 pb-6 pt-8">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/35 via-white/12 to-transparent" />
-
-        <div className="relative z-10 flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 gap-3">
-            <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-full border-[2.5px] border-[#014384] bg-[#e7eef8]">
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#8db3e0] to-[#dce8f7] text-[24px] font-bold text-[#014384]">
-                {getInitials(displayName)}
-              </div>
-            </div>
-
-            <div className="min-w-0 flex-1 pt-2">
-              <p className="text-[11px] font-medium text-[#7486a2]">
-                Welcome Back
+    <div className="min-h-screen w-full bg-[linear-gradient(180deg,#edf4fd_0%,#f6fbff_28%,#fffaf0_62%,#f5f6f8_100%)] pb-28 text-[#014384]">
+      <section className="px-5 pb-8 pt-[calc(env(safe-area-inset-top)+20px)]">
+        <div className="mx-auto max-w-[420px]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7088aa]">
+                Digital ID
               </p>
-              <h1 className="pr-1 text-[18px] font-extrabold uppercase leading-[1.02] tracking-[0.01em] text-[#014384] [overflow-wrap:anywhere]">
-                {displayName}
+              <h1 className="mt-2 text-[24px] font-black leading-[1.05] text-[#014384]">
+                {pageIntroTitle}
               </h1>
-              <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium">
-                <span
-                  className={`inline-block h-2.5 w-2.5 rounded-full ${headerStatus.dot}`}
-                />
-                <span className={headerStatus.text}>{headerStatus.label}</span>
-              </div>
+              <p className="mt-2 max-w-[280px] text-[13px] leading-6 text-[#5c7aa3]">
+                {pageIntroDescription}
+              </p>
+            </div>
+
+            <div className="flex shrink-0 flex-col items-end gap-3 pt-1">
+              <Image
+                src="/images/FOOTER.png"
+                alt="SK Barangay Buting"
+                width={132}
+                height={34}
+                className="h-auto w-[92px] object-contain sm:w-[132px]"
+              />
+              <span
+                className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${headerStatus.pillClass}`}
+              >
+                {headerStatus.label}
+              </span>
             </div>
           </div>
 
-          <div className="shrink-0 pt-1">
-            <Image
-              src="/images/FOOTER.png"
-              alt="SK Barangay Buting"
-              width={132}
-              height={34}
-              className="h-auto w-[86px] object-contain sm:w-[132px]"
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="px-6 pb-8 pt-10">
+          <div className="mt-6">
         {isProfileLoading ? (
           <div className="flex min-h-[52vh] items-center justify-center">
             <Spinner size="lg" />
@@ -490,32 +635,50 @@ export default function DigitalIDPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            <DigitalIDCard
-              profile={profile}
-              memberId={idData.memberId || idData.idNumber || ''}
-              photoUrl={digitalIdPhotoUrl}
-              signatureUrl={digitalIdSignatureUrl}
+            <CredentialSummaryPanel
+              statusLabel={headerStatus.label}
+              issuedSinceLabel={issuedSinceLabel}
+              barangayLabel={barangayLabel}
             />
-            <p className="text-center text-[13px] text-[#5c7aa3]">
-              Present this Digital ID to KK officers whenever they need to verify your membership.
-            </p>
-            <Link
-              href="/profile/signature"
-              className="inline-flex w-full items-center justify-center rounded-full border border-[#cbdcf0] bg-white px-6 py-4 text-[16px] font-semibold text-[#014384]"
-            >
-              Update Signature
-            </Link>
-            <button
-              type="button"
-              onClick={handleSaveId}
-              disabled={isSaving}
-              className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
-              >
-                {isSaving ? 'Saving ID...' : 'Save ID'}
-              </button>
+
+            <div className="space-y-3">
+              <DigitalIDCard
+                profile={digitalIdProfile!}
+                memberId={idData.memberId || idData.idNumber || ''}
+                photoUrl={digitalIdPhotoUrl}
+                signatureUrl={digitalIdSignatureUrl}
+                showBack={false}
+              />
+              <p className="px-1 text-center text-[13px] leading-6 text-[#5c7aa3]">
+                Present this credential to KK officers whenever they need to verify your membership.
+              </p>
             </div>
-          )}
-        </section>
+
+            <PhysicalIdCopySection
+              activeRequest={activePhysicalIdRequest}
+              latestRequest={physicalIdRequests[0] || null}
+              canRequest={canRequestPhysicalId && isDigitalIdReady}
+              eligibilityReason={physicalIdEligibilityReason}
+              isLoading={isPhysicalIdRequestsLoading}
+              onRequest={openPhysicalIdRequestModal}
+            />
+
+            <CredentialActionsSection
+              isSaving={isSaving}
+              onSave={handleSaveId}
+            />
+
+            <EmergencyCredentialPanel
+              emergencyContactName={emergencyContactName}
+              emergencyContactPhone={emergencyContactPhone}
+              emergencyContactRelationship={emergencyContactRelationship}
+              validThru={digitalIdValidThru}
+            />
+          </div>
+        )}
+          </div>
+        </div>
+      </section>
 
       <AlertModal
         isOpen={Boolean(error)}
@@ -526,8 +689,364 @@ export default function DigitalIDPage() {
           setErrorTitle('Digital ID Unavailable')
         }}
       />
+
+      <AlertModal
+        isOpen={Boolean(physicalIdRequestsError)}
+        title="Physical ID Requests Unavailable"
+        message={physicalIdRequestsError || ''}
+        tone="error"
+        onClose={clearPhysicalIdRequestsError}
+      />
+
+      <AlertModal
+        isOpen={Boolean(requestFeedback)}
+        title={requestFeedback?.title}
+        message={requestFeedback?.message || ''}
+        tone={requestFeedback?.tone}
+        onClose={() => setRequestFeedback(null)}
+      />
+
+      <Modal
+        isOpen={isPhysicalRequestModalOpen}
+        onClose={() => {
+          if (!isSubmittingPhysicalIdRequest) {
+            setIsPhysicalRequestModalOpen(false)
+            setRequestFormError('')
+          }
+        }}
+        title="Request Physical Copy"
+        size="md"
+      >
+        <form onSubmit={handleSubmitPhysicalIdRequest} className="space-y-4">
+          <div className="rounded-[18px] border border-[#ffe1a6] bg-[#fff8eb] px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b88408]">
+              Pick-up only
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[#7a5b14]">
+              Physical Digital IDs are released for pick-up only. We will notify you once the request is approved and ready.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[#2c4d77]">
+              Reason for request
+            </label>
+            <textarea
+              value={requestReason}
+              onChange={(event) => setRequestReason(event.target.value)}
+              placeholder="Tell us why you need a physical copy of your Digital ID."
+              rows={4}
+              maxLength={300}
+              className="w-full rounded-2xl border border-[#d8e5f4] bg-[#f8fbff] px-4 py-3 text-sm text-[#014384] placeholder:text-[#8ca4c1] outline-none transition focus:border-[#0572DC] focus:ring-2 focus:ring-[#0572DC]/20"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[#2c4d77]">
+              Contact number
+            </label>
+            <input
+              type="tel"
+              value={requestContactNumber}
+              onChange={(event) =>
+                setRequestContactNumber(
+                  normalizePhysicalIdRequestContactNumber(event.target.value)
+                )
+              }
+              inputMode="numeric"
+              maxLength={REQUEST_CONTACT_NUMBER_MAX_LENGTH}
+              placeholder="Example: 09171234567"
+              className={`w-full rounded-2xl border px-4 py-3 text-sm text-[#014384] placeholder:text-[#8ca4c1] outline-none transition focus:ring-2 ${
+                requestContactNumberError
+                  ? 'border-[#f0b7b7] bg-[#fff3f3] focus:border-[#d64545] focus:ring-[#d64545]/20'
+                  : 'border-[#d8e5f4] bg-[#f8fbff] focus:border-[#0572DC] focus:ring-[#0572DC]/20'
+              }`}
+            />
+            <p
+              className={`mt-1.5 text-xs ${
+                requestContactNumberError ? 'text-[#d64545]' : 'text-[#6f89aa]'
+              }`}
+            >
+              {requestContactNumberError || 'Use an 11-digit mobile number that starts with 09.'}
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[#2c4d77]">
+              Optional notes
+            </label>
+            <textarea
+              value={requestNotes}
+              onChange={(event) => setRequestNotes(event.target.value)}
+              placeholder="Add anything else the SK office should know."
+              rows={3}
+              maxLength={1000}
+              className="w-full rounded-2xl border border-[#d8e5f4] bg-[#f8fbff] px-4 py-3 text-sm text-[#014384] placeholder:text-[#8ca4c1] outline-none transition focus:border-[#0572DC] focus:ring-2 focus:ring-[#0572DC]/20"
+            />
+          </div>
+
+          {requestFormError ? (
+            <div className="rounded-[18px] border border-[#f5d0d0] bg-[#fff1f1] px-4 py-3 text-sm leading-6 text-[#bf4747]">
+              {requestFormError}
+            </div>
+          ) : null}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsPhysicalRequestModalOpen(false)
+                setRequestFormError('')
+              }}
+              disabled={isSubmittingPhysicalIdRequest}
+              className="inline-flex flex-1 items-center justify-center rounded-full border border-[#d8e5f4] bg-white px-5 py-3 text-sm font-semibold text-[#014384] disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmittingPhysicalIdRequest}
+              className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_22px_rgba(5,114,220,0.18)] disabled:opacity-60"
+            >
+              {isSubmittingPhysicalIdRequest ? 'Submitting...' : 'Submit Request'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
+}
+
+function PhysicalIdCopySection({
+  activeRequest,
+  latestRequest,
+  canRequest,
+  eligibilityReason,
+  isLoading,
+  onRequest,
+}: {
+  activeRequest: PhysicalIdRequest | null
+  latestRequest: PhysicalIdRequest | null
+  canRequest: boolean
+  eligibilityReason: string | null
+  isLoading: boolean
+  onRequest: () => void
+}) {
+  return (
+    <section className="rounded-[28px] border border-[#d9e5f3] bg-white/78 px-5 py-5 shadow-[0_12px_24px_rgba(1,67,132,0.06)] backdrop-blur-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7e95b2]">
+            Physical ID Copy
+          </p>
+          <h2 className="mt-1 text-[17px] font-extrabold text-[#014384]">
+            Request a physical release
+          </h2>
+        </div>
+        <span className="rounded-full border border-[#f5dfb1] bg-[#fff8eb] px-3 py-1 text-[11px] font-bold text-[#b88408]">
+          Pick-up only
+        </span>
+      </div>
+
+      <p className="mt-3 text-[13px] leading-6 text-[#5c7aa3]">
+        Use this if you need a physical copy of your Digital ID. Requests go through review, production, and pick-up scheduling before release.
+      </p>
+
+      {isLoading ? (
+        <div className="mt-4 flex justify-center py-8">
+          <Spinner size="md" />
+        </div>
+      ) : activeRequest ? (
+        <div className="mt-4 rounded-[22px] border border-[#dbe7f6] bg-[#f7fbff] px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6f89aa]">
+                Active request
+              </p>
+              <p className="mt-1 text-[15px] font-bold text-[#014384]">
+                {formatRequestDate(activeRequest.createdAt)}
+              </p>
+            </div>
+            <PhysicalIdRequestStatusBadge status={activeRequest.status} />
+          </div>
+
+          <p className="mt-3 text-[13px] leading-6 text-[#315b8d]">
+            Current status: {getPhysicalIdRequestStatusLabel(activeRequest.status)}.
+          </p>
+
+          {activeRequest.adminRemarks ? (
+            <p className="mt-3 rounded-[18px] border border-[#d7e7fb] bg-white px-4 py-3 text-[13px] leading-6 text-[#315b8d]">
+              <span className="font-bold">Admin remarks:</span> {activeRequest.adminRemarks}
+            </p>
+          ) : null}
+
+          {activeRequest.readyForPickupNotice ? (
+            <p className="mt-3 rounded-[18px] border border-[#ccecd8] bg-[#eefaf2] px-4 py-3 text-[13px] leading-6 text-[#23724a]">
+              {activeRequest.readyForPickupNotice}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-[22px] border border-[#dbe7f6] bg-[#f7fbff] px-4 py-4">
+          <p className="text-[13px] leading-6 text-[#315b8d]">
+            {canRequest
+              ? 'You can submit one request at a time. Once approved, the SK office will continue the processing and notify you when it is ready for pick-up.'
+              : eligibilityReason || 'Physical copy requests are currently unavailable for your account.'}
+          </p>
+          {latestRequest ? (
+            <div className="mt-3 flex items-center gap-2 text-[12px] text-[#5c7aa3]">
+              <span>Latest request:</span>
+              <PhysicalIdRequestStatusBadge status={latestRequest.status} size="sm" />
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={onRequest}
+          disabled={!canRequest || isLoading}
+          className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-5 py-3.5 text-[15px] font-bold text-white shadow-[0_10px_22px_rgba(5,114,220,0.16)] disabled:opacity-55"
+        >
+          Request Physical Copy
+        </button>
+        <Link
+          href="/profile/physical-id-requests"
+          className="inline-flex w-full items-center justify-center rounded-full border border-[#d8e5f4] bg-white px-5 py-3 text-[14px] font-semibold text-[#014384]"
+        >
+          My Physical ID Requests
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+function CredentialSummaryPanel({
+  statusLabel,
+  issuedSinceLabel,
+  barangayLabel,
+}: {
+  statusLabel: string
+  issuedSinceLabel: string
+  barangayLabel: string
+}) {
+  return (
+    <section className="rounded-[26px] border border-[#d9e5f3] bg-white/74 px-4 py-4 shadow-[0_10px_22px_rgba(1,67,132,0.05)] backdrop-blur-sm">
+      <div className="grid grid-cols-2 gap-3">
+        <CredentialMetaItem label="Digital ID Status" value={statusLabel} />
+        <CredentialMetaItem label="Member State" value="Verified Member" />
+        <CredentialMetaItem label="Issued Since" value={issuedSinceLabel} />
+        <CredentialMetaItem label="Barangay" value={barangayLabel} />
+      </div>
+    </section>
+  )
+}
+
+function CredentialMetaItem({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-[20px] border border-[#e5edf7] bg-[#f8fbff] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7a91b0]">
+        {label}
+      </p>
+      <p className="mt-1.5 text-[14px] font-bold leading-5 text-[#014384]">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function CredentialActionsSection({
+  isSaving,
+  onSave,
+}: {
+  isSaving: boolean
+  onSave: () => void
+}) {
+  return (
+    <section className="rounded-[28px] border border-[#d9e5f3] bg-white/76 px-5 py-5 shadow-[0_12px_24px_rgba(1,67,132,0.05)] backdrop-blur-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7e95b2]">
+            Credential Actions
+          </p>
+          <p className="mt-2 text-[13px] leading-6 text-[#5c7aa3]">
+            Save a copy, review your verification, or replace the signature shown on the card.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={isSaving}
+          className="col-span-2 inline-flex items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[17px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.16)] disabled:opacity-60"
+        >
+          {isSaving ? 'Saving ID...' : 'Save ID'}
+        </button>
+        <Link
+          href="/verification/status"
+          className="inline-flex items-center justify-center rounded-full border border-[#d8e5f4] bg-white px-4 py-3 text-[14px] font-semibold text-[#014384]"
+        >
+          Verification Status
+        </Link>
+        <Link
+          href="/profile/signature"
+          className="inline-flex items-center justify-center rounded-full border border-[#d8e5f4] bg-white px-4 py-3 text-[14px] font-semibold text-[#014384]"
+        >
+          Update Signature
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+function EmergencyCredentialPanel({
+  emergencyContactName,
+  emergencyContactPhone,
+  emergencyContactRelationship,
+  validThru,
+}: {
+  emergencyContactName: string
+  emergencyContactPhone: string
+  emergencyContactRelationship: string
+  validThru: string
+}) {
+  return (
+    <section className="rounded-[28px] border border-[#e2e8f1] bg-white/68 px-4 py-4 shadow-[0_8px_18px_rgba(1,67,132,0.04)] backdrop-blur-sm">
+      <div className="px-1">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8a9bb2]">
+          Emergency & Validity
+        </p>
+        <p className="mt-2 text-[13px] leading-6 text-[#6b81a1]">
+          These are the emergency and validity details shown on the back of your digital credential.
+        </p>
+      </div>
+
+      <div className="mt-4">
+        <DigitalIdBack
+          emergencyContactName={emergencyContactName}
+          emergencyContactPhone={emergencyContactPhone}
+          emergencyContactRelationship={emergencyContactRelationship}
+          validThru={validThru}
+        />
+      </div>
+    </section>
+  )
+}
+
+function extractYear(value?: string) {
+  if (!value) return new Date().getFullYear()
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return new Date().getFullYear()
+  return date.getFullYear()
 }
 
 function getInitials(value: string) {
@@ -578,6 +1097,7 @@ async function buildDigitalIdPdf({
     firstName?: string
     middleName?: string
     lastName?: string
+    purok?: string
     barangay?: string
     city?: string
     province?: string
@@ -585,6 +1105,8 @@ async function buildDigitalIdPdf({
     gender?: string
     contactNumber?: string
     verifiedAt?: string
+    digitalIdGeneratedAt?: string | null
+    digitalIdApprovedAt?: string | null
     digitalIdEmergencyContactName?: string
     digitalIdEmergencyContactRelationship?: string
     digitalIdEmergencyContactPhone?: string
@@ -607,7 +1129,15 @@ async function buildDigitalIdPdf({
 
   const fullName = buildFullName(profile).toUpperCase() || 'KABATAAN MEMBER'
   const address = buildAddress(profile)
-  const validThru = getDigitalIdValidThru(profile.verifiedAt)
+  const purok = buildPurok(profile.purok)
+  const contactNumber = buildFrontCardValue(profile.contactNumber)
+  const validThru = getDigitalIdValidThru(
+    resolveDigitalIdIssuedAt(
+      profile.digitalIdApprovedAt,
+      profile.digitalIdGeneratedAt,
+      profile.verifiedAt
+    )
+  )
   const emergencyContactName = formatEmergencyContactValue(
     profile.digitalIdEmergencyContactName,
     'Not Provided Yet'
@@ -633,49 +1163,53 @@ async function buildDigitalIdPdf({
   doc.setDrawColor(139, 147, 141)
   doc.setLineWidth(0.6)
   doc.roundedRect(45, 355, 370, 216, 14, 14, 'S')
+  const frontContentOffsetY = -12
+  const frontInfoOffsetY = -18
 
   doc.setTextColor(11, 47, 91)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(6.8)
-  doc.text(memberId || 'DRAFT', 89, 74, { align: 'center', maxWidth: 78 })
+  doc.text(memberId || 'DRAFT', 89, 74 + frontContentOffsetY, { align: 'center', maxWidth: 78 })
 
   if (photoData) {
-    doc.addImage(photoData, 'JPEG', 53, 86, 72, 94)
+    doc.addImage(photoData, 'JPEG', 53, 86 + frontContentOffsetY, 72, 94)
   } else {
     doc.setTextColor(1, 67, 132)
     doc.setFontSize(22)
-    doc.text(getInitials(fullName), 89, 142, { align: 'center' })
+    doc.text(getInitials(fullName), 89, 142 + frontContentOffsetY, { align: 'center' })
   }
 
   if (signatureData) {
-    doc.addImage(signatureData, 'PNG', 48, 184, 82, 22)
+    doc.addImage(signatureData, 'PNG', 48, 184 + frontContentOffsetY, 82, 22)
   }
 
   doc.setDrawColor(128, 128, 128)
   doc.setLineWidth(0.8)
-  doc.line(50, 208, 128, 208)
+  doc.line(50, 208 + frontContentOffsetY, 128, 208 + frontContentOffsetY)
   doc.setTextColor(26, 26, 26)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(5.6)
-  doc.text('SIGNATURE', 89, 216, { align: 'center' })
+  doc.text('SIGNATURE', 89, 216 + frontContentOffsetY, { align: 'center' })
 
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(29, 90, 161)
   doc.setFontSize(7)
-  doc.text('NAME:', 164, 84)
-  doc.text('HOME ADDRESS:', 164, 119)
-  doc.text('DATE OF BIRTH:', 164, 171)
-  doc.text('GENDER:', 299, 171)
-  doc.text('CONTACT NO:', 164, 219)
+  doc.text('NAME:', 164, 84 + frontInfoOffsetY)
+  doc.text('HOME ADDRESS:', 164, 111 + frontInfoOffsetY)
+  doc.text('PUROK:', 164, 152 + frontInfoOffsetY)
+  doc.text('DATE OF BIRTH:', 164, 183 + frontInfoOffsetY)
+  doc.text('GENDER:', 299, 183 + frontInfoOffsetY)
+  doc.text('CONTACT NO:', 164, 218 + frontInfoOffsetY)
 
   doc.setTextColor(11, 47, 91)
   doc.setFontSize(12)
-  doc.text(fullName, 164, 97)
+  doc.text(fullName, 164, 97 + frontInfoOffsetY)
   doc.setFontSize(10.5)
-  doc.text(address, 164, 133, { maxWidth: 160 })
-  doc.text(formatShortDate(profile.birthday), 164, 184)
-  doc.text((profile.gender || '-').toUpperCase(), 299, 184)
-  doc.text(profile.contactNumber || '-', 164, 232)
+  doc.text(address, 164, 123 + frontInfoOffsetY, { maxWidth: 160 })
+  doc.text(purok, 164, 164 + frontInfoOffsetY, { maxWidth: 160 })
+  doc.text(formatShortDate(profile.birthday), 164, 196 + frontInfoOffsetY)
+  doc.text((profile.gender || '-').toUpperCase(), 299, 196 + frontInfoOffsetY)
+  doc.text(contactNumber, 164, 231 + frontInfoOffsetY)
 
   doc.setTextColor(96, 103, 98)
   doc.setFont('helvetica', 'bold')
@@ -707,7 +1241,7 @@ async function buildDigitalIdPdf({
 
   doc.setTextColor(122, 128, 123)
   doc.setFontSize(7)
-  doc.text('VALID THRU', 230, 490, { align: 'center' })
+  doc.text('VALID UNTIL', 230, 490, { align: 'center' })
   doc.setTextColor(34, 40, 35)
   doc.setFontSize(12)
   doc.text(validThru, 230, 504, { align: 'center' })
@@ -751,6 +1285,16 @@ function buildAddress(profile: {
   return parts || '-'
 }
 
+function buildPurok(value?: string) {
+  const nextValue = String(value || '').trim()
+  return nextValue ? nextValue.toUpperCase() : '-'
+}
+
+function buildFrontCardValue(value?: string) {
+  const nextValue = String(value || '').trim()
+  return nextValue || '-'
+}
+
 function formatShortDate(value?: string) {
   if (!value) return '-'
   const date = new Date(value)
@@ -789,13 +1333,26 @@ function getDigitalIdValidThru(value?: string) {
     return '-'
   }
 
-  date.setFullYear(date.getFullYear() + 5)
+  date.setFullYear(date.getFullYear() + 2)
 
   return date.toLocaleDateString('en-US', {
     month: '2-digit',
     day: '2-digit',
     year: 'numeric',
   })
+}
+
+function resolveDigitalIdIssuedAt(
+  ...values: Array<string | null | undefined>
+): string | undefined {
+  for (const value of values) {
+    const normalized = String(value || '').trim()
+    if (normalized) {
+      return normalized
+    }
+  }
+
+  return undefined
 }
 
 async function loadImageData(url: string, output: 'png' | 'jpeg' = 'png') {
@@ -875,4 +1432,41 @@ function getPdfAssetUrl(url: string) {
 
 function sanitizeFileName(value: string) {
   return value.replace(/[^\w-]+/g, '_')
+}
+
+function normalizePhysicalIdRequestContactNumber(value: string) {
+  return value.replace(/\D/g, '').slice(0, REQUEST_CONTACT_NUMBER_MAX_LENGTH)
+}
+
+function getPhysicalIdRequestContactNumberError(value: string) {
+  const trimmedValue = value.trim()
+
+  if (!trimmedValue) {
+    return 'Contact number is required for pickup coordination.'
+  }
+
+  if (!/^09\d{9}$/.test(trimmedValue)) {
+    return 'Contact number must be 11 digits and start with 09.'
+  }
+
+  return ''
+}
+
+function formatRequestDate(value: string | null) {
+  if (!value) {
+    return 'Recently submitted'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Recently submitted'
+  }
+
+  return date.toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }

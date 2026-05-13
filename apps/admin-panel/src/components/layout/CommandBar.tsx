@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BarChart3,
+  ClipboardList,
   CreditCard,
   Gift,
   LayoutDashboard,
@@ -26,6 +27,7 @@ const COMMANDS = [
   { label: 'Dashboard', action: '/dashboard', icon: LayoutDashboard },
   { label: 'Verification', action: '/verification', icon: ShieldCheck },
   { label: 'Youth Members', action: '/youth', icon: UsersRound },
+  { label: 'Physical ID Requests', action: '/physical-id-requests', icon: ClipboardList },
   { label: 'Merchants', action: '/merchants', icon: Store },
   { label: 'Points & Transactions', action: '/points-transactions', icon: TrendingUp },
   { label: 'Reports', action: '/reports', icon: BarChart3 },

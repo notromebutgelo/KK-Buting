@@ -41,6 +41,16 @@ export async function updateProfiling(uid: string, data: Record<string, unknown>
 function normalizeProfilingData(data: Record<string, unknown>) {
   const normalizedData = { ...data };
 
+  if ("contactNumber" in normalizedData) {
+    normalizedData.contactNumber = normalizeProfileContactNumber(
+      normalizedData.contactNumber
+    );
+  }
+
+  if ("purok" in normalizedData) {
+    normalizedData.purok = String(normalizedData.purok || "").trim();
+  }
+
   if ("digitalIdEmergencyContactPhone" in normalizedData) {
     normalizedData.digitalIdEmergencyContactPhone = normalizeEmergencyContactPhone(
       normalizedData.digitalIdEmergencyContactPhone
@@ -54,4 +64,10 @@ function normalizeEmergencyContactPhone(value: unknown) {
   return String(value || "")
     .replace(/\D/g, "")
     .slice(0, 11);
+}
+
+function normalizeProfileContactNumber(value: unknown) {
+  return String(value || "")
+    .replace(/[^\d+()\-\s]/g, "")
+    .trim();
 }

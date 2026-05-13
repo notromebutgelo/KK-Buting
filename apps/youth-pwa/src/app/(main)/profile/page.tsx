@@ -44,6 +44,29 @@ const menuItems = [
     ),
   },
   {
+    href: '/profile/physical-id-requests',
+    label: 'Physical ID Requests',
+    description: 'Track your physical Digital ID copy requests, remarks, and pick-up status updates.',
+    icon: (
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <rect
+          x="3"
+          y="5"
+          width="18"
+          height="14"
+          rx="2.5"
+          strokeWidth={2}
+        />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M7 10h10M7 14h6"
+        />
+      </svg>
+    ),
+  },
+  {
     href: '/profile/change-password',
     label: 'Change Password',
     description: 'Secure your account with a fresh password whenever you need to.',
@@ -144,6 +167,50 @@ export default function ProfilePage() {
 
   const emergencyContactComplete = hasCompleteEmergencyContact(profile)
   const signatureComplete = hasDigitalIdSignature(profile)
+  const overviewStats = [
+    {
+      label: 'Age Group',
+      value: profile?.youthAgeGroup || 'Not set',
+      icon: <PeopleIcon />,
+    },
+    {
+      label: 'Location',
+      value: memberLocation,
+      icon: <LocationPinIcon />,
+    },
+    {
+      label: 'Classification',
+      value: profile?.youthClassification || 'Not set',
+      icon: <GraduationIcon />,
+    },
+    {
+      label: 'Work Status',
+      value: profile?.workStatus || 'Not set',
+      icon: <BriefcaseIcon />,
+    },
+  ]
+  const snapshotItems = [
+    {
+      label: 'Full Name',
+      value: displayName,
+      icon: <UserCardIcon />,
+    },
+    {
+      label: 'Email',
+      value: user?.email || 'No email on file',
+      icon: <MailIcon />,
+    },
+    {
+      label: 'Barangay',
+      value: profile?.barangay || 'Not set yet',
+      icon: <HomePinIcon />,
+    },
+    {
+      label: 'City / Municipality',
+      value: profile?.city || 'Not set yet',
+      icon: <CityIcon />,
+    },
+  ]
 
   const handleLogout = async () => {
     setIsSigningOut(true)
@@ -203,52 +270,67 @@ export default function ProfilePage() {
         </div>
       </Modal>
 
-      <div className="min-h-full bg-gray-50 px-5 pb-8 pt-6">
+      <div className="min-h-full bg-gray-50 px-5 pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)]">
         <section>
-          <div className="rounded-[30px] bg-[linear-gradient(135deg,#014384_0%,#035db7_58%,#0a74de_100%)] p-5 text-white shadow-[0_18px_38px_rgba(1,67,132,0.18)]">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-white/16 ring-4 ring-white/20">
-                  <span className="text-3xl font-black text-white">
-                    {getInitials(displayName) || 'Y'}
-                  </span>
-                </div>
-
+          <div className="rounded-[30px] bg-[linear-gradient(135deg,#014384_0%,#035db7_58%,#0a74de_100%)] p-[1px] text-white shadow-[0_18px_38px_rgba(1,67,132,0.18)]">
+            <div className="rounded-[29px] border border-white/10 bg-[linear-gradient(140deg,#014384_0%,#045fb8_56%,#0a74de_100%)] px-5 pb-5 pt-4.5">
+              <div className="flex items-start justify-between gap-3 border-b border-white/12 pb-4">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                  <p className="pt-0.5 text-[10px] font-semibold uppercase leading-[1.45] tracking-[0.18em] text-white/68">
                     Account Overview
                   </p>
-                  <p className="mt-2 text-sm font-medium text-white/75">KK Youth Member</p>
-                  <h1 className="mt-1 text-[24px] font-black leading-7">{displayName}</h1>
-                  <p className="mt-2 max-w-[220px] text-[13px] leading-[1.55] text-white/78 [overflow-wrap:anywhere]">
-                    {user.email || 'No email on file'}
-                  </p>
+                  <p className="mt-1 text-[13px] font-medium leading-5 text-white/76">KK Youth Member</p>
+                </div>
+
+                {profile ? (
+                  <Badge
+                    status={profile.status}
+                    className="border-white/20 bg-white/12 text-white [&>span:first-child]:bg-[#fcb315]"
+                  />
+                ) : null}
+              </div>
+
+              <div className="mt-5 flex items-center gap-4">
+                <div className="relative flex h-[74px] w-[74px] flex-shrink-0 items-center justify-center rounded-full bg-white/14 ring-[10px] ring-white/10">
+                  <span className="text-[30px] font-black text-white">
+                    {getInitials(displayName) || 'Y'}
+                  </span>
+                  <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#0a5fc1] bg-[#1578ea] shadow-[0_8px_18px_rgba(1,67,132,0.24)]">
+                    <ShieldTickIcon />
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-[20px] font-black leading-[1.08] tracking-[-0.02em] text-white">
+                    {displayName}
+                  </h1>
+                  <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-[12px] text-white/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                    <MailChipIcon />
+                    <span className="truncate">{user.email || 'No email on file'}</span>
+                  </div>
                 </div>
               </div>
 
-              {profile ? (
-                <Badge
-                  status={profile.status}
-                  className="border-white/20 bg-white/14 text-white [&>span:first-child]:bg-[#fcb315]"
-                />
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                {overviewStats.map((item) => (
+                  <ProfileStat
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    icon={item.icon}
+                  />
+                ))}
+              </div>
+
+              {!profile ? (
+                <Link
+                  href="/intro"
+                  className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#ffd67d_0%,#fcba2c_58%,#fcb315_100%)] px-5 py-4 text-[15px] font-bold text-white shadow-[0_12px_24px_rgba(252,179,21,0.28)]"
+                >
+                  Complete Profile Setup
+                </Link>
               ) : null}
             </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <ProfileStat label="Age Group" value={profile?.youthAgeGroup || 'Not set'} />
-              <ProfileStat label="Location" value={memberLocation} />
-              <ProfileStat label="Classification" value={profile?.youthClassification || 'Not set'} />
-              <ProfileStat label="Work Status" value={profile?.workStatus || 'Not set'} />
-            </div>
-
-            {!profile ? (
-              <Link
-                href="/intro"
-                className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#ffd67d_0%,#fcba2c_58%,#fcb315_100%)] px-5 py-4 text-[15px] font-bold text-white shadow-[0_12px_24px_rgba(252,179,21,0.28)]"
-              >
-                Complete Profile Setup
-              </Link>
-            ) : null}
           </div>
 
           <div className="mt-4 rounded-[26px] bg-white px-5 py-5 shadow-[0_12px_28px_rgba(1,67,132,0.08)]">
@@ -267,10 +349,14 @@ export default function ProfilePage() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <InfoCard label="Full Name" value={displayName} />
-              <InfoCard label="Email" value={user.email || 'No email on file'} />
-              <InfoCard label="Barangay" value={profile?.barangay || 'Not set yet'} />
-              <InfoCard label="City / Municipality" value={profile?.city || 'Not set yet'} />
+              {snapshotItems.map((item) => (
+                <InfoCard
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  icon={item.icon}
+                />
+              ))}
             </div>
           </div>
 
@@ -371,21 +457,152 @@ export default function ProfilePage() {
   )
 }
 
-function ProfileStat({ label, value }: { label: string; value: string }) {
+function ProfileStat({
+  label,
+  value,
+  icon,
+}: {
+  label: string
+  value: string
+  icon: React.ReactNode
+}) {
   return (
-    <div className="rounded-[20px] bg-white/10 px-4 py-3 backdrop-blur-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/65">{label}</p>
-      <p className="mt-2 text-[14px] font-bold leading-5 text-white">{value}</p>
+    <div className="rounded-[20px] border border-white/14 bg-white/10 px-3.5 py-3.5 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[16px] bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/62">
+            {label}
+          </p>
+          <p className="mt-1.5 text-[13px] font-bold leading-[1.35] text-white [overflow-wrap:anywhere]">
+            {value}
+          </p>
+        </span>
+      </div>
     </div>
   )
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
+function InfoCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string
+  value: string
+  icon: React.ReactNode
+}) {
   return (
-    <div className="min-w-0 rounded-[20px] border border-[#e1ebf5] bg-[#f8fbff] px-4 py-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7e95b2]">{label}</p>
-      <p className="mt-2 text-[14px] font-bold leading-5 text-[#014384] [overflow-wrap:anywhere]">{value}</p>
+    <div className="min-w-0 rounded-[20px] border border-[#e1ebf5] bg-[#f8fbff] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#edf4fb_0%,#dcecff_100%)] text-[#0b5db7]">
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7e95b2]">
+            {label}
+          </p>
+          <p className="mt-1.5 text-[13px] font-bold leading-[1.35] text-[#014384] [overflow-wrap:anywhere]">
+            {value}
+          </p>
+        </span>
+      </div>
     </div>
+  )
+}
+
+function PeopleIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20a4 4 0 0 0-8 0m8 0H7m10 0h3m-3-7a4 4 0 1 0-8 0m8 0a4 4 0 0 1 4 4v3M9 13a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm8-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+    </svg>
+  )
+}
+
+function LocationPinIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21s-6-4.35-6-10a6 6 0 1 1 12 0c0 5.65-6 10-6 10Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 13.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+    </svg>
+  )
+}
+
+function GraduationIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m3 9 9-4 9 4-9 4-9-4Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V15c0 .9 2.24 2.5 5 2.5s5-1.6 5-2.5v-3.5" />
+    </svg>
+  )
+}
+
+function BriefcaseIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9h16a1 1 0 0 1 1 1v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a1 1 0 0 1 1-1Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 13h4" />
+    </svg>
+  )
+}
+
+function UserCardIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19a4 4 0 0 0-8 0" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h16v14H4z" />
+    </svg>
+  )
+}
+
+function MailIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16v10H4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 8 7 5 7-5" />
+    </svg>
+  )
+}
+
+function HomePinIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 10.5 12 4l8 6.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9.5V20h12V9.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20v-5h4v5" />
+    </svg>
+  )
+}
+
+function CityIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 20V8l6-3v15" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20V4l10 4v12" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 9h.01M7 12h.01M7 15h.01M14 10h.01M14 13h.01M14 16h.01M17 10h.01M17 13h.01M17 16h.01" />
+    </svg>
+  )
+}
+
+function ShieldTickIcon() {
+  return (
+    <svg className="h-4.5 w-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M12 3 6 5.5v6c0 4.1 2.63 7.63 6 8.5 3.37-.87 6-4.4 6-8.5v-6L12 3Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="m9.5 12 1.7 1.7 3.3-3.7" />
+    </svg>
+  )
+}
+
+function MailChipIcon() {
+  return (
+    <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16v10H4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 8 7 5 7-5" />
+    </svg>
   )
 }
 

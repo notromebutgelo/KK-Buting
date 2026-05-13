@@ -8,6 +8,7 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import {
   BarChart3,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -47,6 +48,13 @@ const ALL_NAV_ITEMS = [
     href: '/youth',
     label: 'Youth Members',
     icon: UsersRound,
+    group: 'Operations',
+    superadminOnly: false,
+  },
+  {
+    href: '/physical-id-requests',
+    label: 'Physical ID Requests',
+    icon: ClipboardList,
     group: 'Operations',
     superadminOnly: false,
   },
@@ -167,7 +175,7 @@ export default function Sidebar({
         className="flex h-full flex-col overflow-hidden border-r transition-all duration-300"
         style={{
           width: sidebarWidth,
-          background: 'var(--surface)',
+          background: 'var(--card-solid)',
           borderColor: 'var(--stroke)',
           backdropFilter: 'blur(22px)',
         }}

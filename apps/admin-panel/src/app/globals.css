@@ -14,7 +14,7 @@
   --bg: color-mix(in srgb, var(--brand-neutral) 84%, white 16%);
   --surface: rgba(255, 255, 255, 0.82);
   --surface-muted: color-mix(in srgb, var(--brand-blue) 8%, var(--brand-neutral) 92%);
-  --card: rgba(255, 255, 255, 0.9);
+  --card: #ffffff;
   --card-solid: #ffffff;
   --stroke: rgba(1, 67, 132, 0.12);
   --accent: var(--brand-navy);
@@ -37,13 +37,13 @@
   --info-accent: var(--brand-blue);
   --danger: var(--danger-fg);
   --warning: var(--warning-fg);
-  --shadow-sm: 0 10px 24px rgba(1, 67, 132, 0.08);
-  --shadow-md: 0 20px 48px rgba(1, 67, 132, 0.12);
-  --shadow-lg: 0 28px 80px rgba(1, 67, 132, 0.16);
+  --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 24px 64px rgba(15, 23, 42, 0.12);
   --radius-lg: 18px;
   --radius-md: 14px;
   --radius-sm: 10px;
-  --sidebar-width: 272px;
+  --sidebar-width: 260px;
   --sidebar-collapsed-width: 84px;
 }
 
@@ -95,9 +95,8 @@ body {
   min-height: 100vh;
   font-family: 'Poppins', 'Segoe UI', sans-serif;
   background:
-    radial-gradient(circle at 10% -10%, rgba(5, 114, 220, 0.12), transparent 34%),
-    radial-gradient(circle at 92% 0%, rgba(252, 179, 21, 0.16), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)),
+    radial-gradient(circle at 8% -4%, rgba(5, 114, 220, 0.06), transparent 26%),
+    radial-gradient(circle at 92% 0%, rgba(252, 179, 21, 0.08), transparent 20%),
     var(--bg);
   color: var(--ink);
   transition: background-color 220ms ease, color 220ms ease;

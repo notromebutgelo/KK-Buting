@@ -40,6 +40,11 @@ import {
   getReports,
   createMerchantAccount,
 } from "./admin.service";
+import {
+  getPhysicalIdRequestDetail,
+  listPhysicalIdRequestsForAdmin,
+  updatePhysicalIdRequestByAdmin,
+} from "../physical-id-requests/physicalIdRequests.service";
 
 export async function getDashboard(req: AuthRequest, res: Response) {
   try {
@@ -520,5 +525,75 @@ export async function createMerchantAccountHandler(req: AuthRequest, res: Respon
       return res.status(409).json({ error: "An account with this email already exists." });
     }
     return res.status(500).json({ error: message });
+  }
+}
+
+export async function listPhysicalIdRequestsHandler(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    const result = await listPhysicalIdRequestsForAdmin({
+      status: typeof req.query.status === "string" ? req.query.status : undefined,
+      search: typeof req.query.search === "string" ? req.query.search : undefined,
+      purok: typeof req.query.purok === "string" ? req.query.purok : undefined,
+      requestDate:
+        typeof req.query.requestDate === "string" ? req.query.requestDate : undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      pageSize: req.query.pageSize ? Number(req.query.pageSize) : undefined,
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function getPhysicalIdRequestHandler(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    const request = await getPhysicalIdRequestDetail(req.params.requestId);
+    if (!request) {
+      return res.status(404).json({ error: "Physical ID request not found" });
+    }
+
+    return res.json({ request });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function updatePhysicalIdRequestHandler(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    const request = await updatePhysicalIdRequestByAdmin(
+      req.params.requestId,
+      {
+        status: req.body?.status,
+        adminRemarks: req.body?.adminRemarks,
+        rejectionReason: req.body?.rejectionReason,
+      },
+      req.user?.email || req.user?.role || "admin"
+    );
+
+    return res.json({
+      message: "Physical ID request updated",
+      request,
+    });
+  } catch (err: any) {
+    const message = String(err?.message || "Failed to update physical ID request.");
+    const statusCode = message.includes("not found")
+      ? 404
+      : message.includes("Cannot move") ||
+          message.includes("required") ||
+          message.includes("Provide")
+        ? 400
+        : 500;
+
+    return res.status(statusCode).json({ error: message });
   }
 }

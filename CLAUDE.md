@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-05-09
+Last updated: 2026-05-13
 
 ## What This Repository Is
 
@@ -52,6 +52,7 @@ Main route groups currently wired in:
 - `/api/users`
 - `/api/profiling`
 - `/api/digital-id`
+- `/api/physical-id-requests`
 - `/api/merchants`
 - `/api/rewards`
 - `/api/points`
@@ -64,6 +65,7 @@ The backend uses Firestore as the main system of record. Key collections inferre
 - `users`
 - `kkProfiling`
 - `documents`
+- `physicalIdRequests`
 - `merchants`
 - `rewards`
 - `points`
@@ -171,6 +173,27 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- the youth PWA, backend, and admin panel now support a dedicated Physical Digital ID copy request workflow
+  - a new backend module at `apps/backend/src/modules/physical-id-requests/` now owns youth request submission/history plus admin-side request management against the Firestore `physicalIdRequests` collection
+  - new youth endpoints under `/api/physical-id-requests` now let verified members with an active Digital ID submit one physical-copy request at a time and review their own request history/status
+  - duplicate active requests are now blocked in backend service logic whenever an existing request is still `pending`, `approved`, `processing`, or `ready_for_pickup`
+  - each request now stores the member link, Digital ID reference, reason, pick-up contact number, optional notes, admin remarks, rejection reason, handler, and lifecycle timestamps such as `approvedAt`, `processingAt`, `readyForPickupAt`, `completedAt`, and `rejectedAt`
+  - youth Digital ID UI at `apps/youth-pwa/src/app/(main)/scanner/digital-id/page.tsx` now includes a `Physical ID Copy` section, a mobile-first themed request modal, active-request blocking/summary states, and a direct link to request history
+  - a new youth history page at `apps/youth-pwa/src/app/(main)/profile/physical-id-requests/page.tsx` now shows request date, status badge, remarks, rejection details, ready-for-pickup notice, and a simple per-request status timeline
+  - a new admin workspace at `apps/admin-panel/src/app/(dashboard)/physical-id-requests/page.tsx` now gives admin and superadmin a dedicated queue for list/detail review, filters, request-date search, remarks, and lifecycle transitions from `pending` through `completed`
+  - the admin lifecycle is now enforced as:
+    - `pending -> approved` or `pending -> rejected`
+    - `approved -> processing`
+    - `processing -> ready_for_pickup`
+    - `ready_for_pickup -> completed`
+  - the shared notifications system is now reused for this flow:
+    - admin/superadmin are notified when a new physical ID request is submitted
+    - youth users are notified when the request is submitted, approved, rejected, ready for pick-up, and completed
+  - admin dashboard navigation now includes `Physical ID Requests` in the sidebar, topbar metadata, and command-bar search so the module behaves like the rest of the admin workspace
+  - the admin Physical ID Requests workspace now treats Barangay Buting as fixed system context and uses `Purok / Zone` instead of `barangay` for request filtering, queue display, and request-detail scanning
+  - backend physical ID request records now store `purok` alongside the older barangay context, and the admin queue falls back to each member's current `kkProfiling.purok` value for older request documents that were created before the field existed
+  - the admin page layout was also tightened into a more compact master-detail workflow with smaller status metrics, a cleaner queue table, truncated long identifiers, inline copy actions, and reduced top-of-page descriptive clutter
+  - verification after rollout: `npm run build` in `apps/backend`, `npm run build:youth`, `npm run build` in `apps/admin-panel`, and `npm run test:backend` all passed locally
 - the repo now includes a one-time Firebase cleanup utility for removing pre-live youth test accounts more safely than manual console deletion
   - `apps/backend/utils/cleanupYouthAccounts.js` now scans Firebase Auth, preserves known admin/superadmin emails plus merchant/admin/superadmin roles, and defaults to dry-run mode so the exact deletion candidates can be reviewed first
   - when executed with an explicit confirmation token, the cleanup removes youth-linked Firestore records, Auth users, verification-document storage files, voucher claims, and common user-side ledgers such as `pointsHistory`
@@ -227,6 +250,18 @@ The current live points default in code is now:
   - onboarding draft sanitization and step validation now clear or block stale single-choice values that are no longer valid options, so old free-text answers like unsupported entries cannot silently pass the updated select-based flow
 - the repo now ignores Next.js `.next-dev` development-output folders alongside `.next`, matching the separate dev-vs-build `distDir` setup already used by both web apps
   - generated `.next-dev` files for `apps/youth-pwa` and `apps/admin-panel` should no longer be tracked in Git, which prevents local `next dev` cache churn from appearing as fake source changes after normal development work
+- the youth/admin Digital ID front-card info column was nudged slightly upward and its internal spacing tightened so the text fields sit in better visual balance with the profile photo area
+  - the live youth card, admin preview card, and both exported PDF front layouts now keep the same refined vertical alignment instead of drifting between on-screen and downloaded versions
+  - the same front info block was then nudged a little higher again for a tighter photo-to-text balance while keeping the existing card proportions and responsive behavior intact
+- the superadmin Digital ID back-card preview now mirrors the youth PWA back-card spacing more closely instead of using the older denser lower-section sizing that made the signatory block feel too close to the inner border
+- the admin/superadmin Digital IDs workspace now computes a previewable member ID for queued records even before final issuance has persisted `idNumber`
+  - the front-card preview and related admin exports no longer fall back to `DRAFT` for members already in the Digital ID workflow when a deterministic KK ID can be derived safely from the user id
+- the Digital ID front card now shows a dedicated `Purok` field below `Home Address`, and the entire front content stack was lifted closer to the upper yellow band so the photo/details block sits higher without changing the core card design
+  - the live youth card, superadmin preview, and both PDF/export front layouts were updated together so the extra field and higher alignment stay visually consistent across screens and downloads
+  - the youth/admin Digital ID front `Purok` and `Contact No.` fields are now backed by real profile data instead of placeholder blanks
+  - the profiling schema now captures optional `Purok / Zone` and `Contact Number` entries and maps them into the legacy `kkProfiling.purok` and `kkProfiling.contactNumber` fields already used by admin, verification, and Digital ID flows
+  - the youth `Edit Profile` page now exposes the same front-card fields so already-profiled members can update them without rerunning the full questionnaire, and those saved values immediately feed both the youth Digital ID card and the superadmin preview
+  - the Digital ID back-card validity label now reads `Valid Until`, and the expiry date is now computed as 2 years from Digital ID issuance / approval metadata instead of the older longer verification-based validity calculation
 - admin verification state reset and review responsiveness are now more consistent across Youth Members and Verification
   - manual status changes back to `pending` through `apps/backend/src/modules/admin/admin.service.ts` now also rewind the member's verification handoff metadata and reset all related `documents` review states back to `pending`, so a member no longer stays visually `verified` in the Verification queue after being moved back to pending in Youth Members
   - verification queue status computation in both `apps/backend/src/modules/admin/admin.service.ts` and `apps/backend/src/modules/digital-id/digitalId.service.ts` now recomputes from the current member status plus live document states instead of blindly trusting stale saved queue labels
@@ -647,6 +682,7 @@ The youth app already supports the main user lifecycle:
 - upload verification documents
 - view verification status
 - view digital ID state
+- request and track physical Digital ID copies for pick-up
 - view real notifications
 - browse merchants
 - earn and view points
@@ -668,6 +704,7 @@ The admin panel is already usable as an operations console for:
 - per-document review actions
 - bulk approval
 - youth profile and status management
+- physical Digital ID request review and pick-up workflow management
 - merchant approval and merchant status changes
 - digital ID generation / submission / approval / deactivation / regeneration
 - reward creation and redemption claiming

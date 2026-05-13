@@ -10,7 +10,28 @@ import PageHeader from '@/components/layout/PageHeader'
 import AlertModal from '@/components/ui/AlertModal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
 import Spinner from '@/components/ui/Spinner'
+
+const MEMBER_CONTACT_NUMBER_MAX_LENGTH = 11
+const EMERGENCY_CONTACT_PHONE_MAX_LENGTH = 11
+const PUROK_OPTIONS = [
+  'Aliw',
+  'Ausmulo',
+  'Bukid',
+  'Gitna',
+  'Ilaya',
+  'Looban',
+  'Manggahan 1',
+  'Manggahan 2',
+] as const
+
+type SaveFeedbackState = {
+  title: string
+  message: string
+  actionLabel: string
+  tone: 'success' | 'error'
+}
 
 export default function EditProfilePage() {
   const router = useRouter()
@@ -20,13 +41,19 @@ export default function EditProfilePage() {
 
   const [username, setUsername] = useState(user?.UserName || '')
   const [email, setEmail] = useState(user?.email || '')
+  const [contactNumber, setContactNumber] = useState('')
+  const [purok, setPurok] = useState('')
   const [emergencyContactName, setEmergencyContactName] = useState('')
   const [emergencyContactRelationship, setEmergencyContactRelationship] = useState('')
   const [emergencyContactPhone, setEmergencyContactPhone] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
-  const EMERGENCY_CONTACT_PHONE_MAX_LENGTH = 11
+  const [feedback, setFeedback] = useState<SaveFeedbackState | null>(null)
+  const [showContactNumberValidation, setShowContactNumberValidation] = useState(false)
+
+  const contactNumberError = showContactNumberValidation
+    ? getMemberContactNumberError(contactNumber)
+    : ''
+  const purokOptions = getPurokOptions(purok)
 
   useEffect(() => {
     if (user) {
@@ -37,6 +64,8 @@ export default function EditProfilePage() {
 
   useEffect(() => {
     if (profile) {
+      setContactNumber(normalizeMemberContactNumber(profile.contactNumber || ''))
+      setPurok(profile.purok || '')
       setEmergencyContactName(profile.digitalIdEmergencyContactName || '')
       setEmergencyContactRelationship(profile.digitalIdEmergencyContactRelationship || '')
       setEmergencyContactPhone(
@@ -56,10 +85,13 @@ export default function EditProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
+    setFeedback(null)
     setIsLoading(true)
+    setShowContactNumberValidation(true)
 
     const trimmedUsername = username.trim()
+    const trimmedContactNumber = normalizeMemberContactNumber(contactNumber)
+    const trimmedPurok = purok.trim()
     const trimmedContactName = emergencyContactName.trim()
     const trimmedContactRelationship = emergencyContactRelationship.trim()
     const trimmedContactPhone = normalizeEmergencyContactPhone(
@@ -73,8 +105,24 @@ export default function EditProfilePage() {
       trimmedContactName && trimmedContactRelationship && trimmedContactPhone
     )
 
+    if (getMemberContactNumberError(trimmedContactNumber)) {
+      setFeedback({
+        title: 'Unable to Save Changes',
+        message: 'Contact number must be 11 digits and start with 09.',
+        actionLabel: 'Review Details',
+        tone: 'error',
+      })
+      setIsLoading(false)
+      return
+    }
+
     if (hasAnyEmergencyContactField && !hasCompleteEmergencyContact) {
-      setError('Please complete all emergency contact fields or leave them all blank.')
+      setFeedback({
+        title: 'Unable to Save Changes',
+        message: 'Please complete all emergency contact fields or leave them all blank.',
+        actionLabel: 'Review Details',
+        tone: 'error',
+      })
       setIsLoading(false)
       return
     }
@@ -89,6 +137,8 @@ export default function EditProfilePage() {
       if (profile) {
         requests.push(
           updateProfiling({
+            contactNumber: trimmedContactNumber,
+            purok: trimmedPurok,
             digitalIdEmergencyContactName: trimmedContactName,
             digitalIdEmergencyContactRelationship: trimmedContactRelationship,
             digitalIdEmergencyContactPhone: trimmedContactPhone,
@@ -107,6 +157,8 @@ export default function EditProfilePage() {
       if (profile) {
         setProfile({
           ...profile,
+          contactNumber: trimmedContactNumber,
+          purok: trimmedPurok,
           digitalIdEmergencyContactName: trimmedContactName,
           digitalIdEmergencyContactRelationship: trimmedContactRelationship,
           digitalIdEmergencyContactPhone: trimmedContactPhone,
@@ -114,12 +166,30 @@ export default function EditProfilePage() {
         })
       }
 
-      setSuccess(true)
-      setTimeout(() => router.back(), 1500)
+      setFeedback({
+        title: 'Profile Updated',
+        message: 'Your profile changes have been saved successfully.',
+        actionLabel: 'Back to Profile',
+        tone: 'success',
+      })
     } catch {
-      setError('Failed to update your profile details. Please try again.')
+      setFeedback({
+        title: 'Profile Update Failed',
+        message: 'Failed to update your profile details. Please try again.',
+        actionLabel: 'Try Again',
+        tone: 'error',
+      })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleFeedbackClose = () => {
+    const shouldGoBack = feedback?.tone === 'success'
+    setFeedback(null)
+
+    if (shouldGoBack) {
+      router.back()
     }
   }
 
@@ -133,11 +203,6 @@ export default function EditProfilePage() {
     <div className="min-h-full bg-gray-50">
       <PageHeader title="Edit Profile" />
       <div className="px-5 pt-4">
-        {success && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
-            Profile updated successfully!
-          </div>
-        )}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
@@ -155,6 +220,38 @@ export default function EditProfilePage() {
               disabled
               hint="Email cannot be changed."
             />
+            <div className="rounded-2xl border border-[#d8e5f4] bg-[#f7fbff] p-4">
+              <div className="mb-3">
+                <h2 className="text-[15px] font-bold text-[#014384]">Digital ID Front Details</h2>
+                <p className="mt-1 text-sm leading-6 text-[#5c7aa3]">
+                  These details appear on the front of your Digital ID and stay synced with the superadmin preview.
+                </p>
+              </div>
+              <div className="space-y-4">
+                <Input
+                  label="Contact Number"
+                  type="tel"
+                  value={contactNumber}
+                  onChange={(e) => {
+                    setContactNumber(normalizeMemberContactNumber(e.target.value))
+                  }}
+                  onBlur={() => setShowContactNumberValidation(true)}
+                  placeholder="Example: 09171234567"
+                  inputMode="numeric"
+                  maxLength={MEMBER_CONTACT_NUMBER_MAX_LENGTH}
+                  error={contactNumberError}
+                  hint="Optional, but if you add one it must be 11 digits and start with 09."
+                />
+                <Select
+                  label="Purok / Zone"
+                  value={purok}
+                  onChange={setPurok}
+                  options={purokOptions}
+                  placeholder="Select your purok / zone"
+                  hint="Optional. This fills the Purok field below your home address."
+                />
+              </div>
+            </div>
             <div className="rounded-2xl border border-[#d8e5f4] bg-[#f7fbff] p-4">
               <div className="mb-3">
                 <h2 className="text-[15px] font-bold text-[#014384]">Digital ID Emergency Contact</h2>
@@ -205,10 +302,12 @@ export default function EditProfilePage() {
       </div>
 
       <AlertModal
-        isOpen={Boolean(error)}
-        title="Profile Update Failed"
-        message={error}
-        onClose={() => setError('')}
+        isOpen={Boolean(feedback)}
+        title={feedback?.title}
+        message={feedback?.message || ''}
+        actionLabel={feedback?.actionLabel}
+        tone={feedback?.tone}
+        onClose={handleFeedbackClose}
       />
     </div>
   )
@@ -216,4 +315,30 @@ export default function EditProfilePage() {
 
 function normalizeEmergencyContactPhone(value: string, maxLength: number) {
   return value.replace(/\D/g, '').slice(0, maxLength)
+}
+
+function normalizeMemberContactNumber(value: string) {
+  return value.replace(/\D/g, '').slice(0, MEMBER_CONTACT_NUMBER_MAX_LENGTH)
+}
+
+function getMemberContactNumberError(value: string) {
+  const trimmedValue = value.trim()
+
+  if (!trimmedValue) {
+    return ''
+  }
+
+  if (!/^09\d{9}$/.test(trimmedValue)) {
+    return 'Contact number must be 11 digits and start with 09.'
+  }
+
+  return ''
+}
+
+function getPurokOptions(currentValue: string) {
+  if (!currentValue || PUROK_OPTIONS.includes(currentValue as (typeof PUROK_OPTIONS)[number])) {
+    return [...PUROK_OPTIONS]
+  }
+
+  return [currentValue, ...PUROK_OPTIONS]
 }

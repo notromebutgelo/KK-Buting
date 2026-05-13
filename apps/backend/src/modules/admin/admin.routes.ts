@@ -37,6 +37,9 @@ import {
   regenerateDigitalIdHandler,
   getReportsHandler,
   createMerchantAccountHandler,
+  listPhysicalIdRequestsHandler,
+  getPhysicalIdRequestHandler,
+  updatePhysicalIdRequestHandler,
 } from "./admin.controller";
 import { verifyToken } from "../../middleware/verifyToken";
 import { requireRole } from "../../middleware/requireRole";
@@ -54,6 +57,7 @@ import {
   validateVerificationDocumentReviewRequest,
   validateVerificationRejectRequest,
   validateVerificationResubmissionRequest,
+  validatePhysicalIdRequestAdminUpdateRequest,
   validateYouthProfileUpdateRequest,
   validateYouthStatusRequest,
 } from "../../middleware/validateRequest";
@@ -109,6 +113,14 @@ router.post("/digital-ids/:userId/submit", ...adminOrSuperadmin, submitDigitalId
 router.post("/digital-ids/:userId/approve", ...superadminOnly, approveDigitalIdHandler);
 router.patch("/digital-ids/:userId/deactivate", ...superadminOnly, validateRequest(validateDigitalIdDeactivationRequest), deactivateDigitalIdHandler);
 router.post("/digital-ids/:userId/regenerate", ...superadminOnly, regenerateDigitalIdHandler);
+router.get("/physical-id-requests", ...adminOrSuperadmin, listPhysicalIdRequestsHandler);
+router.get("/physical-id-requests/:requestId", ...adminOrSuperadmin, getPhysicalIdRequestHandler);
+router.patch(
+  "/physical-id-requests/:requestId",
+  ...adminOrSuperadmin,
+  validateRequest(validatePhysicalIdRequestAdminUpdateRequest),
+  updatePhysicalIdRequestHandler
+);
 router.get("/reports", ...adminOrSuperadmin, getReportsHandler);
 
 export default router;

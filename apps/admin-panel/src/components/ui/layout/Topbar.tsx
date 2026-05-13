@@ -27,6 +27,7 @@ const NAV_META: Record<string, { label: string; why: string }> = {
   '/dashboard': { label: 'Dashboard', why: 'System pulse and daily highlights.' },
   '/verification': { label: 'Verification', why: 'Approve credentials and documents.' },
   '/youth': { label: 'Youth Members', why: 'Review registrations and member profiles.' },
+  '/physical-id-requests': { label: 'Physical ID Requests', why: 'Manage physical Digital ID copy requests and pick-up workflow.' },
   '/merchants': { label: 'Merchants', why: 'Manage partner merchant accounts.' },
   '/points-transactions': { label: 'Points & Transactions', why: 'Monitor operational metrics and trends.' },
   '/reports': { label: 'Reports', why: 'Analytics and membership reports.' },
@@ -229,13 +230,13 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
   return (
     <>
       <header
-        className="sticky top-0 z-30 border-b px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8"
+        className="sticky top-0 z-30 border-b px-4 py-3.5 backdrop-blur-xl sm:px-6 lg:px-8"
         style={{
-          background: 'color-mix(in srgb, var(--bg) 82%, transparent)',
+          background: 'var(--card-solid)',
           borderColor: 'var(--stroke)',
         }}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+        <div className="mx-auto flex min-h-[78px] max-w-[1680px] items-center justify-between gap-4">
           {/* Left: hamburger + page title */}
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -263,7 +264,7 @@ export default function Topbar({ onCommandOpen, onMobileNavOpen }: TopbarProps) 
             <button
               type="button"
               onClick={onCommandOpen}
-              className="hidden h-10 min-w-48 items-center justify-between gap-3 rounded-xl border px-3 text-left text-xs transition-colors hover:bg-[color:var(--accent-soft)] md:flex"
+              className="hidden h-11 min-w-[270px] items-center justify-between gap-3 rounded-xl border px-3.5 text-left text-xs transition-colors hover:bg-[color:var(--accent-soft)] md:flex"
               style={{ borderColor: 'var(--stroke)', color: 'var(--muted)', background: 'var(--card)' }}
             >
               <span className="flex items-center gap-2">

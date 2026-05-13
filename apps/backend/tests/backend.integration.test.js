@@ -67,6 +67,20 @@ async function loadAdminService(db) {
   });
 }
 
+async function loadPhysicalIdRequestsService(db) {
+  return loadDistModuleWithMocks(
+    "dist/src/modules/physical-id-requests/physicalIdRequests.service",
+    {
+      "dist/src/config/firebase": createFirebaseConfigMock(db),
+      "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+      "dist/src/modules/notifications/notifications.service": {
+        createNotification: async () => undefined,
+        createNotificationsForRoles: async () => undefined,
+      },
+    }
+  );
+}
+
 const tests = [
   {
     name: "notifications integration writes, lists, and marks records as read in fake Firestore",
@@ -383,6 +397,68 @@ const tests = [
         queue.profiles[0].requiredDocuments.map((document) => document.reviewStatus),
         ["pending", "pending", "pending"]
       );
+    },
+  },
+  {
+    name: "physical ID requests created by youth remain visible in the admin queue when default all-filters are used",
+    async run() {
+      const db = new FakeFirestore({
+        kkProfiling: {
+          "youth-1": {
+            firstName: "Jerome Angelo",
+            lastName: "Alison",
+            barangay: "Bagong Ilog",
+            purok: "Ilaya",
+            status: "verified",
+            verified: true,
+            digitalIdStatus: "active",
+            digitalIdGeneratedAt: "2026-05-10T02:00:00.000Z",
+            digitalIdApprovedAt: "2026-05-10T02:10:00.000Z",
+            idNumber: "KKB-2026-JG22",
+          },
+        },
+        users: {
+          "youth-1": {
+            UserName: "Jerome Angelo Dela Cruz Alison",
+            email: "jerome@example.com",
+          },
+        },
+      });
+
+      const physicalIdRequestsService = await loadPhysicalIdRequestsService(db);
+
+      const created = await physicalIdRequestsService.createPhysicalIdRequest("youth-1", {
+        reason: "My current Digital ID is damaged.",
+        contactNumber: "09123456789",
+        notes: "Requesting one replacement copy for pick-up.",
+      });
+
+      assert.equal(created.status, "pending");
+      assert.equal(created.purok, "Ilaya");
+      assert.equal(db.listDocData("physicalIdRequests").length, 1);
+
+      const queue = await physicalIdRequestsService.listPhysicalIdRequestsForAdmin({
+        status: "all",
+        purok: "all",
+        page: 1,
+        pageSize: 10,
+      });
+
+      assert.equal(queue.requests.length, 1);
+      assert.equal(queue.summary.total, 1);
+      assert.equal(queue.summary.pending, 1);
+      assert.equal(queue.requests[0].id, created.id);
+      assert.equal(queue.requests[0].purok, "Ilaya");
+      assert.deepEqual(queue.filters.purokOptions, ["Ilaya"]);
+
+      const filteredQueue = await physicalIdRequestsService.listPhysicalIdRequestsForAdmin({
+        status: "all",
+        purok: "Ilaya",
+        page: 1,
+        pageSize: 10,
+      });
+
+      assert.equal(filteredQueue.requests.length, 1);
     },
   },
   {

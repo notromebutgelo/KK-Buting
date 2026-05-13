@@ -52,6 +52,8 @@ export type ProfilingDraft = {
   civilStatus?: string;
   religiousAffiliation?: string;
   currentAddressBarangay?: string;
+  purok?: string;
+  contactNumber?: string;
   currentAddressStreetAddress?: string;
   currentAddressHouseBlockUnitNumber?: string;
   currentAddressSameAsPermanent?: string;
@@ -894,6 +896,14 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             placeholder: "Piliin ang barangay kung saan ka kasalukuyang nakatira.",
           },
           {
+            key: "purok",
+            label: "Purok / Zone",
+            type: "text",
+            placeholder: "Example: Purok 1 or Zone 4",
+            helperText:
+              "Optional ito, pero ito ang ipapakita sa front ng iyong Digital ID kapag nilagyan mo.",
+          },
+          {
             key: "currentAddressHouseBlockUnitNumber",
             label:
               "Current Address — House/Block/Unit Number (Number ng kasalukuyang tirahan)",
@@ -906,6 +916,16 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             type: "text",
             required: true,
             placeholder: "Example: Alcalde Jose St.",
+          },
+          {
+            key: "contactNumber",
+            label: "Contact Number",
+            type: "text",
+            placeholder: "Example: 09171234567",
+            inputType: "tel",
+            inputMode: "tel",
+            helperText:
+              "Optional ito, pero ito ang gagamitin sa Contact No. field ng iyong Digital ID.",
           },
           {
             key: "currentAddressSameAsPermanent",
@@ -2084,7 +2104,7 @@ export function buildProfilingPayload(draft: ProfilingDraft) {
     age: Number.isNaN(age) ? null : age,
     birthday,
     email: "",
-    contactNumber: "",
+    contactNumber: normalizeProfileContactNumber(profileDraft.contactNumber),
     digitalIdEmergencyContactName: "",
     digitalIdEmergencyContactRelationship: "",
     digitalIdEmergencyContactPhone: "",
@@ -2092,7 +2112,7 @@ export function buildProfilingPayload(draft: ProfilingDraft) {
     province: "Metro Manila",
     city: "Pasig City",
     barangay: currentBarangay,
-    purok: "",
+    purok: String(profileDraft.purok || "").trim(),
     civilStatus: profileDraft.civilStatus || "",
     youthAgeGroup,
     educationalBackground: profileDraft.highestEducationalAttainment || "",
@@ -2130,4 +2150,10 @@ export function formatFieldValueForReview(
   }
 
   return String(value || "");
+}
+
+function normalizeProfileContactNumber(value: string | undefined) {
+  return String(value || "")
+    .replace(/[^\d+()\-\s]/g, "")
+    .trim();
 }

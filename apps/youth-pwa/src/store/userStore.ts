@@ -16,6 +16,8 @@ export interface UserProfile {
   digitalIdEmergencyContactPhone?: string
   digitalIdEmergencyContactComplete?: boolean
   digitalIdStatus?: 'draft' | 'pending_approval' | 'active' | 'deactivated' | string | null
+  digitalIdGeneratedAt?: string | null
+  digitalIdApprovedAt?: string | null
   digitalIdSignatureUrl?: string | null
   digitalIdSignatureSignedAt?: string | null
   digitalIdSignatureComplete?: boolean

@@ -29,9 +29,9 @@ const noticeStyles: Record<NoticeTone, { background: string; border: string; col
 }
 
 const surfaceStyles: Record<SurfaceTone, string> = {
-  default: 'var(--card)',
-  soft: 'color-mix(in srgb, var(--accent-soft) 68%, var(--card-solid) 32%)',
-  neutral: 'color-mix(in srgb, var(--surface-muted) 82%, var(--card-solid) 18%)',
+  default: 'var(--card-solid)',
+  soft: 'color-mix(in srgb, var(--card-solid) 95%, var(--accent-soft) 5%)',
+  neutral: 'color-mix(in srgb, var(--card-solid) 95%, var(--surface-muted) 5%)',
 }
 
 export function AdminPageIntro({
@@ -147,7 +147,6 @@ export function AdminSurface({
       style={{
         background: surfaceStyles[tone],
         borderColor: 'var(--stroke)',
-        backdropFilter: 'blur(18px)',
       }}
     >
       {children}
@@ -252,7 +251,10 @@ export function AdminTableShell({
   minWidth?: string
 }) {
   return (
-    <div className="overflow-hidden rounded-[var(--radius-md)] border" style={{ borderColor: 'var(--stroke)' }}>
+    <div
+      className="overflow-hidden rounded-[var(--radius-md)] border"
+      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+    >
       <div className="overflow-x-auto">
         <div style={minWidth ? { minWidth } : undefined}>{children}</div>
       </div>
