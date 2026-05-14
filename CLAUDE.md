@@ -1,6 +1,6 @@
 # KK System Overview
 
-Last updated: 2026-05-13
+Last updated: 2026-05-15
 
 ## What This Repository Is
 
@@ -70,6 +70,7 @@ The backend uses Firestore as the main system of record. Key collections inferre
 - `rewards`
 - `points`
 - `transactions`
+- `usedQrTokens`
 - `notifications`
 - `settings`
 
@@ -173,6 +174,15 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- the merchant app QR transaction flow now enforces amount-first scanning and backend one-time-use QR redemption
+  - `apps/merchant-app/src/screens/scanner/ScanScreen.tsx` now requires the merchant to enter a valid purchase amount before the QR camera session can be opened, so the scanner is no longer initialized while key transaction details are still blank
+  - the same screen now treats scanning as a deliberate session: merchants can open, close, or fully reset the scanner, while successful scans clear the active session and amount to prevent accidental carry-over into the next transaction
+  - camera scans continue to use ref-based debounce and ignored-token guards so the same QR does not retrigger repeatedly while it remains in frame, and duplicate/validation notices now route through the shared `ScannerNoticeModal` instead of fragile native alert loops
+  - manual token validation is now gated by the same valid-amount requirement as live camera scans, which keeps the QR and manual fallback flows aligned around the same transaction rules
+  - `apps/backend/src/modules/qr/qr.service.ts` now records successful merchant QR redemptions in a dedicated Firestore `usedQrTokens` collection inside the same transaction that awards points and writes transaction history
+  - that backend one-time-use claim means a scanned QR token becomes invalid immediately after one successful redemption, even if the same token is submitted again rapidly or from another device/session before the frontend finishes updating
+  - duplicate reuse now returns a clear handled error telling the merchant to ask the youth user to refresh or generate a new QR code, while failed or canceled scan flows still return to a clean scanner state instead of the earlier black-screen / repeated-OK behavior
+  - backend coverage now includes duplicate-token route/service/integration cases for the one-time-use QR rule
 - the youth home promo surface and the superadmin verification queue were refined around real live data plus a denser review workspace
   - the youth PWA home page at `apps/youth-pwa/src/app/(main)/home/page.tsx` now reads its rotating promotions card from the real `/api/promotions` source through `apps/youth-pwa/src/services/promotions.service.ts` instead of trying to infer promo data from the merchant-directory payload
   - that means the home promo card now reflects the approved active promotions already managed in the backend promotions module, while still falling back to the themed static empty state when no active promotions exist
@@ -436,6 +446,10 @@ The current live points default in code is now:
   - this specifically fixes the unreadable light cards seen on the dark-mode verification detail page while keeping the same status language visible for both admin and superadmin roles
   - the same shared admin theme file now also provides contrast-safe action-button variants for outline, primary, neutral, success, and danger actions, and the verification detail page now uses those buttons for document review, resubmission, referral, reminder, Digital ID workspace navigation, and submission rejection so dark-mode disabled states no longer wash out labels like `Send Reminder to Superadmin`
   - the neutral button variant now uses a dedicated navy control color instead of inheriting the theme text token, and the reminder / issuance metadata cards now use the shared info-tone surface, which fixes the case where the dark-mode `Send Reminder to Superadmin` button and its surrounding summary card still looked washed out or nearly the same color as the page
+- admin-panel dark mode readability was then hardened more broadly across both admin and superadmin tabs
+  - the shared admin theme in `apps/admin-panel/src/app/globals.css` now also remaps legacy white/gray utility surfaces and text colors into the dark palette, which helps older cards and tables remain readable even when they still use light-mode utility classes
+  - superadmin Dashboard, Verification, Digital IDs, Physical ID Requests, Merchants, Promotions, and Reports now swap their remaining hardcoded light card surfaces over to theme-aware dark surfaces instead of leaving white cards with low-contrast text in dark mode
+  - a few older shared admin widgets such as `YouthTable`, `IDGenerator`, and `MerchantApproval` were also updated so their search inputs, table shells, and detail cards stay readable for both admin and superadmin accounts after toggling dark mode
 - the shared admin loading modal is now more readable and visually aligned with the blue-gold system
   - `apps/admin-panel/src/components/ui/LoadingModal.tsx` now uses a stronger themed overlay, a polished card background, darker title/body contrast, roomier spacing, and a clearer loading hierarchy instead of the earlier washed-out white modal with barely visible helper text
   - the modal continues to power shared admin and superadmin loading states such as dashboard navigation, member updates, merchant creation, and verification actions, so this polish now carries across those flows without per-page overrides

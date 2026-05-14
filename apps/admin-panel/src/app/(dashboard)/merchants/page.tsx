@@ -1704,8 +1704,8 @@ function MerchantMetricCard({
 
   return (
     <div
-      className="min-h-[136px] rounded-[20px] border bg-white px-6 py-5 shadow-[var(--shadow-sm)]"
-      style={{ borderColor: 'var(--stroke)' }}
+      className="min-h-[136px] rounded-[20px] border px-6 py-5 shadow-[var(--shadow-sm)]"
+      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
     >
       <div className="flex items-start gap-4">
         <div

@@ -408,6 +408,81 @@ button:disabled {
   color: rgba(239, 246, 255, 0.68);
 }
 
+.dark .bg-white {
+  background-color: var(--card-solid);
+}
+
+.dark .bg-white\/90 {
+  background-color: color-mix(in srgb, var(--card-solid) 90%, transparent);
+}
+
+.dark .bg-white\/80 {
+  background-color: color-mix(in srgb, var(--card-solid) 80%, transparent);
+}
+
+.dark .bg-gray-50 {
+  background-color: color-mix(in srgb, var(--surface-muted) 82%, var(--card-solid) 18%);
+}
+
+.dark .bg-gray-100 {
+  background-color: color-mix(in srgb, var(--surface-muted) 72%, var(--card-solid) 28%);
+}
+
+.dark .bg-blue-50 {
+  background-color: color-mix(in srgb, var(--info-bg) 82%, var(--card-solid) 18%);
+}
+
+.dark .bg-green-50 {
+  background-color: color-mix(in srgb, var(--success-bg) 82%, var(--card-solid) 18%);
+}
+
+.dark .bg-yellow-50 {
+  background-color: color-mix(in srgb, var(--warning-bg) 82%, var(--card-solid) 18%);
+}
+
+.dark .bg-red-50 {
+  background-color: color-mix(in srgb, var(--danger-bg) 82%, var(--card-solid) 18%);
+}
+
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: var(--stroke);
+}
+
+.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--stroke);
+}
+
+.dark .text-gray-900 {
+  color: var(--ink);
+}
+
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: var(--muted);
+}
+
+.dark .text-blue-700,
+.dark .text-blue-600 {
+  color: #bfdbfe;
+}
+
+.dark .text-green-700,
+.dark .text-green-600 {
+  color: #bbf7d0;
+}
+
+.dark .text-yellow-700 {
+  color: #fde68a;
+}
+
+.dark .text-red-700,
+.dark .text-red-600 {
+  color: #fecdd3;
+}
+
 .surface-input {
   border: 1px solid var(--stroke);
   background: color-mix(in srgb, var(--card-solid) 82%, transparent);

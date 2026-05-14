@@ -30,7 +30,10 @@ export default function IDGenerator({ userId, userName, hasDigitalId, onGenerate
   }
 
   return (
-    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+    <div
+      className="rounded-xl p-4 border shadow-sm"
+      style={{ background: 'var(--card-solid)', borderColor: 'var(--stroke)' }}
+    >
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
           <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,8 +42,8 @@ export default function IDGenerator({ userId, userName, hasDigitalId, onGenerate
           </svg>
         </div>
         <div>
-          <p className="font-semibold text-gray-900 text-sm">{userName}</p>
-          <p className="text-gray-500 text-xs">Digital ID Management</p>
+          <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{userName}</p>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Digital ID Management</p>
         </div>
       </div>
 

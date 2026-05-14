@@ -648,12 +648,16 @@ export default function VerificationPage() {
             </div>
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-[16px] border bg-white" style={{ borderColor: 'var(--stroke)' }}>
+          <div
+            className="mt-6 overflow-hidden rounded-[16px] border"
+            style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+          >
             <div className="overflow-x-auto">
               <div className="min-w-[1020px]">
                 <div
-                  className="grid items-center gap-4 bg-[#edf4ff] px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em]"
+                  className="grid items-center gap-4 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em]"
                   style={{
+                    background: 'var(--surface-muted)',
                     color: 'var(--muted)',
                     gridTemplateColumns:
                       '32px minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.55fr) minmax(0,1.8fr) 92px 72px',
@@ -680,7 +684,7 @@ export default function VerificationPage() {
                     />
                   </div>
                 ) : (
-                  <div className="bg-white">
+                  <div style={{ background: 'var(--card-solid)' }}>
                     {profiles.map((profile, index) => {
                       const isSelected = profile.userId === selectedUserId
                       return (
@@ -697,13 +701,16 @@ export default function VerificationPage() {
                           }}
                           className={`grid min-h-[88px] cursor-pointer items-center gap-4 px-4 py-4 transition-all ${
                             isSelected
-                              ? 'border border-[#3d7cff] bg-[#f9fbff] shadow-[inset_0_0_0_1px_rgba(61,124,255,0.08)]'
+                              ? 'border border-[#3d7cff] shadow-[inset_0_0_0_1px_rgba(61,124,255,0.08)]'
                               : index !== 0
                                 ? 'border-t'
                                 : ''
                           }`}
                           style={{
                             borderColor: isSelected ? '#3d7cff' : 'var(--stroke)',
+                            background: isSelected
+                              ? 'color-mix(in srgb, var(--accent-soft) 58%, var(--card-solid) 42%)'
+                              : 'var(--card-solid)',
                             gridTemplateColumns:
                               '32px minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.55fr) minmax(0,1.8fr) 92px 72px',
                           }}
@@ -711,8 +718,9 @@ export default function VerificationPage() {
                           <div className="flex items-center justify-center">
                             <span
                               className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-                                isSelected ? 'border-[#2563eb] bg-[#2563eb]' : 'border-[#cad5e5] bg-white'
+                                isSelected ? 'border-[#2563eb] bg-[#2563eb]' : 'border-[#cad5e5]'
                               }`}
+                              style={!isSelected ? { background: 'var(--card-solid)' } : undefined}
                             >
                               {isSelected ? (
                                 <CheckCircle2 className="h-3.5 w-3.5 text-white" strokeWidth={2.4} />
@@ -721,7 +729,10 @@ export default function VerificationPage() {
                           </div>
 
                           <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#edf4ff]">
+                            <div
+                              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full"
+                              style={{ background: 'var(--accent-soft)' }}
+                            >
                               {profile.idPhotoUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -797,8 +808,8 @@ export default function VerificationPage() {
                                 event.stopPropagation()
                                 setSelectedUserId(profile.userId)
                               }}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[#f8fbff]"
-                              style={{ borderColor: 'var(--stroke)' }}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[color:var(--surface-muted)]"
+                              style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
                             >
                               <Eye className="h-4.5 w-4.5" strokeWidth={2.1} />
                             </button>
@@ -841,7 +852,11 @@ export default function VerificationPage() {
                     style={
                       active
                         ? { background: 'var(--accent)', color: '#ffffff' }
-                        : { border: '1px solid var(--stroke)', color: 'var(--ink-soft)', background: '#ffffff' }
+                        : {
+                            border: '1px solid var(--stroke)',
+                            color: 'var(--ink-soft)',
+                            background: 'var(--card-solid)',
+                          }
                     }
                   >
                     {pageNumber}
@@ -918,9 +933,15 @@ export default function VerificationPage() {
             </div>
           ) : (
             <div className="mt-5 space-y-5">
-              <div className="rounded-[18px] border bg-white px-5 py-4" style={{ borderColor: 'var(--stroke)' }}>
+              <div
+                className="rounded-[18px] border px-5 py-4"
+                style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+              >
                 <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#edf4ff]">
+                  <div
+                    className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full"
+                    style={{ background: 'var(--accent-soft)' }}
+                  >
                     {selectedProfile.idPhotoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -978,14 +999,17 @@ export default function VerificationPage() {
                 {visibleDocuments.map((document) => (
                   <div
                     key={document.id}
-                    className="grid min-h-[72px] grid-cols-[72px_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[16px] border bg-white px-3 py-3"
-                    style={{ borderColor: 'var(--stroke)' }}
+                    className="grid min-h-[72px] grid-cols-[72px_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[16px] border px-3 py-3"
+                    style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
                   >
                     <button
                       type="button"
                       onClick={() => handlePreviewDocument(document.fileUrl)}
-                      className="flex h-[56px] w-[72px] items-center justify-center overflow-hidden rounded-[12px] border bg-[#f8fbff]"
-                      style={{ borderColor: 'var(--stroke)' }}
+                      className="flex h-[56px] w-[72px] items-center justify-center overflow-hidden rounded-[12px] border"
+                      style={{
+                        borderColor: 'var(--stroke)',
+                        background: 'color-mix(in srgb, var(--surface-muted) 82%, transparent)',
+                      }}
                     >
                       {document.fileUrl && isImageDocument(document.fileUrl) ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -1018,8 +1042,8 @@ export default function VerificationPage() {
                     <button
                       type="button"
                       onClick={() => handlePreviewDocument(document.fileUrl)}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[#f8fbff]"
-                      style={{ borderColor: 'var(--stroke)' }}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[color:var(--surface-muted)]"
+                      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
                     >
                       <Eye className="h-4.5 w-4.5" strokeWidth={2.1} />
                     </button>
@@ -1027,12 +1051,21 @@ export default function VerificationPage() {
                 ))}
               </div>
 
-              <div className="rounded-[16px] border bg-[#f8fbff] px-4 py-4" style={{ borderColor: 'var(--stroke)' }}>
+              <div
+                className="rounded-[16px] border px-4 py-4"
+                style={{
+                  borderColor: 'var(--stroke)',
+                  background: 'color-mix(in srgb, var(--surface-muted) 82%, transparent)',
+                }}
+              >
                 <h3 className="text-base font-black" style={{ color: 'var(--ink)' }}>
                   Admin Verification Summary
                 </h3>
                 <div className="mt-3 flex items-start gap-3">
-                  <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#ebf8f0] text-[#16a34a]">
+                  <span
+                    className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-[#16a34a]"
+                    style={{ background: 'color-mix(in srgb, var(--success-bg) 88%, transparent)' }}
+                  >
                     <CheckCircle2 className="h-4 w-4" strokeWidth={2.1} />
                   </span>
                   <div className="min-w-0 flex-1 text-sm leading-6" style={{ color: 'var(--muted)' }}>
@@ -1056,8 +1089,11 @@ export default function VerificationPage() {
                   Superadmin Action
                 </h3>
                 <div
-                  className="mt-3 rounded-[16px] border bg-white px-4 py-3"
-                  style={{ borderColor: selectedAction ? '#3d7cff' : 'var(--stroke)' }}
+                  className="mt-3 rounded-[16px] border px-4 py-3"
+                  style={{
+                    borderColor: selectedAction ? '#3d7cff' : 'var(--stroke)',
+                    background: 'var(--card-solid)',
+                  }}
                 >
                   <div className="space-y-3">
                     {actionOptions.map((option) => (
@@ -1205,8 +1241,8 @@ function VerificationMetricCard({
 
   return (
     <div
-      className="min-h-[118px] rounded-[18px] border bg-white px-6 py-5 shadow-[0_10px_28px_rgba(15,76,151,0.05)]"
-      style={{ borderColor: 'var(--stroke)' }}
+      className="min-h-[118px] rounded-[18px] border px-6 py-5 shadow-[0_10px_28px_rgba(15,76,151,0.05)]"
+      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
     >
       <div className="flex items-start gap-4">
         <div

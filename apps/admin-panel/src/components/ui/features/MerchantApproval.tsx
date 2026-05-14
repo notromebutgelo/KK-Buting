@@ -36,7 +36,10 @@ export default function MerchantApproval({ merchant, onStatusChange }: MerchantA
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+    <div
+      className="rounded-xl border shadow-sm overflow-hidden"
+      style={{ background: 'var(--card-solid)', borderColor: 'var(--stroke)' }}
+    >
       {merchant.imageUrl && (
         <div className="relative h-36">
           <Image src={merchant.imageUrl} alt={merchant.name} fill className="object-cover" />
@@ -44,7 +47,7 @@ export default function MerchantApproval({ merchant, onStatusChange }: MerchantA
       )}
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="font-bold text-gray-900">{merchant.name}</h3>
+          <h3 className="font-bold" style={{ color: 'var(--ink)' }}>{merchant.name}</h3>
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
             merchant.status === 'approved' ? 'bg-green-100 text-green-700' :
             merchant.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
@@ -53,10 +56,10 @@ export default function MerchantApproval({ merchant, onStatusChange }: MerchantA
             {merchant.status}
           </span>
         </div>
-        <p className="text-gray-500 text-sm mb-1">{merchant.category}</p>
-        <p className="text-gray-600 text-sm line-clamp-2">{merchant.description}</p>
+        <p className="text-sm mb-1" style={{ color: 'var(--muted)' }}>{merchant.category}</p>
+        <p className="text-sm line-clamp-2" style={{ color: 'var(--ink-soft)' }}>{merchant.description}</p>
         {merchant.address && (
-          <p className="text-gray-400 text-xs mt-1">{merchant.address}</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{merchant.address}</p>
         )}
 
         {message && (

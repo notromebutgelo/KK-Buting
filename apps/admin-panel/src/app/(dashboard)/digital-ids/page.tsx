@@ -440,7 +440,10 @@ export default function DigitalIdsPage() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[var(--radius-lg)] border bg-white shadow-[var(--shadow-sm)]" style={{ borderColor: 'var(--stroke)' }}>
+          <div
+            className="overflow-hidden rounded-[var(--radius-lg)] border shadow-[var(--shadow-sm)]"
+            style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+          >
             {isLoading ? (
               <div className="flex justify-center py-20">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
@@ -521,8 +524,12 @@ export default function DigitalIdsPage() {
                                     e.stopPropagation()
                                     setSelectedMemberId(member.uid)
                                   }}
-                                  className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold transition hover:bg-[color:var(--surface-muted)]"
-                                  style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
+                                  className="rounded-xl border px-4 py-2 text-sm font-semibold transition hover:bg-[color:var(--surface-muted)]"
+                                  style={{
+                                    borderColor: 'var(--stroke)',
+                                    color: 'var(--accent-strong)',
+                                    background: 'var(--card-solid)',
+                                  }}
                                 >
                                   View ID
                                 </button>
@@ -532,8 +539,12 @@ export default function DigitalIdsPage() {
                                     e.stopPropagation()
                                     setSelectedMemberId(member.uid)
                                   }}
-                                  className="rounded-xl border bg-white p-2 transition hover:bg-[color:var(--surface-muted)]"
-                                  style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
+                                  className="rounded-xl border p-2 transition hover:bg-[color:var(--surface-muted)]"
+                                  style={{
+                                    borderColor: 'var(--stroke)',
+                                    color: 'var(--accent-strong)',
+                                    background: 'var(--card-solid)',
+                                  }}
                                   aria-label="Open ID details"
                                 >
                                   <MoreVertical className="h-4 w-4" />
@@ -651,7 +662,14 @@ export default function DigitalIdsPage() {
                   </div>
                 ) : null}
 
-                <div className="rounded-2xl border bg-white p-4 text-sm shadow-[var(--shadow-sm)]" style={{ color: 'var(--ink)', borderColor: 'var(--stroke)' }}>
+                <div
+                  className="rounded-2xl border p-4 text-sm shadow-[var(--shadow-sm)]"
+                  style={{
+                    color: 'var(--ink)',
+                    borderColor: 'var(--stroke)',
+                    background: 'var(--card-solid)',
+                  }}
+                >
                   <div className="grid gap-3">
                     <DetailRow label="ID Number" value={selectedMember.memberId || selectedMember.profile?.idNumber || 'Not generated'} />
                     <DetailRow label="Status" value={prettifyStatus(selectedMember.digitalIdStatus)} />
@@ -700,8 +718,8 @@ function SummaryTile({
 
   return (
     <div
-      className="h-full min-h-[126px] rounded-[24px] border bg-white px-5 py-5 shadow-[var(--shadow-sm)]"
-      style={{ borderColor: 'var(--stroke)' }}
+      className="h-full min-h-[126px] rounded-[24px] border px-5 py-5 shadow-[var(--shadow-sm)]"
+      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
     >
       <div className="flex items-start gap-4">
         <div

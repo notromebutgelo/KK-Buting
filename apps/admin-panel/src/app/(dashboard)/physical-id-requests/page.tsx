@@ -1301,9 +1301,10 @@ function MetricCard({
 
   return (
     <div
-      className="rounded-[24px] border bg-white px-4 py-4 shadow-[var(--shadow-sm)]"
+      className="rounded-[24px] border px-4 py-4 shadow-[var(--shadow-sm)]"
       style={{
         borderColor: 'var(--stroke)',
+        background: 'var(--card-solid)',
       }}
     >
       <div className="flex items-start gap-3">

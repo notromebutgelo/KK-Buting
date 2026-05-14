@@ -129,6 +129,14 @@ const tests = [
           generateUserQr: async () => "token",
           processQrScan: async () => ({}),
           processQrRedeem: async (token, uid, amountSpent) => {
+            if (token === "duplicate-token") {
+              const error = new Error(
+                "This QR code has already been used. Please ask the user to refresh or generate a new QR code."
+              );
+              error.status = 409;
+              throw error;
+            }
+
             calls.push({ token, uid, amountSpent });
             return {
               userId: "youth-1",
@@ -189,6 +197,22 @@ const tests = [
           amountSpent: 95,
           pointsRate: 10,
           pointsAwarded: 9,
+        });
+
+        const duplicate = await requestJson(baseUrl, "/redeem", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "merchant",
+            "x-test-uid": "merchant-owner-1",
+          },
+          body: { token: "duplicate-token", amountSpent: 95 },
+        });
+
+        assert.equal(duplicate.status, 409);
+        assert.deepEqual(duplicate.body, {
+          error:
+            "This QR code has already been used. Please ask the user to refresh or generate a new QR code.",
         });
       });
 

@@ -26,7 +26,8 @@ export async function scanQr(req: AuthRequest, res: Response) {
     const result = await processQrScan(token, req.user!.uid, amountSpent);
     return res.json(result);
   } catch (err: any) {
-    return res.status(400).json({ error: err.message });
+    const statusCode = Number(err?.status || err?.statusCode || 400);
+    return res.status(statusCode).json({ error: err.message });
   }
 }
 
@@ -43,6 +44,7 @@ export async function redeemQr(req: AuthRequest, res: Response) {
     const result = await processQrRedeem(token, req.user!.uid, amountSpent);
     return res.json(result);
   } catch (err: any) {
-    return res.status(400).json({ error: err.message });
+    const statusCode = Number(err?.status || err?.statusCode || 400);
+    return res.status(statusCode).json({ error: err.message });
   }
 }

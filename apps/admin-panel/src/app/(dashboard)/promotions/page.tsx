@@ -382,8 +382,8 @@ export default function PromotionsPage() {
                   'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition',
                   active ? 'shadow-[0_8px_24px_rgba(15,76,151,0.14)]' : ''
                 )}
-                style={{
-                  background: active ? 'var(--accent)' : '#ffffff',
+              style={{
+                  background: active ? 'var(--accent)' : 'var(--card-solid)',
                   borderColor: active ? 'var(--accent)' : 'var(--stroke)',
                   color: active ? '#ffffff' : 'var(--ink-soft)',
                 }}
@@ -839,8 +839,8 @@ function ActionIconButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border bg-white text-[#0f4c97] shadow-[0_2px_12px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fbff]"
-      style={{ borderColor: 'var(--stroke)' }}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border text-[#0f4c97] shadow-[0_2px_12px_rgba(15,23,42,0.04)] transition hover:bg-[color:var(--surface-muted)]"
+      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
     >
       {icon}
     </button>
@@ -858,8 +858,8 @@ function PagerButton({
     <button
       type="button"
       disabled={disabled}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border bg-white text-[#0f4c97] transition disabled:cursor-not-allowed disabled:opacity-45"
-      style={{ borderColor: 'var(--stroke)' }}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border text-[#0f4c97] transition disabled:cursor-not-allowed disabled:opacity-45"
+      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
     >
       {children}
     </button>
@@ -880,7 +880,7 @@ function PagerNumber({
       style={
         active
           ? { background: 'var(--accent)', color: '#ffffff' }
-          : { background: '#ffffff', color: 'var(--ink-soft)', border: '1px solid var(--stroke)' }
+          : { background: 'var(--card-solid)', color: 'var(--ink-soft)', border: '1px solid var(--stroke)' }
       }
     >
       {children}
@@ -916,8 +916,8 @@ function PromotionReviewModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.44)] p-6 backdrop-blur-sm">
       <div
-        className="w-full max-w-[680px] rounded-[22px] border bg-white shadow-[0_24px_72px_rgba(15,23,42,0.18)]"
-        style={{ borderColor: 'var(--stroke)' }}
+        className="w-full max-w-[680px] rounded-[22px] border shadow-[0_24px_72px_rgba(15,23,42,0.18)]"
+        style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
       >
         <div className="flex items-start justify-between gap-4 border-b px-6 py-5" style={{ borderColor: 'var(--stroke)' }}>
           <div>
@@ -935,7 +935,7 @@ function PromotionReviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#0f4c97] transition hover:bg-[#eff4fb]"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#0f4c97] transition hover:bg-[color:var(--surface-muted)]"
           >
             <X className="h-4.5 w-4.5" strokeWidth={2.2} />
           </button>
@@ -946,7 +946,13 @@ function PromotionReviewModal({
             <div className="flex items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,#edf4ff_0%,#dfe9fb_100%)] p-4">
               <Sparkles className="h-10 w-10 text-[#0f4c97]" strokeWidth={2} />
             </div>
-            <div className="rounded-[18px] border bg-[#fbfdff] px-4 py-4" style={{ borderColor: 'var(--stroke)' }}>
+            <div
+              className="rounded-[18px] border px-4 py-4"
+              style={{
+                borderColor: 'var(--stroke)',
+                background: 'color-mix(in srgb, var(--surface-muted) 78%, transparent)',
+              }}
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-lg font-black tracking-[-0.03em]" style={{ color: 'var(--ink)' }}>
                   {merchantName}
@@ -1061,7 +1067,13 @@ function PromotionReviewModal({
 
 function DetailTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[16px] border bg-[#fbfdff] px-4 py-4" style={{ borderColor: 'var(--stroke)' }}>
+    <div
+      className="rounded-[16px] border px-4 py-4"
+      style={{
+        borderColor: 'var(--stroke)',
+        background: 'color-mix(in srgb, var(--surface-muted) 78%, transparent)',
+      }}
+    >
       <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
         {label}
       </p>

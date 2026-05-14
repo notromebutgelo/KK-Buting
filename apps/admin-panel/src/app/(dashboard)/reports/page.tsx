@@ -778,8 +778,8 @@ export default function ReportsPage() {
             <button
               type="button"
               onClick={() => void loadReports()}
-              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold"
-              style={{ color: '#b91c1c' }}
+              className="rounded-xl px-4 py-2 text-sm font-semibold"
+              style={{ color: '#b91c1c', background: 'var(--card-solid)' }}
             >
               Retry
             </button>
@@ -1283,9 +1283,10 @@ function ReportKpiCard({
 }) {
   return (
     <section
-      className="min-h-[140px] overflow-hidden rounded-[20px] border bg-white px-5 py-5 shadow-[var(--shadow-sm)]"
+      className="min-h-[140px] overflow-hidden rounded-[20px] border px-5 py-5 shadow-[var(--shadow-sm)]"
       style={{
         borderColor: 'var(--stroke)',
+        background: 'var(--card-solid)',
       }}
     >
       <div className="flex items-start gap-4">

@@ -275,6 +275,72 @@ const tests = [
     },
   },
   {
+    name: "QR integration prevents redeeming the same token twice",
+    async run() {
+      const db = new FakeFirestore({
+        merchants: {
+          "merchant-1": {
+            ownerId: "owner-1",
+            status: "approved",
+            name: "Cafe Buting",
+            businessName: "Cafe Buting",
+            pointsRate: 10,
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            digitalIdStatus: "active",
+            digitalIdRevision: 3,
+            idNumber: "KK-001",
+            firstName: "Juan",
+            lastName: "Dela Cruz",
+          },
+        },
+        users: {
+          "youth-1": {
+            UserName: "Juan Dela Cruz",
+            email: "juan@example.com",
+          },
+        },
+      });
+
+      const merchantsService = await loadMerchantsService(db);
+      const qrService = loadDistModuleWithMocks("dist/src/modules/qr/qr.service", {
+        "dist/src/config/firebase": createFirebaseConfigMock(db),
+        "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+        "dist/utils/renerateQrToken": {
+          generateQrToken: () => "generated-token",
+          verifyQrToken: () => ({
+            userId: "youth-1",
+            revision: 3,
+            timestamp: Date.now(),
+          }),
+        },
+        "dist/src/modules/points/points.service": {
+          logMerchantScanFailure: async () => undefined,
+        },
+        "dist/src/modules/merchants/merhcants.service": merchantsService,
+      });
+
+      const first = await qrService.processQrRedeem("signed-token", "owner-1", 120);
+
+      assert.equal(first.pointsAwarded, 12);
+      assert.equal(db.listDocData("usedQrTokens").length, 1);
+
+      await assert.rejects(
+        qrService.processQrRedeem("signed-token", "owner-1", 120),
+        /already been used/
+      );
+
+      const transactions = db.listDocData("transactions");
+      assert.equal(transactions.length, 1);
+
+      const pointsDoc = db.getDocData("points", "youth-1");
+      assert.equal(pointsDoc.balance, 12);
+      assert.equal(pointsDoc.earnedPoints, 12);
+    },
+  },
+  {
     name: "merchant storefront integration keeps derived image and description fields aligned",
     async run() {
       const db = new FakeFirestore({

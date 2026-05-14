@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 
 const { createDoc, loadDistModuleWithMocks } = require("./test-utils");
+const { FakeFirestore, FieldValue } = require("./fake-firestore");
 
 const tests = [
   {
@@ -188,64 +189,42 @@ const tests = [
   {
     name: "qr.service awards points for a valid merchant QR redemption",
     async run() {
-      const addPointsCalls = [];
       const failureCalls = [];
-
-      const db = {
-        collection(name) {
-          if (name === "kkProfiling") {
-            return {
-              doc(id) {
-                return {
-                  async get() {
-                    assert.equal(id, "youth-1");
-                    return {
-                      data: () => ({
-                        digitalIdStatus: "active",
-                        digitalIdRevision: 2,
-                        idNumber: "KK-001",
-                        firstName: "Juan",
-                        lastName: "Dela Cruz",
-                      }),
-                    };
-                  },
-                };
-              },
-            };
-          }
-
-          if (name === "users") {
-            return {
-              doc(id) {
-                return {
-                  async get() {
-                    assert.equal(id, "youth-1");
-                    return {
-                      data: () => ({
-                        UserName: "Juan Dela Cruz",
-                        email: "juan@example.com",
-                      }),
-                    };
-                  },
-                };
-              },
-            };
-          }
-
-          throw new Error(`Unexpected collection ${name}`);
+      const db = new FakeFirestore({
+        merchants: {
+          "merchant-1": {
+            ownerId: "owner-1",
+            status: "approved",
+            name: "Cafe Buting",
+            businessName: "Cafe Buting",
+            pointsRate: 10,
+          },
         },
-      };
+        kkProfiling: {
+          "youth-1": {
+            digitalIdStatus: "active",
+            digitalIdRevision: 2,
+            idNumber: "KK-001",
+            firstName: "Juan",
+            lastName: "Dela Cruz",
+          },
+        },
+        users: {
+          "youth-1": {
+            UserName: "Juan Dela Cruz",
+            email: "juan@example.com",
+          },
+        },
+      });
 
       const service = loadDistModuleWithMocks("dist/src/modules/qr/qr.service", {
         "dist/src/config/firebase": { db },
+        "module:firebase-admin/firestore": { FieldValue },
         "dist/utils/renerateQrToken": {
           generateQrToken: () => "generated-token",
           verifyQrToken: () => ({ userId: "youth-1", revision: 2, timestamp: Date.now() }),
         },
         "dist/src/modules/points/points.service": {
-          addPoints: async (...args) => {
-            addPointsCalls.push(args);
-          },
           logMerchantScanFailure: async (...args) => {
             failureCalls.push(args);
           },
@@ -277,20 +256,193 @@ const tests = [
         pointsAwarded: 9,
       });
 
-      assert.deepEqual(addPointsCalls, [
+      const pointsDoc = db.getDocData("points", "youth-1");
+      assert.equal(pointsDoc.balance, 9);
+      assert.equal(pointsDoc.earnedPoints, 9);
+
+      const transactions = db.listDocData("transactions");
+      assert.equal(transactions.length, 1);
+      assert.equal(transactions[0].merchantId, "merchant-1");
+      assert.equal(transactions[0].amountSpent, 95);
+
+      const usedTokens = db.listDocData("usedQrTokens");
+      assert.equal(usedTokens.length, 1);
+      assert.equal(usedTokens[0].memberId, "KK-001");
+      assert.equal(usedTokens[0].pointsAwarded, 9);
+
+      assert.equal(failureCalls.length, 0);
+    },
+  },
+  {
+    name: "qr.service rejects a QR token that has already been used",
+    async run() {
+      const failureCalls = [];
+
+      const db = {
+        collection(name) {
+          if (name === "usedQrTokens") {
+            return {
+              doc() {
+                return {
+                  async get() {
+                    return {
+                      exists: true,
+                      data: () => ({
+                        status: "used",
+                      }),
+                    };
+                  },
+                };
+              },
+            };
+          }
+
+          if (name === "kkProfiling") {
+            return {
+              doc() {
+                return {
+                  async get() {
+                    return {
+                      exists: true,
+                      data: () => ({
+                        digitalIdStatus: "active",
+                        digitalIdRevision: 2,
+                        idNumber: "KK-001",
+                        firstName: "Juan",
+                        lastName: "Dela Cruz",
+                      }),
+                    };
+                  },
+                };
+              },
+            };
+          }
+
+          if (name === "users") {
+            return {
+              doc() {
+                return {
+                  collection() {
+                    return {
+                      doc() {
+                        return {};
+                      },
+                    };
+                  },
+                  async get() {
+                    return {
+                      exists: true,
+                      data: () => ({
+                        UserName: "Juan Dela Cruz",
+                        email: "juan@example.com",
+                      }),
+                    };
+                  },
+                };
+              },
+            };
+          }
+
+          if (name === "points") {
+            return {
+              doc() {
+                return {
+                  async get() {
+                    return {
+                      exists: true,
+                      data: () => ({
+                        balance: 0,
+                        earnedPoints: 0,
+                      }),
+                    };
+                  },
+                };
+              },
+            };
+          }
+
+          if (name === "transactions") {
+            return {
+              doc() {
+                return { id: "tx-1" };
+              },
+            };
+          }
+
+          if (name === "merchants") {
+            return {
+              doc() {
+                return {
+                  collection() {
+                    return {
+                      doc() {
+                        return {};
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          }
+
+          throw new Error(`Unexpected collection ${name}`);
+        },
+        async runTransaction(handler) {
+          const tx = {
+            get: async (ref) => ref.get(),
+            set() {
+              throw new Error("No writes should happen for duplicate QR attempts");
+            },
+          };
+          return handler(tx);
+        },
+      };
+
+      const service = loadDistModuleWithMocks("dist/src/modules/qr/qr.service", {
+        "dist/src/config/firebase": { db },
+        "module:firebase-admin/firestore": {
+          FieldValue: {
+            serverTimestamp: () => "server-timestamp",
+          },
+        },
+        "dist/utils/renerateQrToken": {
+          generateQrToken: () => "generated-token",
+          verifyQrToken: () => ({ userId: "youth-1", revision: 2, timestamp: Date.now() }),
+        },
+        "dist/src/modules/points/points.service": {
+          logMerchantScanFailure: async (...args) => {
+            failureCalls.push(args);
+          },
+        },
+        "dist/src/modules/merchants/merhcants.service": {
+          getMerchantByOwnerId: async () => ({
+            id: "merchant-1",
+            name: "Cafe Buting",
+            status: "approved",
+            pointsRate: 10,
+          }),
+        },
+      });
+
+      await assert.rejects(
+        service.processQrRedeem("signed-token", "owner-1", 100),
+        (error) => {
+          assert.equal(error.message, "This QR code has already been used. Please ask the user to refresh or generate a new QR code.");
+          assert.equal(error.status, 409);
+          return true;
+        }
+      );
+
+      assert.deepEqual(failureCalls, [
         [
-          "youth-1",
-          9,
           "merchant-1",
           {
-            amountSpent: 95,
-            memberId: "KK-001",
-            transactionStatus: "success",
-            reason: "Merchant QR redeem",
+            amountSpent: 100,
+            reason: "This QR code has already been used. Please ask the user to refresh or generate a new QR code.",
+            userId: "youth-1",
           },
         ],
       ]);
-      assert.equal(failureCalls.length, 0);
     },
   },
   {

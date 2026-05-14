@@ -7,7 +7,11 @@ type ScannerNoticeModalProps = {
   title: string
   message: string
   confirmLabel?: string
+  secondaryLabel?: string
+  iconName?: React.ComponentProps<typeof MaterialCommunityIcons>['name']
+  tone?: 'warning' | 'danger' | 'info'
   onClose: () => void
+  onSecondaryAction?: () => void
 }
 
 export default function ScannerNoticeModal({
@@ -15,26 +19,61 @@ export default function ScannerNoticeModal({
   title,
   message,
   confirmLabel = 'OK',
+  secondaryLabel,
+  iconName = 'qrcode-remove',
+  tone = 'warning',
   onClose,
+  onSecondaryAction,
 }: ScannerNoticeModalProps) {
+  const palette = getPalette(tone)
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <View style={styles.iconWrap}>
-            <MaterialCommunityIcons name="qrcode-remove" size={32} color="#9c6500" />
+          <View style={[styles.iconWrap, { backgroundColor: palette.softBackground }]}>
+            <MaterialCommunityIcons name={iconName} size={32} color={palette.icon} />
           </View>
 
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
 
-          <Pressable style={styles.button} onPress={onClose}>
-            <Text style={styles.buttonText}>{confirmLabel}</Text>
-          </Pressable>
+          <View style={styles.actions}>
+            {secondaryLabel && onSecondaryAction ? (
+              <Pressable style={styles.secondaryButton} onPress={onSecondaryAction}>
+                <Text style={styles.secondaryButtonText}>{secondaryLabel}</Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable style={styles.button} onPress={onClose}>
+              <Text style={styles.buttonText}>{confirmLabel}</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
   )
+}
+
+function getPalette(tone: 'warning' | 'danger' | 'info') {
+  if (tone === 'danger') {
+    return {
+      icon: '#c2410c',
+      softBackground: '#fff1f2',
+    }
+  }
+
+  if (tone === 'info') {
+    return {
+      icon: '#014384',
+      softBackground: '#eef4fb',
+    }
+  }
+
+  return {
+    icon: '#9c6500',
+    softBackground: '#fff4d8',
+  }
 }
 
 const styles = StyleSheet.create({
@@ -77,9 +116,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
   },
-  button: {
+  actions: {
     width: '100%',
     marginTop: 6,
+    gap: 10,
+  },
+  button: {
+    width: '100%',
     borderRadius: 16,
     backgroundColor: '#014384',
     paddingVertical: 15,
@@ -87,6 +130,20 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryButton: {
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d9e4f0',
+    backgroundColor: '#ffffff',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#35506d',
     fontSize: 15,
     fontWeight: '800',
   },
