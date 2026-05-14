@@ -7,9 +7,11 @@
     "node": ">=20.19.0 <21"
   },
   "scripts": {
-    "start": "expo start --lan",
+    "start": "expo start --tunnel",
+    "start:lan": "expo start --lan",
     "start:tunnel": "expo start --tunnel",
-    "start:clear": "expo start --lan --clear",
+    "start:clear": "expo start --tunnel --clear",
+    "start:lan:clear": "expo start --lan --clear",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",

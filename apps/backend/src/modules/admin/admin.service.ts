@@ -892,6 +892,23 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
       inReview: profiles.filter((profile) => profile.queueStatus === "in_review").length,
       pendingSuperadmin: profiles.filter((profile) => profile.queueStatus === PENDING_SUPERADMIN_ID_GENERATION).length,
       resubmissionRequested: profiles.filter((profile) => profile.queueStatus === "resubmission_requested").length,
+      pendingReview: profiles.filter((profile) =>
+        ["pending", "in_review"].includes(String(profile.queueStatus || ""))
+      ).length,
+      flaggedBySystem: profiles.filter((profile) => Number(profile.documentCounts.rejected || 0) > 0).length,
+      requiringAttention: profiles.filter(
+        (profile) =>
+          profile.queueStatus === "resubmission_requested" ||
+          Number(profile.documentCounts.rejected || 0) > 0 ||
+          Number(profile.missingDocuments.length || 0) > 0
+      ).length,
+      approvedToday: profiles.filter((profile) => {
+        const approvedAt = String(profile.verificationDocumentsApprovedAt || "");
+        if (!approvedAt) return false;
+        const approvedDate = new Date(approvedAt);
+        const today = new Date();
+        return !Number.isNaN(approvedDate.getTime()) && approvedDate.toDateString() === today.toDateString();
+      }).length,
     },
   };
 }
@@ -1407,6 +1424,7 @@ export async function getMerchants(status?: string) {
       ...merchant,
       ownerEmail: owner?.email,
       ownerName: owner?.UserName,
+      contactNumber: owner?.contactNumber || owner?.phoneNumber || merchant.contactNumber || null,
       pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 10),
       dateJoined: merchant.createdAt || merchant.updatedAt || null,
     };
@@ -1431,6 +1449,7 @@ export async function getMerchantDetails(merchantId: string) {
     ...merchant,
     ownerEmail: owner?.email || merchant.ownerEmail || null,
     ownerName: owner?.UserName || merchant.ownerName || null,
+    contactNumber: owner?.contactNumber || owner?.phoneNumber || merchant.contactNumber || null,
     pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 10),
     dateJoined: merchant.createdAt || merchant.updatedAt || null,
   };

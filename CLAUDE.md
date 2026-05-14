@@ -173,6 +173,11 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- the youth home promo surface and the superadmin verification queue were refined around real live data plus a denser review workspace
+  - the youth PWA home page at `apps/youth-pwa/src/app/(main)/home/page.tsx` now reads its rotating promotions card from the real `/api/promotions` source through `apps/youth-pwa/src/services/promotions.service.ts` instead of trying to infer promo data from the merchant-directory payload
+  - that means the home promo card now reflects the approved active promotions already managed in the backend promotions module, while still falling back to the themed static empty state when no active promotions exist
+  - the superadmin verification queue at `apps/admin-panel/src/app/(dashboard)/verification/page.tsx` now uses a tighter queue-and-review layout with compact top metrics, a denser filter/search row, a selectable verification table, and a persistent right-side review panel for document inspection and next-step actions
+  - the backend verification summary payload in `apps/backend/src/modules/admin/admin.service.ts` now also returns queue-focused top-line metrics such as `pendingReview`, `flaggedBySystem`, `requiringAttention`, and `approvedToday` so the verification workspace can render those cards directly without recomputing everything client-side
 - the youth PWA, backend, and admin panel now support a dedicated Physical Digital ID copy request workflow
   - a new backend module at `apps/backend/src/modules/physical-id-requests/` now owns youth request submission/history plus admin-side request management against the Firestore `physicalIdRequests` collection
   - new youth endpoints under `/api/physical-id-requests` now let verified members with an active Digital ID submit one physical-copy request at a time and review their own request history/status
@@ -541,10 +546,11 @@ The current live points default in code is now:
   - the Expo SDK 54 Babel preset can require `react-refresh/babel` from the app-level resolution path during Metro bundling
   - in this workspace snapshot, `react-refresh` was only present under nested package trees, which could make `npx expo start` fail with `Cannot find module 'react-refresh/babel'`
   - keeping `react-refresh` explicit in merchant-app devDependencies makes the Babel dependency path less fragile during local dev
-- merchant app local start scripts now default to Expo LAN mode and expose explicit fallback scripts for tunnel / cache-reset startup
-  - `apps/merchant-app/package.json` now uses `expo start --lan` for the default start path so Expo Go is less likely to receive a localhost-only QR target that a physical phone cannot reach
-  - `npm run start:tunnel --workspace merchant-app` is now the fallback for difficult networks or machines with multiple adapters
-  - `npm run start:clear --workspace merchant-app` is now the intentional cache-reset path instead of needing to remember the full Expo CLI flags manually
+- merchant app local start scripts now default to Expo tunnel mode and keep explicit LAN fallbacks for faster same-network sessions
+  - `apps/merchant-app/package.json` now uses `expo start --tunnel` for the default start path because Expo Go on physical Android devices can otherwise fail with `Failed to download remote update` when LAN discovery or device-to-computer reachability is unreliable
+  - `npm run start:lan --workspace merchant-app` is the opt-in faster path for same-Wi-Fi development when the phone can reliably reach the Metro server over LAN
+  - `npm run start:tunnel --workspace merchant-app` remains available as the explicit tunnel command
+  - `npm run start:clear --workspace merchant-app` now clears cache while staying on tunnel, and `npm run start:lan:clear --workspace merchant-app` is available for LAN-specific cache-reset troubleshooting
 - the merchant QR scanner now guards same-session duplicate scans more cleanly in the Expo app
   - `apps/merchant-app/src/screens/scanner/ScanScreen.tsx` now uses a ref-based scan lock in addition to React state so one camera read cannot stack repeated scan actions before the UI finishes responding
   - the scanner now remembers the most recently handled QR token for the current scan session and blocks immediate repeat scans of that exact same code unless the merchant intentionally taps `Reset Scanner`

@@ -5,12 +5,11 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import StatCard from '../../components/StatCard'
-import StatusBadge from '../../components/StatusBadge'
-import StatusBanner from '../../components/StatusBanner'
 import TransactionCard from '../../components/TransactionCard'
 import { getMerchantDashboardSnapshot } from '../../services/merchantWorkspace.service'
 import { useAuthStore } from '../../store/authStore'
-import type { MerchantDashboardSnapshot } from '../../types/merchant'
+import type { MerchantDashboardSnapshot, MerchantStatus } from '../../types/merchant'
+import { getStatusLabel, getStatusMessage } from '../../utils/merchant'
 
 export default function DashboardScreen() {
   const user = useAuthStore((state) => state.user)
@@ -37,64 +36,110 @@ export default function DashboardScreen() {
   const brandName = profile?.businessName ?? user?.UserName ?? 'Merchant'
   const heroCopy =
     profile?.shortDescription ||
-    "Your merchant workspace for QR scans, youth rewards activity, and storefront performance."
+    'Serving delicious products, building youth trust, and keeping your merchant workspace ready for every QR transaction.'
   const brandInitials = getInitials(brandName)
   const recentTransactions = snapshot?.recentTransactions || []
+  const unreadAlerts = snapshot?.unreadNotificationCount ?? 0
+  const greeting = getGreeting()
+  const statusCopy = profile?.adminNote?.trim() || getStatusMessage(profile?.status || 'active')
+  const statusTone = getStatusTone(profile?.status || 'active')
   const activePromoLabel =
     snapshot?.spotlightPromotion?.valueLabel || `${snapshot?.activePromotionCount ?? 0} active promo${snapshot?.activePromotionCount === 1 ? '' : 's'}`
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
-          <View style={styles.heroGlowBlue} />
-          <View style={styles.heroGlowGold} />
-
-          <View style={styles.heroHeader}>
-            <View style={styles.heroCopyBlock}>
-              <Text style={styles.eyebrow}>SK Merchant Workspace</Text>
-              <Text style={styles.heroTitle} numberOfLines={2}>
-                {brandName}
-              </Text>
-              <Text style={styles.heroSubtitle}>{heroCopy}</Text>
+        <View style={styles.topHeader}>
+          <View style={styles.topHeaderIdentity}>
+            <View style={styles.headerLogoWrap}>
+              {profile?.logoUrl ? (
+                <Image source={{ uri: profile.logoUrl }} style={styles.headerLogoImage} />
+              ) : (
+                <View style={styles.headerLogoFallback}>
+                  <Text style={styles.headerLogoFallbackText}>{brandInitials}</Text>
+                </View>
+              )}
             </View>
-            {profile ? <StatusBadge status={profile.status} /> : null}
+            <View style={styles.headerCopyBlock}>
+              <Text style={styles.headerGreeting}>{greeting},</Text>
+              <View style={styles.headerNameRow}>
+                <Text style={styles.headerMerchantName} numberOfLines={1}>
+                  {brandName}
+                </Text>
+                {profile ? (
+                  <View style={[styles.headerStatusPill, { backgroundColor: statusTone.pillBackground }]}>
+                    <View style={[styles.headerStatusDot, { backgroundColor: statusTone.dotColor }]} />
+                    <Text style={[styles.headerStatusText, { color: statusTone.textColor }]}>
+                      {getStatusLabel(profile.status)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.headerSubtitle}>Merchant Workspace</Text>
+            </View>
           </View>
 
-          <View style={styles.heroBrandRow}>
-            <View style={styles.logoWrap}>
+          <Pressable style={styles.notificationButton} onPress={() => navigation.navigate('Alerts')}>
+            <MaterialCommunityIcons name="bell-outline" size={28} color="#0a5fd8" />
+            {unreadAlerts > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadAlerts > 9 ? '9+' : unreadAlerts}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+
+        <View style={styles.featureCard}>
+          <View style={styles.featureGlowPrimary} />
+          <View style={styles.featureGlowSecondary} />
+          <View style={styles.featureGlowTertiary} />
+
+          <View style={styles.featureHeader}>
+            <View style={styles.featureLogoWrap}>
               {profile?.logoUrl ? (
-                <Image source={{ uri: profile.logoUrl }} style={styles.logoImage} />
+                <Image source={{ uri: profile.logoUrl }} style={styles.featureLogoImage} />
               ) : (
-                <View style={styles.logoFallback}>
-                  <Text style={styles.logoFallbackText}>{brandInitials}</Text>
+                <View style={styles.featureLogoFallback}>
+                  <Text style={styles.featureLogoFallbackText}>{brandInitials}</Text>
                 </View>
               )}
             </View>
 
-            <View style={styles.heroMeta}>
-              <View style={styles.metaPill}>
-                <Text style={styles.metaLabel}>This month</Text>
-                <Text style={styles.metaValue}>{snapshot?.transactionsThisMonth ?? 0} txns</Text>
-              </View>
-              <View style={[styles.metaPill, styles.metaPillWarm]}>
-                <Text style={[styles.metaLabel, styles.metaLabelWarm]}>Active promos</Text>
-                <Text style={[styles.metaValue, styles.metaValueWarm]}>{snapshot?.activePromotionCount ?? 0}</Text>
-              </View>
-            </View>
+            <Text style={styles.featureCopy}>{heroCopy}</Text>
           </View>
 
-          {profile ? <StatusBanner status={profile.status} message={profile.adminNote} /> : null}
+          <View style={styles.featureMetricsRow}>
+            <FeatureMetricCard
+              label="This month"
+              value={String(snapshot?.transactionsThisMonth ?? 0)}
+              suffix="Transactions"
+            />
+            <FeatureMetricCard
+              label="Active promos"
+              value={String(snapshot?.activePromotionCount ?? 0)}
+              suffix={snapshot?.activePromotionCount === 1 ? 'Promotion' : 'Promotions'}
+            />
+          </View>
         </View>
 
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>
-            <StatCard label="Scans today" value={String(snapshot?.scansToday ?? 0)} caption="Successful QR validations" />
+            <StatCard
+              label="Scans today"
+              value={String(snapshot?.scansToday ?? 0)}
+              caption="Successful scans"
+              icon="qrcode-scan"
+              iconColor="#0a5fd8"
+              iconBackground="#eef4ff"
+            />
             <StatCard
               label="Points today"
               value={String(snapshot?.approvedPointsToday ?? 0)}
-              caption="Approved member points"
-              tone="neutral"
+              caption="Points issued"
+              icon="star-circle-outline"
+              iconColor="#e29b00"
+              iconBackground="#fff6df"
+              valueColor="#b77900"
             />
           </View>
 
@@ -102,42 +147,46 @@ export default function DashboardScreen() {
             <StatCard
               label="Monthly txns"
               value={String(snapshot?.transactionsThisMonth ?? 0)}
-              caption="Recorded successful purchases"
+              caption="This month"
+              icon="chart-line"
+              iconColor="#16a34a"
+              iconBackground="#e8f9ee"
+              valueColor="#0d7a34"
             />
             <StatCard
               label="Unread alerts"
-              value={String(snapshot?.unreadNotificationCount ?? 0)}
-              caption="Admin and system updates"
-              tone="neutral"
+              value={String(unreadAlerts)}
+              caption="View alerts"
+              icon="bell-outline"
+              iconColor="#f43f5e"
+              iconBackground="#fff0f3"
+              valueColor="#d9264c"
             />
           </View>
         </View>
 
-        {snapshot?.spotlightPromotion ? (
-          <View style={styles.spotlightCard}>
-            <View style={styles.spotlightHeader}>
-              <View>
-                <Text style={styles.spotlightEyebrow}>Featured Promo</Text>
-                <Text style={styles.spotlightTitle}>{snapshot.spotlightPromotion.title}</Text>
-              </View>
-              <View style={styles.spotlightBadge}>
-                <Text style={styles.spotlightBadgeText}>{snapshot.spotlightPromotion.valueLabel}</Text>
-              </View>
-            </View>
-            {snapshot.spotlightPromotion.shortTagline ? (
-              <Text style={styles.spotlightCopy}>{snapshot.spotlightPromotion.shortTagline}</Text>
-            ) : null}
+        <Pressable style={styles.statusInfoCard} onPress={() => navigation.navigate('Shop')}>
+          <View style={[styles.statusInfoIconWrap, { backgroundColor: statusTone.iconBackground }]}>
+            <MaterialCommunityIcons
+              name={getStatusCardIcon(profile?.status || 'active')}
+              size={28}
+              color={statusTone.iconColor}
+            />
           </View>
-        ) : null}
+          <View style={styles.statusInfoCopyBlock}>
+            <Text style={styles.statusInfoTitle}>{statusCopy}</Text>
+          </View>
+          <View style={styles.statusInfoAction}>
+            <MaterialCommunityIcons name="chevron-right" size={24} color="#0a5fd8" />
+          </View>
+        </Pressable>
 
         <View style={styles.transactionsShell}>
           <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Recent Transactions</Text>
-              <Text style={styles.sectionCopy}>Latest successful and failed scans in your workspace.</Text>
-            </View>
+            <Text style={styles.sectionTitle}>Recent Transactions</Text>
             <Pressable style={styles.historyButton} onPress={() => navigation.navigate('Transactions')}>
               <Text style={styles.historyButtonText}>View all</Text>
+              <MaterialCommunityIcons name="chevron-right" size={18} color="#0a5fd8" />
             </Pressable>
           </View>
 
@@ -191,6 +240,26 @@ export default function DashboardScreen() {
   )
 }
 
+function FeatureMetricCard({
+  label,
+  value,
+  suffix,
+}: {
+  label: string
+  value: string
+  suffix: string
+}) {
+  return (
+    <View style={styles.featureMetricCard}>
+      <Text style={styles.featureMetricLabel}>{label}</Text>
+      <View style={styles.featureMetricValueRow}>
+        <Text style={styles.featureMetricValue}>{value}</Text>
+        <Text style={styles.featureMetricSuffix}>{suffix}</Text>
+      </View>
+    </View>
+  )
+}
+
 function FooterMetric({
   icon,
   label,
@@ -223,223 +292,379 @@ function getInitials(value: string) {
   return parts.map((part) => part[0]?.toUpperCase() || '').join('')
 }
 
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function getStatusTone(status: MerchantStatus) {
+  if (status === 'pending') {
+    return {
+      pillBackground: '#fff7df',
+      dotColor: '#e6a100',
+      textColor: '#9c6500',
+      iconBackground: '#fff6df',
+      iconColor: '#e6a100',
+    }
+  }
+
+  if (status === 'suspended') {
+    return {
+      pillBackground: '#fff0f3',
+      dotColor: '#f43f5e',
+      textColor: '#cc284a',
+      iconBackground: '#fff0f3',
+      iconColor: '#f43f5e',
+    }
+  }
+
+  return {
+    pillBackground: '#e8f9ee',
+    dotColor: '#16a34a',
+    textColor: '#19934b',
+    iconBackground: '#eef4ff',
+    iconColor: '#0a5fd8',
+  }
+}
+
+function getStatusCardIcon(status: MerchantStatus) {
+  if (status === 'pending') return 'clock-outline'
+  if (status === 'suspended') return 'alert-circle-outline'
+  return 'storefront-outline'
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f7fb',
   },
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    paddingBottom: 28,
-    gap: 16,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    gap: 20,
   },
-  heroCard: {
-    overflow: 'hidden',
-    borderRadius: 28,
-    backgroundColor: '#ffffff',
-    padding: 20,
-    gap: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(1, 67, 132, 0.08)',
-    shadowColor: '#014384',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 3,
-  },
-  heroGlowBlue: {
-    position: 'absolute',
-    top: -34,
-    right: -20,
-    width: 148,
-    height: 148,
-    borderRadius: 999,
-    backgroundColor: 'rgba(5, 114, 220, 0.13)',
-  },
-  heroGlowGold: {
-    position: 'absolute',
-    bottom: -50,
-    left: -14,
-    width: 130,
-    height: 130,
-    borderRadius: 999,
-    backgroundColor: 'rgba(252, 179, 21, 0.14)',
-  },
-  heroHeader: {
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 14,
   },
-  heroCopyBlock: {
-    gap: 8,
-  },
-  eyebrow: {
-    color: '#0572dc',
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  heroTitle: {
-    color: '#014384',
-    fontSize: 28,
-    fontWeight: '900',
-    lineHeight: 32,
-  },
-  heroSubtitle: {
-    color: '#60748f',
-    fontSize: 14,
-    lineHeight: 21,
-    maxWidth: '92%',
-  },
-  heroBrandRow: {
+  topHeaderIdentity: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
   },
-  logoWrap: {
+  headerLogoWrap: {
     width: 68,
     height: 68,
     borderRadius: 22,
-    backgroundColor: '#eef4fb',
-    padding: 4,
+    backgroundColor: '#ffffff',
+    padding: 6,
+    shadowColor: '#014384',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
   },
-  logoImage: {
+  headerLogoImage: {
     width: '100%',
     height: '100%',
     borderRadius: 18,
     backgroundColor: '#ffffff',
   },
-  logoFallback: {
+  headerLogoFallback: {
     flex: 1,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#014384',
   },
-  logoFallbackText: {
+  headerLogoFallbackText: {
     color: '#ffffff',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
   },
-  heroMeta: {
+  headerCopyBlock: {
     flex: 1,
+    gap: 4,
+  },
+  headerGreeting: {
+    color: '#60748f',
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  headerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
+    flexWrap: 'wrap',
   },
-  metaPill: {
-    borderRadius: 18,
-    backgroundColor: '#eef4fb',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  metaPillWarm: {
-    backgroundColor: '#fff6df',
-  },
-  metaLabel: {
-    color: '#6a7f98',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  metaLabelWarm: {
-    color: '#8d712a',
-  },
-  metaValue: {
+  headerMerchantName: {
+    flexShrink: 1,
     color: '#014384',
-    fontSize: 16,
+    fontSize: 26,
     fontWeight: '900',
-    marginTop: 3,
+    lineHeight: 31,
   },
-  metaValueWarm: {
-    color: '#9c6500',
-  },
-  statsGrid: {
-    gap: 12,
-  },
-  statsRow: {
+  headerStatusPill: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  spotlightCard: {
-    borderRadius: 24,
-    backgroundColor: '#014384',
-    padding: 18,
-    gap: 10,
-  },
-  spotlightHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  spotlightEyebrow: {
-    color: '#a7d0ff',
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-  },
-  spotlightTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '900',
-    marginTop: 4,
-  },
-  spotlightBadge: {
+    alignItems: 'center',
+    gap: 8,
     borderRadius: 999,
-    backgroundColor: '#fcb315',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  spotlightBadgeText: {
-    color: '#014384',
-    fontSize: 12,
-    fontWeight: '900',
+  headerStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
   },
-  spotlightCopy: {
-    color: '#d6e8fb',
+  headerStatusText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  headerSubtitle: {
+    color: '#60748f',
     fontSize: 14,
     lineHeight: 20,
   },
-  transactionsShell: {
+  notificationButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    shadowColor: '#014384',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    backgroundColor: '#ff405e',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  notificationBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  featureCard: {
+    overflow: 'hidden',
+    borderRadius: 28,
+    backgroundColor: '#0454b8',
+    padding: 22,
+    gap: 18,
+    shadowColor: '#014384',
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 5,
+  },
+  featureGlowPrimary: {
+    position: 'absolute',
+    top: -18,
+    right: -24,
+    width: 180,
+    height: 180,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  featureGlowSecondary: {
+    position: 'absolute',
+    bottom: -54,
+    right: 36,
+    width: 132,
+    height: 132,
+    borderRadius: 999,
+    backgroundColor: 'rgba(5, 114, 220, 0.24)',
+  },
+  featureGlowTertiary: {
+    position: 'absolute',
+    top: 42,
+    right: -12,
+    width: 118,
+    height: 118,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  featureHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
+  featureLogoWrap: {
+    width: 88,
+    height: 88,
     borderRadius: 26,
     backgroundColor: '#ffffff',
-    padding: 18,
+    padding: 8,
+  },
+  featureLogoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+  },
+  featureLogoFallback: {
+    flex: 1,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0a4ca0',
+  },
+  featureLogoFallbackText: {
+    color: '#ffffff',
+    fontSize: 26,
+    fontWeight: '900',
+  },
+  featureCopy: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 17,
+    lineHeight: 28,
+    fontWeight: '500',
+    paddingTop: 6,
+  },
+  featureMetricsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  featureMetricCard: {
+    flex: 1,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  featureMetricLabel: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
+  },
+  featureMetricValueRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  featureMetricValue: {
+    color: '#ffffff',
+    fontSize: 42,
+    fontWeight: '900',
+    lineHeight: 44,
+  },
+  featureMetricSuffix: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 21,
+  },
+  statsGrid: {
     gap: 14,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  statusInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 26,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
     borderWidth: 1,
     borderColor: 'rgba(1, 67, 132, 0.08)',
+    shadowColor: '#014384',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 3,
+  },
+  statusInfoIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusInfoCopyBlock: {
+    flex: 1,
+  },
+  statusInfoTitle: {
+    color: '#014384',
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 28,
+  },
+  statusInfoAction: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef4ff',
+  },
+  transactionsShell: {
+    gap: 14,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '900',
     color: '#014384',
   },
-  sectionCopy: {
-    marginTop: 4,
-    color: '#6a7f98',
-    fontSize: 13,
-    lineHeight: 19,
-    maxWidth: 220,
-  },
   historyButton: {
-    borderRadius: 999,
-    backgroundColor: '#eef4fb',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
   },
   historyButtonText: {
-    color: '#014384',
+    color: '#0a5fd8',
     fontWeight: '800',
-    fontSize: 12,
+    fontSize: 14,
   },
   list: {
+    borderRadius: 28,
+    backgroundColor: '#ffffff',
+    padding: 18,
     gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+    shadowColor: '#014384',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 3,
   },
   emptyCard: {
     borderRadius: 20,

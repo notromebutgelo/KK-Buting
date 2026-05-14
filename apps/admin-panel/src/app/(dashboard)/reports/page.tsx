@@ -27,7 +27,6 @@ import {
   FileClock,
   RefreshCw,
   RotateCcw,
-  Store,
   TrendingUp,
   Users,
 } from 'lucide-react'
@@ -44,11 +43,10 @@ import {
   AdminField,
   AdminFilterBar,
   AdminNotice,
-  AdminPageIntro,
   AdminSurface,
   AdminSurfaceHeader,
 } from '@/components/admin/workspace'
-import { DashboardMiniStat, DashboardPill, DashboardStatusList } from '@/components/dashboard/primitives'
+import { DashboardPill, DashboardStatusList } from '@/components/dashboard/primitives'
 import api from '@/lib/api'
 
 interface ReportDatum {
@@ -756,38 +754,19 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <AdminPageIntro
-        eyebrow="Analytics workspace"
-        title="Turn KK profiling answers into cleaner, more actionable barangay reporting."
-        description="This workspace keeps the reporting story focused on the real leadership questions: who is in the registry, which youth segments need support, how verification is moving, and what the current profiling answers say about demographics, education, work, and engagement."
-        pills={[
-          <DashboardPill key="live" tone="soft">
-            Live backend data
-          </DashboardPill>,
-          <DashboardPill key="profiling" tone="default">
-            KK profiling insights
-          </DashboardPill>,
-          <DashboardPill key="export" tone="success">
-            Printable PDF export
-          </DashboardPill>,
-        ]}
-        aside={
-          <div className="grid grid-cols-2 gap-3">
-            <DashboardMiniStat
-              label={summary.currentMonthLabel}
-              value={summary.currentMonthRegistered.toLocaleString()}
-              meta="Registrations in the latest reporting month"
-              tone="soft"
-            />
-            <DashboardMiniStat
-              label="Verification rate"
-              value={`${summary.verificationRate}%`}
-              meta="Profiles currently marked as verified"
-              tone="neutral"
-            />
-          </div>
-        }
-      />
+      <AdminSurface className="px-8 py-6">
+        <div className="space-y-2">
+          <h1
+            className="text-[2rem] font-black tracking-[-0.03em]"
+            style={{ color: 'var(--ink)' }}
+          >
+            Reports
+          </h1>
+          <p className="text-base leading-7" style={{ color: 'var(--muted)' }}>
+            Analytics and membership reports.
+          </p>
+        </div>
+      </AdminSurface>
 
       {error ? (
         <AdminNotice tone="danger">
@@ -808,180 +787,195 @@ export default function ReportsPage() {
         </AdminNotice>
       ) : null}
 
-      {!error && !hasChartData ? (
-        <AdminSurface>
-          <AdminSurfaceHeader
-            title="No report data yet"
-            description="Live analytics will appear here once member profiling and verification records are available."
-          />
-          <div className="mt-5">
-            <AdminEmptyState
-              title="Waiting for analytics"
-              description="As soon as the registry has enough live member data, the charts, cards, and report exports will populate here."
-            />
-          </div>
-        </AdminSurface>
-      ) : null}
-
-      {!error && hasChartData ? (
+      {!error ? (
         <>
-          <AdminSurface tone="soft">
-            <AdminSurfaceHeader
-              title="Report tools"
-              description="Refresh live analytics, narrow the reporting scope with filters, and generate official PDF exports for meetings and documentation."
-              action={
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void loadReports()}
-                    disabled={isLoading || isExporting}
-                    className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
-                    style={{
-                      borderColor: 'var(--stroke)',
-                      background: 'var(--card)',
-                      color: 'var(--ink-soft)',
-                    }}
-                  >
-                    <RefreshCw size={16} />
-                    Refresh data
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    disabled={isLoading || isExporting}
-                    className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
-                    style={{
-                      borderColor: 'var(--stroke)',
-                      background: 'var(--card)',
-                      color: 'var(--ink-soft)',
-                    }}
-                  >
-                    <RotateCcw size={16} />
-                    Reset filters
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openReportBuilder}
-                    disabled={isLoading || isExporting}
-                    className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
-                    style={{ background: 'var(--accent)' }}
-                  >
-                    <Download size={16} />
-                    Build PDF report
-                  </button>
-                </div>
-              }
-            />
-            <div className="mt-5">
-              <AdminFilterBar columns="xl:grid-cols-6">
-                <AdminField label="Date From">
-                  <input
-                    type="date"
-                    value={filters.dateFrom}
-                    onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-                    className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
-                    style={{
-                      borderColor: 'var(--stroke)',
-                      background: 'var(--card)',
-                      color: 'var(--ink)',
-                    }}
-                  />
-                </AdminField>
-                <AdminField label="Date To">
-                  <input
-                    type="date"
-                    value={filters.dateTo}
-                    onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
-                    className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
-                    style={{
-                      borderColor: 'var(--stroke)',
-                      background: 'var(--card)',
-                      color: 'var(--ink)',
-                    }}
-                  />
-                </AdminField>
-                <AdminField label="Barangay">
-                  <ReportSelect
-                    value={filters.barangay}
-                    onChange={(value) => setFilters((current) => ({ ...current, barangay: value }))}
-                    options={['all', ...filterOptions.barangays]}
-                  />
-                </AdminField>
-                <AdminField label="Age Group">
-                  <ReportSelect
-                    value={filters.ageGroup}
-                    onChange={(value) => setFilters((current) => ({ ...current, ageGroup: value }))}
-                    options={['all', ...filterOptions.ageGroups]}
-                  />
-                </AdminField>
-                <AdminField label="Gender">
-                  <ReportSelect
-                    value={filters.gender}
-                    onChange={(value) => setFilters((current) => ({ ...current, gender: value }))}
-                    options={['all', ...filterOptions.genders]}
-                  />
-                </AdminField>
-                <AdminField label="Verification Status">
-                  <ReportSelect
-                    value={filters.status}
-                    onChange={(value) => setFilters((current) => ({ ...current, status: value }))}
-                    options={['all', ...filterOptions.statuses]}
-                  />
-                </AdminField>
-              </AdminFilterBar>
-            </div>
-          </AdminSurface>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
             <ReportKpiCard
               label="Total registered youth"
               value={summary.totalRegisteredUsers.toLocaleString()}
-              meta="Youth members represented in the current filtered reporting scope."
+              meta="Youth members in the selected period"
               icon={<Users size={18} />}
               accent={REPORT_COLORS[0]}
             />
             <ReportKpiCard
               label="Verified youth"
               value={summary.verifiedUsers.toLocaleString()}
-              meta="Members who have already completed the verification requirement."
+              meta="Youth members who completed verification"
               icon={<BadgeCheck size={18} />}
               accent={REPORT_COLORS[3]}
-              trendLabel={`${summary.verificationRate}% verified`}
-              trendTone="positive"
             />
             <ReportKpiCard
               label="Pending verifications"
               value={summary.pendingVerifications.toLocaleString()}
-              meta="Members still waiting for document review or other verification steps."
+              meta="Members awaiting review or missing requirements"
               icon={<FileClock size={18} />}
               accent={REPORT_COLORS[4]}
             />
             <ReportKpiCard
-              label="Active merchants"
-              value={summary.activeMerchants.toLocaleString()}
-              meta="Approved merchant partners currently active in the ecosystem."
-              icon={<Store size={18} />}
-              accent={REPORT_COLORS[1]}
-            />
-            <ReportKpiCard
               label="Monthly growth"
               value={formatSignedPercent(summary.monthlyGrowthPercent)}
-              meta={`Compared with the previous registration month before ${summary.currentMonthLabel}.`}
+              meta="Change vs previous month"
               icon={<TrendingUp size={18} />}
-              accent={REPORT_COLORS[5]}
-              trendLabel={summary.monthlyGrowthPercent >= 0 ? 'Growth' : 'Decline'}
-              trendTone={summary.monthlyGrowthPercent >= 0 ? 'positive' : 'warning'}
+              accent={REPORT_COLORS[6]}
             />
             <ReportKpiCard
-              label="Survey completion rate"
+              label="Survey completion"
               value={`${summary.surveyCompletionRate}%`}
-              meta="Profiles with completed KK questionnaire submissions in the filtered scope."
+              meta="Profiles with completed KK questionnaire"
               icon={<ClipboardList size={18} />}
               accent={REPORT_COLORS[2]}
             />
-          </div>
+          </section>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.24fr,0.76fr]">
+          {!hasChartData ? (
+            <AdminSurface>
+              <AdminSurfaceHeader
+                title="No report data yet"
+                description="Live analytics will appear here once member profiling and verification records are available."
+              />
+              <div className="mt-5">
+                <AdminEmptyState
+                  title="Waiting for analytics"
+                  description="As soon as the registry has enough live member data, the charts, cards, and report exports will populate here."
+                />
+              </div>
+            </AdminSurface>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_352px]">
+                <AdminSurface className="xl:col-span-2">
+                  <AdminSurfaceHeader
+                    title="Report tools"
+                    description="Filter the data, refresh insights, and generate exports for meetings."
+                    action={
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void loadReports()}
+                          disabled={isLoading || isExporting}
+                          className="inline-flex h-11 items-center gap-2 rounded-[14px] border px-4 text-sm font-semibold transition-colors disabled:opacity-60"
+                          style={{
+                            borderColor: 'var(--stroke)',
+                            background: 'var(--card)',
+                            color: 'var(--ink-soft)',
+                          }}
+                        >
+                          <RefreshCw size={16} />
+                          Refresh data
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetFilters}
+                          disabled={isLoading || isExporting}
+                          className="inline-flex h-11 items-center gap-2 rounded-[14px] border px-4 text-sm font-semibold transition-colors disabled:opacity-60"
+                          style={{
+                            borderColor: 'var(--stroke)',
+                            background: 'var(--card)',
+                            color: 'var(--ink-soft)',
+                          }}
+                        >
+                          <RotateCcw size={16} />
+                          Reset filters
+                        </button>
+                        <button
+                          type="button"
+                          onClick={openReportBuilder}
+                          disabled={isLoading || isExporting}
+                          className="inline-flex h-11 items-center gap-2 rounded-[14px] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                          style={{ background: 'var(--accent)' }}
+                        >
+                          <Download size={16} />
+                          Build PDF report
+                        </button>
+                      </div>
+                    }
+                  />
+
+                  <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-6">
+                    <AdminField label="Date from">
+                      <input
+                        type="date"
+                        value={filters.dateFrom}
+                        onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                        className="h-12 w-full rounded-[14px] border px-4 text-sm outline-none"
+                        style={{
+                          borderColor: 'var(--stroke)',
+                          background: 'var(--card)',
+                          color: 'var(--ink)',
+                        }}
+                      />
+                    </AdminField>
+                    <AdminField label="Date to">
+                      <input
+                        type="date"
+                        value={filters.dateTo}
+                        onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                        className="h-12 w-full rounded-[14px] border px-4 text-sm outline-none"
+                        style={{
+                          borderColor: 'var(--stroke)',
+                          background: 'var(--card)',
+                          color: 'var(--ink)',
+                        }}
+                      />
+                    </AdminField>
+                    <AdminField label="Barangay">
+                      <ReportSelect
+                        value={filters.barangay}
+                        onChange={(value) => setFilters((current) => ({ ...current, barangay: value }))}
+                        options={['all', ...filterOptions.barangays]}
+                      />
+                    </AdminField>
+                    <AdminField label="Age group">
+                      <ReportSelect
+                        value={filters.ageGroup}
+                        onChange={(value) => setFilters((current) => ({ ...current, ageGroup: value }))}
+                        options={['all', ...filterOptions.ageGroups]}
+                      />
+                    </AdminField>
+                    <AdminField label="Gender">
+                      <ReportSelect
+                        value={filters.gender}
+                        onChange={(value) => setFilters((current) => ({ ...current, gender: value }))}
+                        options={['all', ...filterOptions.genders]}
+                      />
+                    </AdminField>
+                    <AdminField label="Verification status">
+                      <ReportSelect
+                        value={filters.status}
+                        onChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+                        options={['all', ...filterOptions.statuses]}
+                      />
+                    </AdminField>
+                  </div>
+                </AdminSurface>
+
+                <ReportsOverviewCard summary={summary} />
+
+                <VerticalBarPanel
+                  title="Youth by age group"
+                  description="Compares the age bands represented in the registry."
+                  data={ageChartData}
+                  insight={insights.topAgeGroup}
+                  xAxisHeight={56}
+                  badge={summary.currentMonthLabel}
+                  insightTone="info"
+                  insightIcon={<Users size={15} />}
+                />
+
+                <VerticalBarPanel
+                  title="Top barangays with most registered youth"
+                  description="Shows the barangays contributing the largest share of registered youth."
+                  data={barangayChartData}
+                  insight={insights.topBarangay}
+                  xAxisHeight={70}
+                  colorOffset={1}
+                  badge={summary.currentMonthLabel}
+                  insightTone="success"
+                  insightIcon={<BadgeCheck size={15} />}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.24fr,0.76fr]">
             <ChartPanel
               title="Registration and verification trend"
               description="A modern view of how the registry is growing over time, with verified profiles layered into the same timeline."
@@ -1120,85 +1114,68 @@ export default function ReportsPage() {
                 />
               </div>
             </AdminSurface>
-          </div>
+              </div>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <VerticalBarPanel
-              title="Youth by age group"
-              description="Compares the age bands represented in the filtered registry."
-              data={ageChartData}
-              insight={insights.topAgeGroup}
-              xAxisHeight={56}
-            />
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <DonutPanel
+                  title="Reported gender distribution"
+                  description="Uses a single clean donut to show the current demographic split without duplicating the same proportion elsewhere."
+                  data={genderChartData}
+                  config={genderConfig}
+                  insight={insights.topGender}
+                />
 
-            <VerticalBarPanel
-              title="Top barangays with most registered youth"
-              description="Surfaces the barangays contributing the largest share of registered youth members."
-              data={barangayChartData}
-              insight={insights.topBarangay}
-              xAxisHeight={70}
-              colorOffset={1}
-            />
-          </div>
+                <HorizontalBarPanel
+                  title="Educational background"
+                  description="Highlights the strongest educational segments in the current filtered dataset."
+                  data={educationChartData}
+                  insight={insights.topEducation}
+                  yAxisWidth={150}
+                  colorOffset={2}
+                />
+              </div>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <DonutPanel
-              title="Reported gender distribution"
-              description="Uses a single clean donut to show the current demographic split without duplicating the same proportion elsewhere."
-              data={genderChartData}
-              config={genderConfig}
-              insight={insights.topGender}
-            />
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <HorizontalBarPanel
+                  title="Employment status"
+                  description="Shows how many youth members are employed, unemployed, or actively looking for work."
+                  data={workChartData}
+                  insight={insights.topWorkStatus}
+                  yAxisWidth={122}
+                  colorOffset={3}
+                />
 
-            <HorizontalBarPanel
-              title="Educational background"
-              description="Highlights the strongest educational segments in the current filtered dataset."
-              data={educationChartData}
-              insight={insights.topEducation}
-              yAxisWidth={150}
-              colorOffset={2}
-            />
-          </div>
+                <HorizontalBarPanel
+                  title="Out-of-school youth reasons"
+                  description="Makes it easier to see which barriers are most commonly keeping youth members out of school."
+                  data={outOfSchoolChartData}
+                  insight={insights.topOutOfSchoolReason}
+                  yAxisWidth={170}
+                  colorOffset={4}
+                />
+              </div>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <HorizontalBarPanel
-              title="Employment status"
-              description="Shows how many youth members are employed, unemployed, or actively looking for work."
-              data={workChartData}
-              insight={insights.topWorkStatus}
-              yAxisWidth={122}
-              colorOffset={3}
-            />
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <HorizontalBarPanel
+                  title="Skills and training interests"
+                  description="Summarizes scholarship support, academic/vocational signals, and business interest from the KK profiling responses."
+                  data={learningChartData}
+                  insight={insights.topPathway}
+                  yAxisWidth={164}
+                  colorOffset={5}
+                />
 
-            <HorizontalBarPanel
-              title="Out-of-school youth reasons"
-              description="Makes it easier to see which barriers are most commonly keeping youth members out of school."
-              data={outOfSchoolChartData}
-              insight={insights.topOutOfSchoolReason}
-              yAxisWidth={170}
-              colorOffset={4}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <HorizontalBarPanel
-              title="Skills and training interests"
-              description="Summarizes scholarship support, academic/vocational signals, and business interest from the KK profiling responses."
-              data={learningChartData}
-              insight={insights.topPathway}
-              yAxisWidth={164}
-              colorOffset={5}
-            />
-
-            <HorizontalBarPanel
-              title="Barangay engagement insights"
-              description="Shows the strongest participation signals from the profiling answers, including voting, KK assembly attendance, and volunteer involvement."
-              data={civicChartData}
-              insight={insights.topCivicSignal}
-              yAxisWidth={178}
-              colorOffset={6}
-            />
-          </div>
+                <HorizontalBarPanel
+                  title="Barangay engagement insights"
+                  description="Shows the strongest participation signals from the profiling answers, including voting, KK assembly attendance, and volunteer involvement."
+                  data={civicChartData}
+                  insight={insights.topCivicSignal}
+                  yAxisWidth={178}
+                  colorOffset={6}
+                />
+              </div>
+            </>
+          )}
         </>
       ) : null}
 
@@ -1275,7 +1252,7 @@ function ReportSelect({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+      className="h-12 w-full rounded-[14px] border px-4 text-sm outline-none"
       style={{
         borderColor: 'var(--stroke)',
         background: 'var(--card)',
@@ -1297,65 +1274,131 @@ function ReportKpiCard({
   meta,
   icon,
   accent,
-  trendLabel,
-  trendTone = 'default',
 }: {
   label: string
   value: string
   meta: string
   icon: ReactNode
   accent: string
-  trendLabel?: string
-  trendTone?: 'default' | 'positive' | 'warning'
 }) {
-  const toneStyles =
-    trendTone === 'positive'
-      ? { background: 'var(--success-bg)', color: 'var(--success-fg)' }
-      : trendTone === 'warning'
-        ? { background: 'var(--warning-bg)', color: 'var(--warning-fg)' }
-        : { background: 'var(--surface-muted)', color: 'var(--muted)' }
-
   return (
     <section
-      className="overflow-hidden rounded-[var(--radius-lg)] border p-5 shadow-[var(--shadow-sm)]"
+      className="min-h-[140px] overflow-hidden rounded-[20px] border bg-white px-5 py-5 shadow-[var(--shadow-sm)]"
       style={{
-        background: 'var(--card)',
         borderColor: 'var(--stroke)',
       }}
     >
-      <div
-        className="mb-4 h-1.5 w-full rounded-full"
-        style={{ background: `linear-gradient(90deg, ${accent} 0%, transparent 74%)` }}
-      />
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start gap-4">
         <div
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl"
+          className="grid h-14 w-14 shrink-0 place-items-center rounded-full"
           style={{
-            background: `color-mix(in srgb, ${accent} 16%, var(--card-solid) 84%)`,
+            background: `color-mix(in srgb, ${accent} 14%, white 86%)`,
             color: accent,
           }}
         >
           {icon}
         </div>
-        {trendLabel ? (
-          <span
-            className="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
-            style={toneStyles}
-          >
-            {trendLabel}
-          </span>
-        ) : null}
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--ink-soft)' }}>
+            {label}
+          </p>
+          <p className="mt-3 text-[2rem] font-black leading-none tracking-[-0.03em]" style={{ color: 'var(--ink)' }}>
+            {value}
+          </p>
+          <p className="mt-3 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+            {meta}
+          </p>
+        </div>
       </div>
-      <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
-        {label}
-      </p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>
-        {value}
-      </p>
-      <p className="mt-3 text-sm leading-6" style={{ color: 'var(--muted)' }}>
-        {meta}
-      </p>
     </section>
+  )
+}
+
+function ReportsOverviewCard({ summary }: { summary: ReportSummary }) {
+  return (
+    <AdminSurface className="xl:row-span-2">
+      <AdminSurfaceHeader
+        title="Reporting overview"
+        description="Key highlights based on the selected filters."
+      />
+      <div className="mt-5 grid gap-3">
+        <OverviewMiniCard
+          label="Registered this month"
+          value={summary.currentMonthRegistered.toLocaleString()}
+          meta="New youth registrations"
+          icon={<Users size={16} />}
+          accent={REPORT_COLORS[0]}
+        />
+        <OverviewMiniCard
+          label="Verified this month"
+          value={summary.currentMonthVerified.toLocaleString()}
+          meta="Youth marked as verified"
+          icon={<BadgeCheck size={16} />}
+          accent={REPORT_COLORS[3]}
+        />
+        <OverviewMiniCard
+          label="Pending right now"
+          value={summary.pendingVerifications.toLocaleString()}
+          meta="Awaiting verification"
+          icon={<FileClock size={16} />}
+          accent={REPORT_COLORS[4]}
+        />
+        <OverviewMiniCard
+          label="Surveys completed"
+          value={`${summary.surveyCompletionRate}%`}
+          meta="KK questionnaire completion"
+          icon={<ClipboardList size={16} />}
+          accent={REPORT_COLORS[6]}
+        />
+      </div>
+    </AdminSurface>
+  )
+}
+
+function OverviewMiniCard({
+  label,
+  value,
+  meta,
+  icon,
+  accent,
+}: {
+  label: string
+  value: string
+  meta: string
+  icon: ReactNode
+  accent: string
+}) {
+  return (
+    <div
+      className="rounded-[18px] border p-4"
+      style={{
+        borderColor: 'var(--stroke)',
+        background: 'var(--card)',
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full"
+          style={{
+            background: `color-mix(in srgb, ${accent} 12%, white 88%)`,
+            color: accent,
+          }}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold tracking-[0.02em]" style={{ color: 'var(--ink-soft)' }}>
+            {label}
+          </p>
+          <p className="mt-1 text-[1.65rem] font-black leading-none tracking-[-0.03em]" style={{ color: 'var(--ink)' }}>
+            {value}
+          </p>
+          <p className="mt-2 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+            {meta}
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1817,6 +1860,9 @@ function VerticalBarPanel({
   insight,
   xAxisHeight = 56,
   colorOffset = 0,
+  badge,
+  insightTone = 'info',
+  insightIcon,
 }: {
   title: string
   description: string
@@ -1824,17 +1870,34 @@ function VerticalBarPanel({
   insight?: string
   xAxisHeight?: number
   colorOffset?: number
+  badge?: string
+  insightTone?: 'info' | 'success' | 'warning'
+  insightIcon?: ReactNode
 }) {
   if (data.length === 0) {
     return (
-      <ChartPanel title={title} description={description} insight={insight}>
+      <ChartPanel
+        title={title}
+        description={description}
+        insight={insight}
+        badge={badge}
+        insightTone={insightTone}
+        insightIcon={insightIcon}
+      >
         <ChartPanelEmpty />
       </ChartPanel>
     )
   }
 
   return (
-    <ChartPanel title={title} description={description} insight={insight}>
+    <ChartPanel
+      title={title}
+      description={description}
+      insight={insight}
+      badge={badge}
+      insightTone={insightTone}
+      insightIcon={insightIcon}
+    >
       <ChartContainer config={BAR_CONFIG} className="min-h-[320px] w-full">
         <ResponsiveContainer width="100%" height={320}>
           <BarChart accessibilityLayer data={data} margin={{ left: 0, right: 8 }}>
@@ -1980,26 +2043,71 @@ function ChartPanel({
   description,
   children,
   insight,
+  badge,
+  insightTone = 'info',
+  insightIcon,
 }: {
   title: string
   description: string
   children: ReactNode
   insight?: string
+  badge?: string
+  insightTone?: 'info' | 'success' | 'warning'
+  insightIcon?: ReactNode
 }) {
+  const insightStyles =
+    insightTone === 'success'
+      ? {
+          background: 'color-mix(in srgb, var(--success-bg) 88%, white 12%)',
+          borderColor: 'color-mix(in srgb, var(--success-accent) 18%, var(--stroke) 82%)',
+          color: 'var(--success-fg)',
+        }
+      : insightTone === 'warning'
+        ? {
+            background: 'color-mix(in srgb, var(--warning-bg) 88%, white 12%)',
+            borderColor: 'color-mix(in srgb, var(--warning-accent) 18%, var(--stroke) 82%)',
+            color: 'var(--warning-fg)',
+          }
+        : {
+            background: 'color-mix(in srgb, var(--info-bg) 88%, white 12%)',
+            borderColor: 'color-mix(in srgb, var(--info-accent) 18%, var(--stroke) 82%)',
+            color: 'var(--info-fg)',
+          }
+
   return (
     <AdminSurface>
-      <AdminSurfaceHeader title={title} description={description} />
+      <AdminSurfaceHeader
+        title={title}
+        description={description}
+        action={
+          badge ? (
+            <span
+              className="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold"
+              style={{
+                background: 'var(--surface-muted)',
+                color: 'var(--accent-strong)',
+              }}
+            >
+              {badge}
+            </span>
+          ) : undefined
+        }
+      />
       <div className="mt-5">{children}</div>
       {insight ? (
         <div
-          className="mt-5 rounded-2xl border px-4 py-3 text-sm leading-6"
-          style={{
-            background: 'color-mix(in srgb, var(--surface-muted) 76%, transparent)',
-            borderColor: 'var(--stroke)',
-            color: 'var(--ink-soft)',
-          }}
+          className="mt-5 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm leading-6"
+          style={insightStyles}
         >
-          {insight}
+          {insightIcon ? (
+            <span
+              className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/80"
+              style={{ color: insightStyles.color }}
+            >
+              {insightIcon}
+            </span>
+          ) : null}
+          <span style={{ color: 'var(--ink-soft)' }}>{insight}</span>
         </div>
       ) : null}
     </AdminSurface>

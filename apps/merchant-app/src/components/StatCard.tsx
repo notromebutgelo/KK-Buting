@@ -1,20 +1,36 @@
 import React from 'react'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { StyleSheet, Text, View } from 'react-native'
 
 type StatCardProps = {
   label: string
   value: string
   caption?: string
-  tone?: 'brand' | 'neutral'
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name']
+  iconColor?: string
+  iconBackground?: string
+  valueColor?: string
 }
 
-export default function StatCard({ label, value, caption, tone = 'brand' }: StatCardProps) {
+export default function StatCard({
+  label,
+  value,
+  caption,
+  icon,
+  iconColor = '#0a5fd8',
+  iconBackground = '#eef4ff',
+  valueColor = '#014384',
+}: StatCardProps) {
   return (
-    <View style={[styles.card, tone === 'neutral' && styles.neutralCard]}>
-      <View style={[styles.accent, tone === 'neutral' && styles.neutralAccent]} />
-      <Text style={[styles.label, tone === 'neutral' && styles.neutralLabel]}>{label}</Text>
-      <Text style={[styles.value, tone === 'neutral' && styles.neutralValue]}>{value}</Text>
-      {caption ? <Text style={[styles.caption, tone === 'neutral' && styles.neutralCaption]}>{caption}</Text> : null}
+    <View style={styles.card}>
+      <View style={[styles.iconWrap, { backgroundColor: iconBackground }]}>
+        <MaterialCommunityIcons name={icon} size={30} color={iconColor} />
+      </View>
+      <View style={styles.copy}>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.value, { color: valueColor }]}>{value}</Text>
+        {caption ? <Text style={styles.caption}>{caption}</Text> : null}
+      </View>
     </View>
   )
 }
@@ -22,57 +38,47 @@ export default function StatCard({ label, value, caption, tone = 'brand' }: Stat
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    minHeight: 122,
-    borderRadius: 22,
+    minHeight: 148,
+    borderRadius: 24,
     backgroundColor: '#ffffff',
     paddingHorizontal: 16,
-    paddingVertical: 15,
-    gap: 4,
+    paddingVertical: 18,
+    gap: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(1, 67, 132, 0.08)',
     shadowColor: '#014384',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 3,
   },
-  neutralCard: {
-    backgroundColor: '#fffaf0',
+  iconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  accent: {
-    width: 34,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: '#0572dc',
-    marginBottom: 8,
-  },
-  neutralAccent: {
-    backgroundColor: '#fcb315',
+  copy: {
+    flex: 1,
+    gap: 4,
   },
   label: {
-    color: '#6a7f98',
-    fontSize: 12,
-    fontWeight: '700',
+    color: '#63748b',
+    fontSize: 11,
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  neutralLabel: {
-    color: '#7f6d44',
+    letterSpacing: 0.9,
   },
   value: {
-    color: '#014384',
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '900',
   },
   caption: {
-    color: '#587290',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  neutralValue: {
-    color: '#9c6500',
-  },
-  neutralCaption: {
-    color: '#8a764e',
+    color: '#60748f',
+    fontSize: 14,
+    lineHeight: 20,
   },
 })

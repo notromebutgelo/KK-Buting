@@ -1,7 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Eye, EyeOff, Search } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Clock3,
+  Eye,
+  EyeOff,
+  MoreHorizontal,
+  Plus,
+  Repeat2,
+  Search,
+  Store,
+  UsersRound,
+  X,
+} from 'lucide-react'
 import api from '@/lib/api'
 import LoadingModal from '@/components/ui/LoadingModal'
 import {
@@ -9,14 +20,10 @@ import {
   AdminField,
   AdminFilterBar,
   AdminNotice,
-  AdminPageIntro,
-  AdminStatCard,
-  AdminStatGrid,
   AdminSurface,
   AdminSurfaceHeader,
-  AdminTabBar,
 } from '@/components/admin/workspace'
-import { DashboardMiniStat, DashboardPill } from '@/components/dashboard/primitives'
+import { DashboardPill } from '@/components/dashboard/primitives'
 import { cn } from '@/utils/cn'
 
 type MerchantStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
@@ -31,6 +38,8 @@ interface Merchant {
   ownerId?: string
   ownerEmail?: string
   ownerName?: string
+  contactNumber?: string | null
+  ownerPhone?: string | null
   createdAt?: string
   imageUrl?: string
   logoUrl?: string
@@ -52,6 +61,7 @@ interface MerchantTransaction {
 
 type MerchantTab = 'directory' | 'transactions' | 'create'
 const MERCHANT_TRANSACTION_PAGE_SIZE = 6
+const MERCHANT_DIRECTORY_PAGE_SIZE = 5
 
 const statusOptions: Array<{ value: MerchantStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All statuses' },
@@ -93,13 +103,17 @@ export default function MerchantsPage() {
   const [statusFilter, setStatusFilter] = useState<MerchantStatus | 'all'>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [dateJoinedFilter, setDateJoinedFilter] = useState('')
+  const [directoryPage, setDirectoryPage] = useState(1)
   const [transactionPage, setTransactionPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [loadingLabel, setLoadingLabel] = useState('Updating merchant')
   const [message, setMessage] = useState('')
+  const [showDirectoryDetails, setShowDirectoryDetails] = useState(false)
+  const [openActionMerchantId, setOpenActionMerchantId] = useState<string | null>(null)
   const [editor, setEditor] = useState({ discountInfo: '', termsAndConditions: '', pointsRate: '10' })
+  const actionMenuRef = useRef<HTMLDivElement | null>(null)
 
   const isSuperadmin = adminRole === 'superadmin'
 
@@ -232,6 +246,46 @@ export default function MerchantsPage() {
     setTransactionPage(1)
   }, [activeTab, selectedMerchantId])
 
+  useEffect(() => {
+    setDirectoryPage(1)
+  }, [activeTab, categoryFilter, dateJoinedFilter, search, statusFilter])
+
+  useEffect(() => {
+    if (activeTab !== 'directory') {
+      setShowDirectoryDetails(false)
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (!showDirectoryDetails) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setShowDirectoryDetails(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showDirectoryDetails])
+
+  useEffect(() => {
+    setOpenActionMerchantId(null)
+  }, [activeTab, categoryFilter, dateJoinedFilter, directoryPage, search, statusFilter])
+
+  useEffect(() => {
+    if (!openActionMerchantId) return
+
+    function handleClickOutside(event: MouseEvent) {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
+        setOpenActionMerchantId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openActionMerchantId])
+
   async function refreshMerchants(preferredId?: string | null) {
     const res = await api.get('/admin/merchants')
     const nextMerchants = res.data.merchants || res.data || []
@@ -239,8 +293,12 @@ export default function MerchantsPage() {
     setSelectedMerchantId(preferredId || nextMerchants[0]?.id || null)
   }
 
-  async function handleMerchantAction(action: 'approve' | 'reject' | 'suspend' | 'reactivate') {
-    if (!selectedMerchant) return
+  async function handleMerchantAction(
+    action: 'approve' | 'reject' | 'suspend' | 'reactivate',
+    merchantOverride?: Merchant
+  ) {
+    const targetMerchant = merchantOverride || selectedMerchant
+    if (!targetMerchant) return
 
     setLoadingLabel(
       action === 'approve'
@@ -253,14 +311,15 @@ export default function MerchantsPage() {
     )
     setIsSaving(true)
     setMessage('')
+    setOpenActionMerchantId(null)
 
     try {
-      if (action === 'approve') await api.patch(`/admin/merchants/${selectedMerchant.id}/approve`)
+      if (action === 'approve') await api.patch(`/admin/merchants/${targetMerchant.id}/approve`)
       else if (action === 'reactivate')
-        await api.patch(`/admin/merchants/${selectedMerchant.id}/status`, { status: 'approved' })
+        await api.patch(`/admin/merchants/${targetMerchant.id}/status`, { status: 'approved' })
       else if (action === 'suspend')
-        await api.patch(`/admin/merchants/${selectedMerchant.id}/status`, { status: 'suspended' })
-      else await api.patch(`/admin/merchants/${selectedMerchant.id}/status`, { status: 'rejected' })
+        await api.patch(`/admin/merchants/${targetMerchant.id}/status`, { status: 'suspended' })
+      else await api.patch(`/admin/merchants/${targetMerchant.id}/status`, { status: 'rejected' })
 
       setMessage(
         action === 'approve'
@@ -271,7 +330,7 @@ export default function MerchantsPage() {
               ? 'Merchant suspended successfully.'
               : 'Merchant rejected successfully.'
       )
-      await refreshMerchants(selectedMerchant.id)
+      await refreshMerchants(targetMerchant.id)
     } catch (error: any) {
       setMessage(error?.response?.data?.error || 'We could not update the merchant right now.')
     } finally {
@@ -361,18 +420,30 @@ export default function MerchantsPage() {
     transactions: transactions.length,
   }
 
-  const tabs: Array<{ id: MerchantTab; label: string; count?: number }> = [
+  const tabs: Array<{ id: Exclude<MerchantTab, 'create'>; label: string; count?: number }> = [
     { id: 'directory', label: 'Directory', count: counts.total },
     { id: 'transactions', label: 'Transactions', count: counts.transactions },
-    ...(isSuperadmin ? [{ id: 'create' as const, label: 'Create merchant' }] : []),
   ]
 
   const messageTone = message.toLowerCase().includes('could not') || message.toLowerCase().includes('failed') ? 'danger' : 'success'
   const isTransactionsTab = activeTab === 'transactions'
+  const isDirectoryTab = activeTab === 'directory'
   const listSurfaceTitle = isTransactionsTab ? 'Merchant transaction selector' : 'Merchant directory'
   const listSurfaceDescription = isTransactionsTab
     ? 'Choose a merchant on the left, then review their paginated QR and points-award history on the right.'
     : 'Use the list to select a merchant record, then maintain storefront details, status, and policy copy from the detail panel.'
+
+  const directoryPageCount = Math.max(1, Math.ceil(filteredMerchants.length / MERCHANT_DIRECTORY_PAGE_SIZE))
+  const paginatedMerchants = useMemo(() => {
+    const start = (directoryPage - 1) * MERCHANT_DIRECTORY_PAGE_SIZE
+    return filteredMerchants.slice(start, start + MERCHANT_DIRECTORY_PAGE_SIZE)
+  }, [directoryPage, filteredMerchants])
+  const directoryRangeStart = filteredMerchants.length
+    ? (directoryPage - 1) * MERCHANT_DIRECTORY_PAGE_SIZE + 1
+    : 0
+  const directoryRangeEnd = filteredMerchants.length
+    ? directoryRangeStart + paginatedMerchants.length - 1
+    : 0
 
   const transactionPageCount = Math.max(1, Math.ceil(transactions.length / MERCHANT_TRANSACTION_PAGE_SIZE))
   const paginatedTransactions = useMemo(() => {
@@ -394,6 +465,10 @@ export default function MerchantsPage() {
     setTransactionPage((current) => Math.min(current, transactionPageCount))
   }, [transactionPageCount])
 
+  useEffect(() => {
+    setDirectoryPage((current) => Math.min(current, directoryPageCount))
+  }, [directoryPageCount])
+
   return (
     <>
       <LoadingModal
@@ -403,74 +478,107 @@ export default function MerchantsPage() {
       />
 
       <div className="flex flex-col gap-6">
-        <AdminPageIntro
-          eyebrow="Merchant operations"
-          title="Manage merchant records, storefront details, and transaction activity from one calmer workspace."
-          description="Merchant accounts are provisioned manually by superadmin from this page, so the workspace now focuses on directory maintenance, transaction review, and lifecycle controls instead of application intake."
-          pills={[
-            <DashboardPill key="role" tone={isSuperadmin ? 'soft' : 'default'}>
-              {isSuperadmin ? 'Superadmin controls enabled' : 'Admin access'}
-            </DashboardPill>,
-            <DashboardPill key="queue" tone={counts.pending > 0 ? 'warning' : 'default'}>
-              {counts.pending > 0 ? 'Pending merchant records' : 'Manual creation flow'}
-            </DashboardPill>,
-          ]}
-          aside={
-            <div className="grid grid-cols-2 gap-3">
-              <DashboardMiniStat
-                label="Merchant records"
-                value={counts.total.toLocaleString()}
-                meta="Profiles stored in the directory"
-                tone="soft"
-              />
-              <DashboardMiniStat
-                label="Active merchants"
-                value={counts.active.toLocaleString()}
-                meta="Partners already live"
-                tone="neutral"
-              />
-            </div>
-          }
-        />
+        <AdminSurface className="px-8 py-6">
+          <div className="space-y-2">
+            <h1
+              className="text-[2rem] font-black tracking-[-0.03em]"
+              style={{ color: 'var(--ink)' }}
+            >
+              Merchants
+            </h1>
+            <p className="text-base leading-7" style={{ color: 'var(--muted)' }}>
+              Manage partner merchant accounts.
+            </p>
+          </div>
+        </AdminSurface>
 
-        <AdminStatGrid>
-        <AdminStatCard
-          label="Merchant records"
-          value={counts.total.toLocaleString()}
-          meta="Every merchant profile currently stored in the directory."
-          accent="var(--accent)"
-        />
-        <AdminStatCard
-          label="Active merchants"
-          value={counts.active.toLocaleString()}
-          meta="Approved merchants currently able to operate in the ecosystem."
-          accent="var(--accent-strong)"
-        />
-        <AdminStatCard
-          label="Pending status review"
-          value={counts.pending.toLocaleString()}
-          meta="Legacy or imported merchant records that still need a decision."
-          accent="var(--accent-warm)"
-        />
-        <AdminStatCard
-          label="Selected transactions"
-          value={counts.transactions.toLocaleString()}
-          meta="QR and points-award activity for the merchant currently in focus."
-          accent="rgba(1, 67, 132, 0.34)"
-        />
-        </AdminStatGrid>
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <MerchantMetricCard
+            label="Merchant records"
+            value={counts.total.toLocaleString()}
+            description="Profiles stored in the directory"
+            icon={<Store size={22} />}
+            tone="blue"
+          />
+          <MerchantMetricCard
+            label="Active merchants"
+            value={counts.active.toLocaleString()}
+            description="Partners currently active"
+            icon={<UsersRound size={22} />}
+            tone="green"
+          />
+          <MerchantMetricCard
+            label="Pending review"
+            value={counts.pending.toLocaleString()}
+            description="Records awaiting your decision"
+            icon={<Clock3 size={22} />}
+            tone="amber"
+          />
+          <MerchantMetricCard
+            label="Total transactions"
+            value={counts.transactions.toLocaleString()}
+            description="QR and points activity (selected range)"
+            icon={<Repeat2 size={22} />}
+            tone="violet"
+          />
+        </section>
 
-        <AdminTabBar
-          value={activeTab}
-          onChange={(tab) => {
-            setActiveTab(tab)
-            if (tab === 'create') {
-              setCreateResult(null)
-              setCreateError('')
-            }
-          }}
-          tabs={tabs}
-        />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex items-end gap-8 border-b border-[var(--stroke)]">
+            {tabs.map((tab) => {
+              const active = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.id)
+                    setShowDirectoryDetails(false)
+                  }}
+                  className={cn(
+                    'relative inline-flex items-center gap-3 pb-4 text-sm font-semibold transition',
+                    active ? 'text-[var(--accent)]' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]',
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  {typeof tab.count === 'number' ? (
+                    <span
+                      className={cn(
+                        'inline-flex h-6 min-w-[24px] items-center justify-center rounded-full px-2 text-[11px] font-semibold',
+                        active ? 'bg-[rgba(30,91,255,0.1)] text-[var(--accent)]' : 'bg-[var(--surface-muted)] text-[var(--muted)]',
+                      )}
+                    >
+                      {tab.count}
+                    </span>
+                  ) : null}
+                  {active ? (
+                    <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[var(--accent)]" />
+                  ) : null}
+                </button>
+              )
+            })}
+            {activeTab === 'create' ? (
+              <span className="pb-4 text-sm font-semibold text-[var(--accent)]">
+                Create merchant
+              </span>
+            ) : null}
+          </div>
+
+          {isSuperadmin ? (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('create')
+                setCreateResult(null)
+                setCreateError('')
+              }}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(30,91,255,0.18)] transition hover:opacity-95"
+            >
+              <Plus size={16} />
+              Add merchant
+            </button>
+          ) : null}
+        </div>
 
         {activeTab === 'create' ? (
           <div className="mx-auto w-full max-w-3xl">
@@ -629,6 +737,311 @@ export default function MerchantsPage() {
               </AdminSurface>
             )}
           </div>
+        ) : isDirectoryTab ? (
+          <>
+            <AdminSurface className="px-6 py-5">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1.1fr_1.1fr_1fr_auto]">
+                <div>
+                  <AdminField label="Search">
+                    <div className="relative">
+                      <Search
+                        size={16}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+                        style={{ color: 'var(--muted)' }}
+                      />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search by name, email, or contact"
+                        className="surface-input h-11 w-full rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/25"
+                      />
+                    </div>
+                  </AdminField>
+                </div>
+
+                <div>
+                  <AdminField label="Status">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as MerchantStatus | 'all')}
+                      className={cn(inputClass, 'h-11')}
+                    >
+                      {statusOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </AdminField>
+                </div>
+
+                <div>
+                  <AdminField label="Category">
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className={cn(inputClass, 'h-11')}
+                    >
+                      <option value="all">All categories</option>
+                      {categoryOptions.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </AdminField>
+                </div>
+
+                <div>
+                  <AdminField label="Date joined">
+                    <input
+                      type="date"
+                      value={dateJoinedFilter}
+                      onChange={(e) => setDateJoinedFilter(e.target.value)}
+                      className={cn(inputClass, 'h-11')}
+                    />
+                  </AdminField>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('')
+                      setStatusFilter('all')
+                      setCategoryFilter('all')
+                      setDateJoinedFilter('')
+                    }}
+                    className="inline-flex h-11 items-center justify-center rounded-xl border px-5 text-sm font-semibold transition hover:bg-[var(--surface-muted)]"
+                    style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </AdminSurface>
+
+            <AdminSurface className="overflow-visible p-0">
+              {isLoading ? (
+                <div className="flex justify-center py-20">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
+                </div>
+              ) : filteredMerchants.length === 0 ? (
+                <div className="px-6 py-8">
+                  <AdminEmptyState
+                    title="No merchants match the current filters"
+                    description="Adjust the search, status, category, or date filters to surface more merchant records."
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-visible">
+                    <table className="w-full table-fixed">
+                      <colgroup>
+                        <col className="w-[31%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[19%]" />
+                        <col className="w-[10%]" />
+                      </colgroup>
+                      <thead className="border-b" style={{ borderColor: 'var(--stroke)' }}>
+                        <tr>
+                          {['Merchant', 'Category', 'Status', 'Date joined', 'Contact', 'Actions'].map((heading) => (
+                            <th
+                              key={heading}
+                              className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.16em]"
+                              style={{ color: 'var(--muted)' }}
+                            >
+                              {heading}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[color:var(--stroke)]">
+                        {paginatedMerchants.map((merchant) => (
+                          <tr key={merchant.id} className="transition-colors hover:bg-[color:var(--surface-muted)]/45">
+                            <td className="px-5 py-4">
+                              <div className="flex items-start gap-4">
+                                <div
+                                  className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border"
+                                  style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}
+                                >
+                                  {merchant.logoUrl || merchant.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={merchant.logoUrl || merchant.imageUrl}
+                                      alt={merchant.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-sm font-bold" style={{ color: 'var(--muted)' }}>
+                                      {getInitials(merchant.name)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+                                    {merchant.name}
+                                  </p>
+                                  <p className="mt-1 line-clamp-2 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+                                    {merchant.address || 'Address not provided'}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
+                              <span className="block truncate">{merchant.category || 'Uncategorized'}</span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <StatusPill status={merchant.status} />
+                            </td>
+                            <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
+                              {formatDate(merchant.createdAt)}
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="space-y-1.5 text-sm leading-5" style={{ color: 'var(--ink-soft)' }}>
+                                <p className="truncate">{merchant.ownerEmail || 'No email saved'}</p>
+                                <p className="truncate">{merchant.contactNumber || merchant.ownerPhone || 'No phone saved'}</p>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="relative flex items-center justify-end gap-2" ref={openActionMerchantId === merchant.id ? actionMenuRef : null}>
+                                <MerchantIconActionButton
+                                  label="View merchant details"
+                                  onClick={() => {
+                                    setSelectedMerchantId(merchant.id)
+                                    setShowDirectoryDetails(true)
+                                    setOpenActionMerchantId(null)
+                                  }}
+                                >
+                                  <Eye size={16} />
+                                </MerchantIconActionButton>
+                                <MerchantIconActionButton
+                                  label="Open merchant actions"
+                                  onClick={() => {
+                                    setSelectedMerchantId(merchant.id)
+                                    setOpenActionMerchantId((current) => (current === merchant.id ? null : merchant.id))
+                                  }}
+                                >
+                                  <MoreHorizontal size={16} />
+                                </MerchantIconActionButton>
+
+                                {openActionMerchantId === merchant.id ? (
+                                  <div
+                                    className="absolute right-0 top-11 z-20 min-w-[220px] rounded-2xl border bg-white p-2 shadow-[0_20px_45px_rgba(15,23,42,0.12)]"
+                                    style={{ borderColor: 'var(--stroke)' }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedMerchantId(merchant.id)
+                                        setShowDirectoryDetails(true)
+                                        setOpenActionMerchantId(null)
+                                      }}
+                                      className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-[var(--surface-muted)]"
+                                      style={{ color: 'var(--ink)' }}
+                                    >
+                                      View details
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedMerchantId(merchant.id)
+                                        setActiveTab('transactions')
+                                        setShowDirectoryDetails(false)
+                                        setOpenActionMerchantId(null)
+                                      }}
+                                      className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-[var(--surface-muted)]"
+                                      style={{ color: 'var(--ink)' }}
+                                    >
+                                      Open transactions
+                                    </button>
+                                    {isSuperadmin && merchant.status === 'pending' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleMerchantAction('approve', merchant)}
+                                        className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-[var(--surface-muted)]"
+                                        style={{ color: '#16a34a' }}
+                                      >
+                                        Approve merchant
+                                      </button>
+                                    ) : null}
+                                    {isSuperadmin && merchant.status === 'approved' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleMerchantAction('suspend', merchant)}
+                                        className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-[var(--surface-muted)]"
+                                        style={{ color: '#d97706' }}
+                                      >
+                                        Suspend merchant
+                                      </button>
+                                    ) : null}
+                                    {isSuperadmin && merchant.status === 'suspended' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleMerchantAction('reactivate', merchant)}
+                                        className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-[var(--surface-muted)]"
+                                        style={{ color: 'var(--accent)' }}
+                                      >
+                                        Reactivate merchant
+                                      </button>
+                                    ) : null}
+                                    {isSuperadmin && merchant.status !== 'rejected' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleMerchantAction('reject', merchant)}
+                                        className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-[var(--surface-muted)]"
+                                        style={{ color: '#ef4444' }}
+                                      >
+                                        Reject merchant
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div
+                    className="flex flex-col gap-4 border-t px-6 py-4 md:flex-row md:items-center md:justify-between"
+                    style={{ borderColor: 'var(--stroke)' }}
+                  >
+                    <p className="text-sm leading-6" style={{ color: 'var(--muted)' }}>
+                      Showing {directoryRangeStart}-{directoryRangeEnd} of {filteredMerchants.length} merchants
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <MerchantPagerButton
+                        onClick={() => setDirectoryPage((page) => Math.max(1, page - 1))}
+                        disabled={directoryPage === 1}
+                      >
+                        Previous
+                      </MerchantPagerButton>
+                      <span
+                        className="inline-flex h-9 min-w-[36px] items-center justify-center rounded-xl px-3 text-sm font-semibold"
+                        style={{ background: 'var(--accent)', color: '#ffffff' }}
+                      >
+                        {directoryPage}
+                      </span>
+                      <MerchantPagerButton
+                        onClick={() => setDirectoryPage((page) => Math.min(directoryPageCount, page + 1))}
+                        disabled={directoryPage === directoryPageCount}
+                      >
+                        Next
+                      </MerchantPagerButton>
+                    </div>
+                  </div>
+                </>
+              )}
+            </AdminSurface>
+
+          </>
         ) : (
           <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(360px,0.88fr)]">
             <AdminSurface className="h-full">
@@ -1054,25 +1467,344 @@ export default function MerchantsPage() {
           </div>
         )}
       </div>
+
+      {showDirectoryDetails && selectedMerchant ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.42)] px-4 py-6"
+          onClick={() => setShowDirectoryDetails(false)}
+        >
+          <div
+            className="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <AdminSurface className="overflow-visible p-6 sm:p-7">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p
+                    className="text-xs font-semibold uppercase tracking-[0.18em]"
+                    style={{ color: 'var(--accent-strong)' }}
+                  >
+                    Merchant profile
+                  </p>
+                  <h2 className="mt-2 text-xl font-semibold" style={{ color: 'var(--ink)' }}>
+                    {selectedMerchant.name}
+                  </h2>
+                  <p className="mt-1 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+                    {selectedMerchant.address || 'Address not provided'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <StatusPill status={selectedMerchant.status} />
+                  <button
+                    type="button"
+                    onClick={() => setShowDirectoryDetails(false)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-[var(--surface-muted)]"
+                    style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}
+                    aria-label="Close merchant details"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {message ? (
+                <div className="mt-5">
+                  <AdminNotice tone={messageTone}>{message}</AdminNotice>
+                </div>
+              ) : null}
+
+              <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                <div
+                  className="rounded-2xl border p-4"
+                  style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                        Merchant basics
+                      </h3>
+                      <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                        Core owner, category, address, and points-conversion details for the selected merchant.
+                      </p>
+                    </div>
+                    <DashboardPill tone="soft">Directory view</DashboardPill>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <DetailTile label="Business category" value={selectedMerchant.category || 'Uncategorized'} />
+                    <DetailTile label="Owner" value={selectedMerchant.ownerName || 'Unknown owner'} />
+                    <DetailTile label="Email" value={selectedMerchant.ownerEmail || 'No owner email'} />
+                    <DetailTile
+                      label="Contact number"
+                      value={selectedMerchant.contactNumber || selectedMerchant.ownerPhone || 'No phone saved'}
+                    />
+                    <DetailTile label="Date joined" value={formatDateTime(selectedMerchant.createdAt)} />
+                    <DetailTile
+                      label="Points rate"
+                      value={`PHP ${Number(selectedMerchant.pointsRate || 10).toLocaleString()} = 1 pt`}
+                    />
+                    <DetailTile label="Address" value={selectedMerchant.address || 'Address not provided'} fullWidth />
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-2xl border p-4"
+                  style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                        Storefront snapshot
+                      </h3>
+                      <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                        A read-only summary of what youth members currently see for this merchant.
+                      </p>
+                    </div>
+                    <DashboardPill tone="default">Customer-facing copy</DashboardPill>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    <DetailRow
+                      label="Business info"
+                      value={selectedMerchant.businessInfo || selectedMerchant.description || 'No business info yet'}
+                    />
+                    <DetailRow label="Discount info" value={selectedMerchant.discountInfo || 'No discount copy yet'} />
+                    <DetailRow
+                      label="Terms"
+                      value={selectedMerchant.termsAndConditions || 'No terms and conditions added yet'}
+                    />
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-2xl border p-4 xl:col-span-2"
+                  style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                        Discount and terms
+                      </h3>
+                      <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                        Admin can update these merchant-facing details on behalf of the partner.
+                      </p>
+                    </div>
+                    <DashboardPill tone={isSuperadmin ? 'soft' : 'default'}>
+                      {isSuperadmin ? 'Superadmin access' : 'Admin access'}
+                    </DashboardPill>
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    <textarea
+                      value={editor.discountInfo}
+                      onChange={(e) => setEditor((current) => ({ ...current, discountInfo: e.target.value }))}
+                      rows={3}
+                      placeholder="Discount information for youth members"
+                      className={inputClass}
+                    />
+                    <textarea
+                      value={editor.termsAndConditions}
+                      onChange={(e) => setEditor((current) => ({ ...current, termsAndConditions: e.target.value }))}
+                      rows={4}
+                      placeholder="Terms and conditions shown to the merchant and youth members"
+                      className={inputClass}
+                    />
+                    <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                      <input
+                        type="number"
+                        min="1"
+                        value={editor.pointsRate}
+                        onChange={(e) => setEditor((current) => ({ ...current, pointsRate: e.target.value }))}
+                        className={inputClass}
+                        placeholder="Points rate in pesos"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveMerchantProfile()}
+                        disabled={isSaving}
+                        className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{ background: 'var(--accent)' }}
+                      >
+                        Save details
+                      </button>
+                    </div>
+                    <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                      Default conversion is PHP 100 = 10 points.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-2xl border p-4 xl:col-span-2"
+                  style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                        Lifecycle actions
+                      </h3>
+                      <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                        Approval, rejection, suspension, and reactivation controls live here.
+                      </p>
+                    </div>
+                    {!isSuperadmin ? <DashboardPill tone="danger">Superadmin only</DashboardPill> : null}
+                  </div>
+
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <ActionButton
+                      label="Approve merchant"
+                      tone="green"
+                      disabled={!isSuperadmin || selectedMerchant.status === 'approved' || isSaving}
+                      onClick={() => void handleMerchantAction('approve')}
+                    />
+                    <ActionButton
+                      label="Reject merchant"
+                      tone="red"
+                      disabled={!isSuperadmin || selectedMerchant.status === 'rejected' || isSaving}
+                      onClick={() => void handleMerchantAction('reject')}
+                    />
+                    <ActionButton
+                      label="Suspend merchant"
+                      tone="amber"
+                      disabled={!isSuperadmin || selectedMerchant.status !== 'approved' || isSaving}
+                      onClick={() => void handleMerchantAction('suspend')}
+                    />
+                    <ActionButton
+                      label="Reactivate merchant"
+                      tone="blue"
+                      disabled={!isSuperadmin || selectedMerchant.status !== 'suspended' || isSaving}
+                      onClick={() => void handleMerchantAction('reactivate')}
+                    />
+                  </div>
+                </div>
+              </div>
+            </AdminSurface>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
 
-function StatusPill({ status }: { status: MerchantStatus }) {
-  const classes: Record<MerchantStatus, string> = {
-    pending: 'bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]',
-    approved: 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]',
-    rejected: 'bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]',
-    suspended: 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]',
-  }
-  const labels: Record<MerchantStatus, string> = {
-    pending: 'Pending',
-    approved: 'Active',
-    rejected: 'Rejected',
-    suspended: 'Suspended',
-  }
+function MerchantMetricCard({
+  label,
+  value,
+  description,
+  icon,
+  tone,
+}: {
+  label: string
+  value: string
+  description: string
+  icon: React.ReactNode
+  tone: 'blue' | 'green' | 'amber' | 'violet'
+}) {
+  const palette = getMerchantMetricPalette(tone)
 
-  return <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', classes[status])}>{labels[status]}</span>
+  return (
+    <div
+      className="min-h-[136px] rounded-[20px] border bg-white px-6 py-5 shadow-[var(--shadow-sm)]"
+      style={{ borderColor: 'var(--stroke)' }}
+    >
+      <div className="flex items-start gap-4">
+        <div
+          className="grid h-14 w-14 shrink-0 place-items-center rounded-full"
+          style={{ background: palette.background, color: palette.color }}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--muted)' }}>
+            {label}
+          </p>
+          <p className="mt-3 text-[2.15rem] font-black leading-none tracking-[-0.03em]" style={{ color: 'var(--ink)' }}>
+            {value}
+          </p>
+          <p className="mt-3 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MerchantIconActionButton({
+  children,
+  label,
+  onClick,
+}: {
+  children: React.ReactNode
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border transition hover:bg-[var(--surface-muted)]"
+      style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function MerchantPagerButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  disabled: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex h-9 items-center justify-center rounded-xl border px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-45"
+      style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function StatusPill({ status }: { status: MerchantStatus }) {
+  const classes: Record<MerchantStatus, { badge: string; dot: string; label: string }> = {
+    pending: {
+      badge: 'bg-[#eff6ff] text-[#1e5bff]',
+      dot: 'bg-[#1e5bff]',
+      label: 'Pending',
+    },
+    approved: {
+      badge: 'bg-[#ecfdf5] text-[#16a34a]',
+      dot: 'bg-[#16a34a]',
+      label: 'Active',
+    },
+    rejected: {
+      badge: 'bg-[#fef2f2] text-[#ef4444]',
+      dot: 'bg-[#ef4444]',
+      label: 'Rejected',
+    },
+    suspended: {
+      badge: 'bg-[#fef2f2] text-[#ef4444]',
+      dot: 'bg-[#ef4444]',
+      label: 'Suspended',
+    },
+  }
+  const current = classes[status]
+
+  return (
+    <span className={cn('inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold', current.badge)}>
+      <span className={cn('h-1.5 w-1.5 rounded-full', current.dot)} />
+      {current.label}
+    </span>
+  )
 }
 
 function ActionButton({
@@ -1112,7 +1844,10 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
         {label}
       </span>
-      <span className="max-w-[240px] text-right text-sm font-medium leading-6" style={{ color: 'var(--ink)' }}>
+      <span
+        className="max-w-[240px] break-words text-right text-sm font-medium leading-6 [overflow-wrap:anywhere]"
+        style={{ color: 'var(--ink)' }}
+      >
         {value}
       </span>
     </div>
@@ -1130,7 +1865,7 @@ function DetailTile({
 }) {
   return (
     <div
-      className={cn('rounded-2xl border px-4 py-3', fullWidth ? 'sm:col-span-2' : '')}
+      className={cn('min-w-0 rounded-2xl border px-4 py-3', fullWidth ? 'sm:col-span-2' : '')}
       style={{
         borderColor: 'var(--stroke)',
         background: 'color-mix(in srgb, var(--surface-muted) 70%, transparent)',
@@ -1139,7 +1874,10 @@ function DetailTile({
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
         {label}
       </p>
-      <p className="mt-2 text-sm font-medium leading-6" style={{ color: 'var(--ink)' }}>
+      <p
+        className="mt-2 break-words text-sm font-medium leading-6 [overflow-wrap:anywhere]"
+        style={{ color: 'var(--ink)' }}
+      >
         {value}
       </p>
     </div>
@@ -1319,12 +2057,44 @@ function buildPaginationPages(current: number, total: number): Array<number | 'e
   return pages
 }
 
+function getMerchantMetricPalette(tone: 'blue' | 'green' | 'amber' | 'violet') {
+  if (tone === 'green') {
+    return {
+      background: '#ecfdf5',
+      color: '#16a34a',
+    }
+  }
+
+  if (tone === 'amber') {
+    return {
+      background: '#fff7ed',
+      color: '#f59e0b',
+    }
+  }
+
+  if (tone === 'violet') {
+    return {
+      background: '#f5f3ff',
+      color: '#7c3aed',
+    }
+  }
+
+  return {
+    background: '#edf4ff',
+    color: '#1e5bff',
+  }
+}
+
 function formatDate(value?: string) {
   if (!value) return 'Not recorded'
 
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return 'Not recorded'
-  return parsed.toLocaleDateString('en-PH')
+  return parsed.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function formatDateTime(value?: string) {
@@ -1332,7 +2102,13 @@ function formatDateTime(value?: string) {
 
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return 'Not recorded'
-  return parsed.toLocaleString('en-PH')
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 function CredentialRow({
   label,
