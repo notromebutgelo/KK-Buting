@@ -328,6 +328,13 @@ export function SelectField({
     setSearchQuery("");
   }
 
+  const pickerSubtitle =
+    helperText ||
+    description ||
+    (searchable
+      ? "Search or browse the options below."
+      : "Choose one option below.");
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -398,11 +405,7 @@ export function SelectField({
               <div className="pf-picker-head">
                 <div className="pf-picker-copy">
                   <h3 className="pf-picker-title" id={sheetTitleId}>{label}</h3>
-                  <p className="pf-picker-subtitle">
-                    {searchable
-                      ? "Search or browse the options below."
-                      : "Choose one option below."}
-                  </p>
+                  <p className="pf-picker-subtitle">{pickerSubtitle}</p>
                 </div>
                 <button
                   type="button"

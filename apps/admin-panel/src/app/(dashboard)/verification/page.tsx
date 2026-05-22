@@ -490,13 +490,13 @@ export default function VerificationPage() {
 
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <AdminSurface className="px-6 py-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <div className="flex items-center gap-2.5">
                 <h1
-                  className="text-[1.95rem] font-black tracking-[-0.04em]"
+                  className="text-[clamp(1.85rem,3vw,1.95rem)] font-black tracking-[-0.04em]"
                   style={{ color: 'var(--ink)' }}
                 >
                   Verification Queue
@@ -511,7 +511,7 @@ export default function VerificationPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => void handleRefresh()}
@@ -533,7 +533,7 @@ export default function VerificationPage() {
             </div>
           </div>
 
-          <section className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <section className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-4">
             <VerificationMetricCard
               label="Pending Review"
               value={queueMetrics.pendingReview.toLocaleString()}
@@ -881,12 +881,12 @@ export default function VerificationPage() {
 
         <AdminSurface className="sticky top-6 self-start px-6 py-6">
           <div className="flex items-start justify-between gap-3">
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent)]">
                   <ShieldCheck className="h-4.5 w-4.5" strokeWidth={2.1} />
                 </span>
-                <h2 className="text-[1.85rem] font-black tracking-[-0.04em]" style={{ color: 'var(--ink)' }}>
+                <h2 className="text-[clamp(1.65rem,3vw,1.85rem)] font-black tracking-[-0.04em]" style={{ color: 'var(--ink)' }}>
                   Review Submission
                 </h2>
               </div>
@@ -957,7 +957,7 @@ export default function VerificationPage() {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[1.35rem] font-black tracking-[-0.03em]" style={{ color: 'var(--ink)' }}>
+                    <h3 className="break-words text-[clamp(1.15rem,2.1vw,1.35rem)] font-black tracking-[-0.03em]" style={{ color: 'var(--ink)' }}>
                       {selectedProfile.fullName}
                     </h3>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -999,7 +999,7 @@ export default function VerificationPage() {
                 {visibleDocuments.map((document) => (
                   <div
                     key={document.id}
-                    className="grid min-h-[72px] grid-cols-[72px_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[16px] border px-3 py-3"
+                    className="grid min-h-[72px] grid-cols-[72px_minmax(0,1fr)] gap-3 rounded-[16px] border px-3 py-3 sm:grid-cols-[72px_minmax(0,1fr)_auto_auto] sm:items-center"
                     style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
                   >
                     <button
@@ -1037,12 +1037,14 @@ export default function VerificationPage() {
                       </p>
                     </div>
 
-                    <DocumentStatusBadge status={document.reviewStatus} />
+                    <div className="sm:justify-self-start">
+                      <DocumentStatusBadge status={document.reviewStatus} />
+                    </div>
 
                     <button
                       type="button"
                       onClick={() => handlePreviewDocument(document.fileUrl)}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[color:var(--surface-muted)]"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[color:var(--surface-muted)] sm:justify-self-end"
                       style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
                     >
                       <Eye className="h-4.5 w-4.5" strokeWidth={2.1} />
@@ -1241,24 +1243,24 @@ function VerificationMetricCard({
 
   return (
     <div
-      className="min-h-[118px] rounded-[18px] border px-6 py-5 shadow-[0_10px_28px_rgba(15,76,151,0.05)]"
+      className="h-full min-h-[142px] rounded-[18px] border px-5 py-5 shadow-[0_10px_28px_rgba(15,76,151,0.05)]"
       style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col gap-4 min-[420px]:flex-row min-[420px]:items-start">
         <div
           className="grid h-12 w-12 shrink-0 place-items-center rounded-full"
           style={{ background: palette.background, color: palette.color }}
         >
           {icon}
         </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--ink-soft)' }}>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] break-words" style={{ color: 'var(--ink-soft)' }}>
             {label}
           </p>
           <p className="mt-3 text-[1.95rem] font-black leading-none tracking-[-0.03em]" style={{ color: palette.color }}>
             {value}
           </p>
-          <p className="mt-2.5 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+          <p className="mt-2.5 text-sm leading-6 break-words" style={{ color: 'var(--muted)' }}>
             {description}
           </p>
         </div>
