@@ -502,6 +502,7 @@ export function SelectField({
                     No matching options found. Try a shorter keyword.
                   </div>
                 )}
+                <div className="pf-picker-list-spacer" aria-hidden="true" />
               </div>
             </div>
           </div>
