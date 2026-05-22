@@ -750,6 +750,11 @@ export function validateYouthProfileUpdateRequest(req: Request) {
     });
   }
 
+  const contactNumber = toTrimmedString(body.contactNumber);
+  if (contactNumber && !/^09\d{9}$/.test(contactNumber)) {
+    errors.push("contactNumber must be 11 digits and start with 09.");
+  }
+
   validateNumber(errors, body, "age", "age", { min: 0, integer: true });
   validateNumber(errors, body, "yearsInBarangay", "yearsInBarangay", { min: 0, integer: true });
   validateBoolean(errors, body, "registeredSkVoter", "registeredSkVoter");

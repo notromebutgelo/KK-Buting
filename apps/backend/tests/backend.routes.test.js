@@ -664,6 +664,74 @@ const tests = [
       assert.equal(controllerCalled, true);
     },
   },
+  {
+    name: "profiling routes reject invalid contact numbers before controller execution",
+    async run() {
+      let submitCalled = false;
+      let updateCalled = false;
+
+      const router = loadDistModuleWithMocks("dist/src/modules/profiling/profiling.routes", {
+        "dist/src/middleware/verifyToken": {
+          verifyToken: createVerifyTokenMock(),
+        },
+        "dist/src/modules/profiling/profiling.controller": {
+          submitProfilingHandler: async (_req, res) => {
+            submitCalled = true;
+            res.status(201).json({ message: "Profiling submitted" });
+          },
+          getProfilingHandler: async (_req, res) => res.json({}),
+          updateProfilingHandler: async (_req, res) => {
+            updateCalled = true;
+            res.json({ message: "Profile updated" });
+          },
+        },
+      }).default;
+
+      await withExpressServer(router, async (baseUrl) => {
+        const invalidSubmit = await requestJson(baseUrl, "/", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "youth",
+          },
+          body: {
+            firstName: "Juan",
+            contactNumber: "08123456789",
+          },
+        });
+
+        assert.equal(invalidSubmit.status, 400);
+        assert.equal(invalidSubmit.body.error, "Invalid request payload.");
+        assert.ok(
+          invalidSubmit.body.details.includes(
+            "contactNumber must be 11 digits and start with 09."
+          )
+        );
+
+        const invalidUpdate = await requestJson(baseUrl, "/me", {
+          method: "PATCH",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "youth",
+          },
+          body: {
+            contactNumber: "0912345",
+          },
+        });
+
+        assert.equal(invalidUpdate.status, 400);
+        assert.equal(invalidUpdate.body.error, "Invalid request payload.");
+        assert.ok(
+          invalidUpdate.body.details.includes(
+            "contactNumber must be 11 digits and start with 09."
+          )
+        );
+      });
+
+      assert.equal(submitCalled, false);
+      assert.equal(updateCalled, false);
+    },
+  },
 ];
 
 (async () => {

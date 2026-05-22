@@ -226,6 +226,11 @@
   color: rgba(27, 58, 107, 0.35);
 }
 
+.pf-input-invalid {
+  border-color: rgba(166, 61, 61, 0.72);
+  box-shadow: 0 0 0 3px rgba(166, 61, 61, 0.08);
+}
+
 .pf-textarea {
   min-height: 108px;
   resize: vertical;
@@ -245,26 +250,39 @@
   color: rgba(15, 40, 86, 0.6);
 }
 
+.pf-input-error {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #a63d3d;
+}
+
 .pf-select-wrap {
   position: relative;
 }
 
+.pf-select-wrap.open .pf-select-trigger {
+  border-color: rgba(5, 114, 220, 0.34);
+  box-shadow: 0 12px 26px rgba(1, 67, 132, 0.14);
+}
+
 .pf-select-trigger {
   width: 100%;
-  min-height: 49px;
-  padding: 12px 14px;
+  min-height: 56px;
+  padding: 14px 16px;
   background: var(--kk-input-bg);
   border: 1.5px solid var(--kk-input-border);
-  border-radius: var(--radius-input);
+  border-radius: 16px;
   color: var(--kk-blue);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   text-align: left;
   font-size: 15px;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(255, 255, 255, 0.16);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .pf-select-trigger.placeholder {
@@ -274,6 +292,12 @@
 .pf-select-value {
   flex: 1;
   min-width: 0;
+  font-weight: 700;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .pf-select-chevron {
@@ -286,45 +310,197 @@
   transform: rotate(180deg);
 }
 
-.pf-select-popover {
+.pf-picker-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.pf-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(7, 23, 52, 0.46);
+  backdrop-filter: blur(6px);
+}
+
+.pf-picker-sheet {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(100% + 8px);
-  z-index: 30;
+  bottom: 0;
+  max-height: min(78dvh, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px 18px calc(18px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(255, 244, 217, 0.98) 0%, rgba(255, 249, 236, 0.995) 100%);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -12px 38px rgba(15, 40, 86, 0.24);
 }
 
-.pf-select-options {
-  max-height: 240px;
-  overflow-y: auto;
-  border-radius: 18px;
-  padding: 8px;
-  background: rgba(255, 249, 236, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 18px 34px rgba(15, 40, 86, 0.18);
-  backdrop-filter: blur(14px);
+.pf-picker-handle {
+  width: 52px;
+  height: 5px;
+  margin: 0 auto 2px;
+  border-radius: 999px;
+  background: rgba(27, 58, 107, 0.18);
 }
 
-.pf-select-option {
-  width: 100%;
-  padding: 12px 14px;
+.pf-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pf-picker-copy {
+  min-width: 0;
+}
+
+.pf-picker-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--kk-blue);
+}
+
+.pf-picker-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(15, 40, 86, 0.65);
+}
+
+.pf-picker-close {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
   border: none;
-  background: transparent;
-  border-radius: 12px;
-  text-align: left;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: rgba(27, 58, 107, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 18px rgba(15, 40, 86, 0.08);
+}
+
+.pf-picker-search-wrap {
+  position: relative;
+}
+
+.pf-picker-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(27, 58, 107, 0.45);
+}
+
+.pf-picker-search-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px 12px 42px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(1, 67, 132, 0.1);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--kk-blue);
   font-size: 14px;
   font-weight: 600;
+  outline: none;
+}
+
+.pf-picker-search-input::placeholder {
+  color: rgba(27, 58, 107, 0.38);
+}
+
+.pf-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.pf-picker-option {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid rgba(1, 67, 132, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--kk-blue);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
   cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.pf-select-option.selected {
-  background: linear-gradient(90deg, #014384 0%, #035db7 52%, #0572dc 100%);
+.pf-picker-option:active {
+  transform: scale(0.995);
+}
+
+.pf-picker-option.selected {
+  border-color: rgba(5, 114, 220, 0.34);
+  box-shadow: 0 10px 22px rgba(1, 67, 132, 0.12);
+  background: rgba(225, 239, 255, 0.96);
+}
+
+.pf-picker-option-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-picker-option-label {
+  display: block;
+  font-size: 14px;
+  line-height: 1.42;
+  font-weight: 700;
+  color: var(--kk-blue);
+}
+
+.pf-picker-option-indicator {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(1, 67, 132, 0.22);
+  background: white;
   color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.pf-select-option:not(.selected):hover {
-  background: rgba(1, 67, 132, 0.08);
+.pf-picker-option-indicator.selected {
+  border-color: var(--kk-blue-md);
+  background: var(--kk-blue-md);
+}
+
+.pf-picker-empty {
+  padding: 22px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(15, 40, 86, 0.62);
+}
+
+@media (min-width: 768px) {
+  .pf-picker-sheet {
+    left: max(24px, calc(50% - 280px));
+    right: max(24px, calc(50% - 280px));
+    bottom: 20px;
+    border-radius: 28px;
+    max-height: min(72dvh, 720px);
+  }
 }
 
 .pf-phone-row {
@@ -435,18 +611,18 @@
 .pf-option-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .pf-option-card {
   width: 100%;
   border: 1px solid rgba(1, 67, 132, 0.12);
-  border-radius: 18px;
-  padding: 14px 15px;
+  border-radius: 16px;
+  padding: 13px 14px;
   background: rgba(255, 255, 255, 0.88);
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   text-align: left;
   color: var(--kk-blue);
   cursor: pointer;
@@ -505,9 +681,9 @@
 }
 
 .pf-option-text {
-  font-size: 14px;
-  line-height: 1.5;
-  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.42;
+  font-weight: 700;
 }
 
 .pf-bottombar {

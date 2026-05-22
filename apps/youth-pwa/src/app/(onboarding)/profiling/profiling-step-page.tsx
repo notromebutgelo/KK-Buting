@@ -5,23 +5,25 @@ import { useRouter } from "next/navigation";
 import SignaturePad, { type SignaturePadHandle } from "@/components/ui/SignaturePad";
 import {
   CONSENT_AGREE,
+  PROFILE_CONTACT_NUMBER_MAX_LENGTH,
   type ProfilingDraft,
   type ProfilingFieldConfig,
+  getFieldValidationError,
   getNextStepPath,
   getPreviousStepPath,
   getStepByNumber,
   isFieldVisible,
   isOtherOptionSelected,
+  normalizeProfileContactNumber,
   sanitizeDraftForVisibility,
   isStepComplete,
 } from "./profiling-schema";
 import {
+  AdaptiveSingleChoiceField,
   CheckboxListField,
   FooterBranding,
   NextArrowButton,
   ProfilingShell,
-  RadioListField,
-  SelectField,
   TextAreaField,
   TextField,
   readProfilingDraft,
@@ -40,7 +42,12 @@ export function ProfilingStepPage({ stepNumber }: { stepNumber: number }) {
   const isValid = useMemo(() => isStepComplete(step, draft), [draft, step]);
 
   function updateField<K extends keyof ProfilingDraft>(key: K, value: ProfilingDraft[K]) {
-    setDraft((prev) => sanitizeDraftForVisibility({ ...prev, [key]: value }));
+    const nextValue =
+      key === "contactNumber" && typeof value === "string"
+        ? (normalizeProfileContactNumber(value) as ProfilingDraft[K])
+        : value;
+
+    setDraft((prev) => sanitizeDraftForVisibility({ ...prev, [key]: nextValue }));
   }
 
   function handleSubmit(event: React.FormEvent) {
@@ -112,6 +119,8 @@ function QuestionField({
   const rawValue = draft[field.key];
   const stringValue = typeof rawValue === "string" ? rawValue : "";
   const arrayValue = Array.isArray(rawValue) ? rawValue : [];
+  const isContactNumberField = field.key === "contactNumber";
+  const fieldError = getFieldValidationError(field, draft);
   const showOtherField = field.otherKey && isOtherOptionSelected(field, draft);
   const otherKey = field.otherKey;
   const otherValue =
@@ -129,7 +138,9 @@ function QuestionField({
               placeholder={field.placeholder}
               type={field.inputType || "text"}
               required={field.required}
-              inputMode={field.inputMode}
+              inputMode={isContactNumberField ? "numeric" : field.inputMode}
+              maxLength={isContactNumberField ? PROFILE_CONTACT_NUMBER_MAX_LENGTH : undefined}
+              error={fieldError}
             />
             {field.description ? <p className="pf-question-copy">{field.description}</p> : null}
             {field.helperText ? <p className="pf-input-hint">{field.helperText}</p> : null}
@@ -150,29 +161,17 @@ function QuestionField({
           </div>
         );
       case "select":
-        return (
-          <div>
-            <SelectField
-              label={field.label}
-              value={stringValue}
-              onChange={(value) => onChange(field.key, value)}
-              options={field.options || []}
-              placeholder={field.placeholder || "Select an option"}
-              required={field.required}
-            />
-            {field.description ? <p className="pf-question-copy">{field.description}</p> : null}
-            {field.helperText ? <p className="pf-input-hint">{field.helperText}</p> : null}
-          </div>
-        );
       case "radio":
         return (
-          <RadioListField
+          <AdaptiveSingleChoiceField
             label={field.label}
             description={field.description}
             helperText={field.helperText}
             options={field.options || []}
             value={stringValue}
             onChange={(value) => onChange(field.key, value)}
+            placeholder={field.placeholder || "Select an option"}
+            required={field.required}
           />
         );
       case "checkbox":

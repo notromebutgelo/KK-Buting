@@ -68,6 +68,6 @@ function normalizeEmergencyContactPhone(value: unknown) {
 
 function normalizeProfileContactNumber(value: unknown) {
   return String(value || "")
-    .replace(/[^\d+()\-\s]/g, "")
-    .trim();
+    .replace(/\D/g, "")
+    .slice(0, 11);
 }

@@ -189,6 +189,9 @@ export type ProfilingStepConfig = {
   sections: ProfilingStepSection[];
 };
 
+export const PROFILE_CONTACT_NUMBER_MAX_LENGTH = 11;
+const PROFILE_CONTACT_NUMBER_PATTERN = /^09\d{9}$/;
+
 const MONTH_OPTIONS = [
   "January (Enero)",
   "February (Pebrero)",
@@ -923,9 +926,9 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             type: "text",
             placeholder: "Example: 09171234567",
             inputType: "tel",
-            inputMode: "tel",
+            inputMode: "numeric",
             helperText:
-              "Optional ito, pero ito ang gagamitin sa Contact No. field ng iyong Digital ID.",
+              "Optional ito, pero kung maglalagay ka dapat 11 digits ito at nagsisimula sa 09 para magamit sa Contact No. field ng iyong Digital ID.",
           },
           {
             key: "currentAddressSameAsPermanent",
@@ -1813,6 +1816,7 @@ function hasAllowedSingleChoiceValue(
 
 export function sanitizeDraftForVisibility(draft: ProfilingDraft) {
   const nextDraft: ProfilingDraft = { ...draft };
+  nextDraft.contactNumber = normalizeProfileContactNumber(nextDraft.contactNumber);
   const allFields = PROFILING_STEPS.flatMap((step) =>
     step.sections.flatMap((section) => section.fields)
   );
@@ -1896,7 +1900,12 @@ export function isOtherOptionSelected(field: ProfilingFieldConfig, draft: Profil
 }
 
 function isFieldComplete(field: ProfilingFieldConfig, draft: ProfilingDraft) {
-  if (!field.required || !isFieldVisible(field, draft)) return true;
+  if (!isFieldVisible(field, draft)) return true;
+
+  const validationError = getFieldValidationError(field, draft);
+  if (!field.required) {
+    return !validationError;
+  }
 
   const value = draft[field.key];
   if (isBlank(value)) return false;
@@ -1906,7 +1915,19 @@ function isFieldComplete(field: ProfilingFieldConfig, draft: ProfilingDraft) {
     return !isBlank(draft[field.otherKey]);
   }
 
-  return true;
+  return !validationError;
+}
+
+export function getFieldValidationError(field: ProfilingFieldConfig, draft: ProfilingDraft) {
+  if (!isFieldVisible(field, draft)) {
+    return "";
+  }
+
+  if (field.key === "contactNumber") {
+    return getProfileContactNumberError(draft.contactNumber);
+  }
+
+  return "";
 }
 
 export function getStepByNumber(stepNumber: number) {
@@ -2152,8 +2173,22 @@ export function formatFieldValueForReview(
   return String(value || "");
 }
 
-function normalizeProfileContactNumber(value: string | undefined) {
+export function normalizeProfileContactNumber(value: string | undefined) {
   return String(value || "")
-    .replace(/[^\d+()\-\s]/g, "")
-    .trim();
+    .replace(/\D/g, "")
+    .slice(0, PROFILE_CONTACT_NUMBER_MAX_LENGTH);
+}
+
+export function getProfileContactNumberError(value: string | undefined) {
+  const normalizedValue = normalizeProfileContactNumber(value);
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  if (!PROFILE_CONTACT_NUMBER_PATTERN.test(normalizedValue)) {
+    return "Contact number must be 11 digits and start with 09.";
+  }
+
+  return "";
 }
