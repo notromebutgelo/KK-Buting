@@ -16,8 +16,6 @@ const DIGITAL_ID_TERMS_TEXT =
 const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
 const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
 const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
-const DIGITAL_ID_FRONT_LEFT_LOGO_SRC = '/images/brgy logo.png'
-
 export default function DigitalIDCard({
   profile,
   memberId,
@@ -119,14 +117,6 @@ export function DigitalIdFace({
         alt="Digital KK ID front background"
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <div className="pointer-events-none absolute left-[2.9%] top-[3.2%] z-[1] w-[11%] max-w-[44px] min-w-[30px] overflow-hidden rounded-full bg-white/96 p-[0.55%] shadow-[0_10px_20px_rgba(1,67,132,0.22)]">
-        <img
-          src={DIGITAL_ID_FRONT_LEFT_LOGO_SRC}
-          alt="Barangay Buting logo"
-          className="h-auto w-full object-contain"
-        />
-      </div>
-
       <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
         <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
           <div className="flex flex-col items-center">
