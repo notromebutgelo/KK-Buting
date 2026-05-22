@@ -44,6 +44,7 @@ const DIGITAL_ID_TERMS_TEXT =
 const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
 const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
 const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
+const DIGITAL_ID_FRONT_LEFT_LOGO_SRC = '/images/brgy logo.png'
 const REQUEST_CONTACT_NUMBER_MAX_LENGTH = 11
 
 export default function DigitalIDPage() {
@@ -1121,8 +1122,9 @@ async function buildDigitalIdPdf({
     format: [700, 460],
   })
 
-  const [frontBg, photoData, signatureData] = await Promise.all([
+  const [frontBg, frontLeftLogo, photoData, signatureData] = await Promise.all([
     loadImageData('/images/KK ID - Front BG.png'),
+    loadImageData(DIGITAL_ID_FRONT_LEFT_LOGO_SRC).catch(() => ''),
     photoUrl ? loadImageData(photoUrl, 'jpeg').catch(() => '') : Promise.resolve(''),
     signatureUrl ? loadImageData(signatureUrl).catch(() => '') : Promise.resolve(''),
   ])
@@ -1155,6 +1157,9 @@ async function buildDigitalIdPdf({
   doc.rect(0, 0, 460, 700, 'F')
 
   doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
+  if (frontLeftLogo) {
+    doc.addImage(frontLeftLogo, 'PNG', 32, 28, 42, 42)
+  }
   doc.setFillColor(244, 242, 236)
   doc.roundedRect(20, 330, 420, 266, 24, 24, 'F')
   doc.setDrawColor(80, 88, 82)
