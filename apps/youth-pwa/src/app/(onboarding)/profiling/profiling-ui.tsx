@@ -339,7 +339,9 @@ export function SelectField({
     if (!isOpen) return;
 
     const previousOverflow = document.body.style.overflow;
+    const previousPickerState = document.body.dataset.profilingPickerOpen;
     document.body.style.overflow = "hidden";
+    document.body.dataset.profilingPickerOpen = "true";
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -355,6 +357,11 @@ export function SelectField({
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      if (previousPickerState) {
+        document.body.dataset.profilingPickerOpen = previousPickerState;
+      } else {
+        delete document.body.dataset.profilingPickerOpen;
+      }
       document.removeEventListener("keydown", handleEscape);
       if (focusTimeout) {
         window.clearTimeout(focusTimeout);
