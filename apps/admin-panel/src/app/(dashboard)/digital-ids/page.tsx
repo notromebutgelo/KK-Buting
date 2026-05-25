@@ -104,7 +104,7 @@ const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
 const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
 const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
 const DIGITAL_ID_SIGNATORY_OFFICE = ''
-
+const DIGITAL_ID_BARANGAY_LOGO_SRC = '/images/brgy logo.png'
 export default function DigitalIdsPage() {
   const [members, setMembers] = useState<DigitalIdMember[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -842,6 +842,11 @@ function DigitalIdPreviewCard({
     return (
       <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
         <img src="/images/KK ID - Front BG.png" alt="KK ID front background" className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={DIGITAL_ID_BARANGAY_LOGO_SRC}
+          alt="Barangay Buting seal"
+          className="absolute left-[4.45%] top-[3.15%] h-[12.8%] w-auto object-contain"
+        />
         <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
           <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
             <div className="flex flex-col items-center">
@@ -1052,6 +1057,7 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   })
 
   const frontBg = await loadImageData('/images/KK ID - Front BG.png')
+  const barangayLogo = await loadImageData(DIGITAL_ID_BARANGAY_LOGO_SRC)
   const photoData = member.photoUrl || member.profilePhotoUrl
     ? await loadImageData(member.photoUrl || member.profilePhotoUrl || '', 'jpeg').catch(() => '')
     : ''
@@ -1072,6 +1078,7 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   doc.rect(0, 0, 460, 700, 'F')
 
   doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
+  doc.addImage(barangayLogo, 'PNG', 38.7, 28.4, 34, 34)
   doc.setFillColor(244, 242, 236)
   doc.roundedRect(20, 330, 420, 266, 24, 24, 'F')
   doc.setDrawColor(80, 88, 82)
