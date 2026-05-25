@@ -17,6 +17,7 @@ const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
 const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
 const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
 const DIGITAL_ID_BARANGAY_LOGO_SRC = '/images/brgy logo.png'
+const DIGITAL_ID_SK_LOGO_SRC = '/images/SKButingLogo.png'
 export default function DigitalIDCard({
   profile,
   memberId,
@@ -112,17 +113,13 @@ export function DigitalIdFace({
   qrCodeUrl?: string
 }) {
   return (
-    <div className="relative aspect-[1.58/1] overflow-hidden rounded-[26px] ring-1 ring-[#d7e3f1] shadow-[0_20px_40px_rgba(1,67,132,0.18)]">
+    <div className="relative aspect-[1.58/1] overflow-hidden rounded-[26px] [container-type:inline-size] ring-1 ring-[#d7e3f1] shadow-[0_20px_40px_rgba(1,67,132,0.18)]">
       <img
         src={backgroundSrc}
         alt="Digital KK ID front background"
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <img
-        src={DIGITAL_ID_BARANGAY_LOGO_SRC}
-        alt="Barangay Buting seal"
-        className="absolute left-[2.8%] top-[4.1%] h-[10.4%] w-[10.4%] rounded-full object-contain"
-      />
+      <DigitalIdFrontHeader />
       <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
         <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
           <div className="flex flex-col items-center">
@@ -177,6 +174,32 @@ export function DigitalIdFace({
             ) : null}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function DigitalIdFrontHeader() {
+  return (
+    <div className="absolute inset-x-0 top-0 h-[18.9%] bg-[#014384] text-white">
+      <div className="absolute inset-x-0 bottom-0 h-[14%] bg-[#ffc20e]" />
+      <img
+        src={DIGITAL_ID_BARANGAY_LOGO_SRC}
+        alt="Barangay Buting seal"
+        className="absolute left-[4.1%] top-[16%] h-[62%] w-auto rounded-full object-contain"
+      />
+      <img
+        src={DIGITAL_ID_SK_LOGO_SRC}
+        alt="Katipunan ng Kabataan Barangay Buting seal"
+        className="absolute right-[4.1%] top-[16%] h-[62%] w-auto rounded-full object-contain"
+      />
+      <div className="absolute inset-x-[13.2%] top-[15%] text-center">
+        <p className="whitespace-nowrap font-serif text-[clamp(1rem,4.4cqw,2.05rem)] leading-none tracking-[0.08em]">
+          KATIPUNAN NG KABATAAN
+        </p>
+        <p className="mt-[1.2%] whitespace-nowrap text-[clamp(0.34rem,1.45cqw,0.68rem)] font-semibold uppercase leading-none tracking-[0.12em]">
+          Sangguniang Kabataan ng Barangay Buting
+        </p>
       </div>
     </div>
   )

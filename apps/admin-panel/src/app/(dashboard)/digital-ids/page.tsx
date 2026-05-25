@@ -105,6 +105,7 @@ const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
 const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
 const DIGITAL_ID_SIGNATORY_OFFICE = ''
 const DIGITAL_ID_BARANGAY_LOGO_SRC = '/images/brgy logo.png'
+const DIGITAL_ID_SK_LOGO_SRC = '/images/SKButingLogo.png'
 export default function DigitalIdsPage() {
   const [members, setMembers] = useState<DigitalIdMember[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -840,13 +841,9 @@ function DigitalIdPreviewCard({
 
   if (previewSide === 'front') {
     return (
-      <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
+      <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
         <img src="/images/KK ID - Front BG.png" alt="KK ID front background" className="absolute inset-0 h-full w-full object-cover" />
-        <img
-          src={DIGITAL_ID_BARANGAY_LOGO_SRC}
-          alt="Barangay Buting seal"
-          className="absolute left-[2.8%] top-[4.1%] h-[10.4%] w-[10.4%] rounded-full object-contain"
-        />
+        <DigitalIdFrontHeader />
         <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
           <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
             <div className="flex flex-col items-center">
@@ -931,6 +928,32 @@ function DigitalIdPreviewCard({
             ) : null}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function DigitalIdFrontHeader() {
+  return (
+    <div className="absolute inset-x-0 top-0 h-[18.9%] bg-[#014384] text-white">
+      <div className="absolute inset-x-0 bottom-0 h-[14%] bg-[#ffc20e]" />
+      <img
+        src={DIGITAL_ID_BARANGAY_LOGO_SRC}
+        alt="Barangay Buting seal"
+        className="absolute left-[4.1%] top-[16%] h-[62%] w-auto rounded-full object-contain"
+      />
+      <img
+        src={DIGITAL_ID_SK_LOGO_SRC}
+        alt="Katipunan ng Kabataan Barangay Buting seal"
+        className="absolute right-[4.1%] top-[16%] h-[62%] w-auto rounded-full object-contain"
+      />
+      <div className="absolute inset-x-[13.2%] top-[15%] text-center">
+        <p className="whitespace-nowrap font-serif text-[clamp(1rem,4.4cqw,2.05rem)] leading-none tracking-[0.08em]">
+          KATIPUNAN NG KABATAAN
+        </p>
+        <p className="mt-[1.2%] whitespace-nowrap text-[clamp(0.34rem,1.45cqw,0.68rem)] font-semibold uppercase leading-none tracking-[0.12em]">
+          Sangguniang Kabataan ng Barangay Buting
+        </p>
       </div>
     </div>
   )
@@ -1058,6 +1081,7 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
 
   const frontBg = await loadImageData('/images/KK ID - Front BG.png')
   const barangayLogo = await loadImageData(DIGITAL_ID_BARANGAY_LOGO_SRC)
+  const skLogo = await loadImageData(DIGITAL_ID_SK_LOGO_SRC)
   const photoData = member.photoUrl || member.profilePhotoUrl
     ? await loadImageData(member.photoUrl || member.profilePhotoUrl || '', 'jpeg').catch(() => '')
     : ''
@@ -1078,7 +1102,19 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   doc.rect(0, 0, 460, 700, 'F')
 
   doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
-  doc.addImage(barangayLogo, 'PNG', 31.8, 30.9, 27.6, 27.6)
+  doc.setFillColor(1, 67, 132)
+  doc.rect(20, 20, 420, 50, 'F')
+  doc.setFillColor(255, 194, 14)
+  doc.rect(20, 70, 420, 8, 'F')
+  doc.addImage(barangayLogo, 'PNG', 37, 28, 31, 31)
+  doc.addImage(skLogo, 'PNG', 392, 28, 31, 31)
+  doc.setTextColor(255, 255, 255)
+  doc.setFont('times', 'normal')
+  doc.setFontSize(26)
+  doc.text('KATIPUNAN NG KABATAAN', 230, 52, { align: 'center', maxWidth: 310 })
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.2)
+  doc.text('SANGGUNIANG KABATAAN NG BARANGAY BUTING', 230, 64, { align: 'center', maxWidth: 280 })
   doc.setFillColor(244, 242, 236)
   doc.roundedRect(20, 330, 420, 266, 24, 24, 'F')
   doc.setDrawColor(80, 88, 82)
