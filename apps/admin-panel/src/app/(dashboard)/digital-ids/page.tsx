@@ -845,7 +845,7 @@ function DigitalIdPreviewCard({
         <img
           src={DIGITAL_ID_BARANGAY_LOGO_SRC}
           alt="Barangay Buting seal"
-          className="absolute left-[4.45%] top-[3.15%] h-[12.8%] w-auto object-contain"
+          className="absolute left-[2.8%] top-[4.1%] h-[10.4%] w-[10.4%] rounded-full object-contain"
         />
         <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
           <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
@@ -1078,7 +1078,7 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   doc.rect(0, 0, 460, 700, 'F')
 
   doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
-  doc.addImage(barangayLogo, 'PNG', 38.7, 28.4, 34, 34)
+  doc.addImage(barangayLogo, 'PNG', 31.8, 30.9, 27.6, 27.6)
   doc.setFillColor(244, 242, 236)
   doc.roundedRect(20, 330, 420, 266, 24, 24, 'F')
   doc.setDrawColor(80, 88, 82)

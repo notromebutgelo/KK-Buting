@@ -121,7 +121,7 @@ export function DigitalIdFace({
       <img
         src={DIGITAL_ID_BARANGAY_LOGO_SRC}
         alt="Barangay Buting seal"
-        className="absolute left-[4.45%] top-[3.15%] h-[12.8%] w-auto object-contain"
+        className="absolute left-[2.8%] top-[4.1%] h-[10.4%] w-[10.4%] rounded-full object-contain"
       />
       <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
         <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
