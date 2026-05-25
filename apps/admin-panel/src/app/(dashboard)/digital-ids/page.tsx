@@ -936,7 +936,6 @@ function DigitalIdPreviewCard({
 function DigitalIdFrontHeader() {
   return (
     <div className="absolute inset-x-0 top-0 h-[18.9%] bg-[#014384] text-white">
-      <div className="absolute inset-x-0 bottom-0 h-[14%] bg-[#ffc20e]" />
       <img
         src={DIGITAL_ID_BARANGAY_LOGO_SRC}
         alt="Barangay Buting seal"
@@ -1104,8 +1103,6 @@ async function buildDigitalIdPdf(member: DigitalIdDetail) {
   doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
   doc.setFillColor(1, 67, 132)
   doc.rect(20, 20, 420, 50, 'F')
-  doc.setFillColor(255, 194, 14)
-  doc.rect(20, 70, 420, 8, 'F')
   doc.addImage(barangayLogo, 'PNG', 37, 28, 31, 31)
   doc.addImage(skLogo, 'PNG', 392, 28, 31, 31)
   doc.setTextColor(255, 255, 255)

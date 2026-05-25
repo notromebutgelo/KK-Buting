@@ -182,7 +182,6 @@ export function DigitalIdFace({
 function DigitalIdFrontHeader() {
   return (
     <div className="absolute inset-x-0 top-0 h-[18.9%] bg-[#014384] text-white">
-      <div className="absolute inset-x-0 bottom-0 h-[14%] bg-[#ffc20e]" />
       <img
         src={DIGITAL_ID_BARANGAY_LOGO_SRC}
         alt="Barangay Buting seal"
