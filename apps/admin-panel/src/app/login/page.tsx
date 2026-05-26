@@ -9,11 +9,13 @@ import { persistAdminSession } from '@/lib/session';
 const HARDCODED_ADMIN_CREDENTIALS = {
   'kk-buting-admin-7419': {
     email: 'admin@kkbapp-buting.com',
-    password: 'KKButing_Admin@7419!',
+    loginPassword: 'KKButing_Admin@7419!',
+    firebasePassword: 'KKAdmin123!',
   },
   'kk-buting-super-9632': {
     email: 'superadmin@kkbapp-buting.com',
-    password: 'KKButing_Super@9632!',
+    loginPassword: 'KKButing_Super@9632!',
+    firebasePassword: 'KKSuperAdmin123!',
   },
 } as const;
 
@@ -34,7 +36,7 @@ export default function AdminLoginPage() {
       const normalizedUsername = username.trim().toLowerCase() as AdminLoginUsername;
       const credential = HARDCODED_ADMIN_CREDENTIALS[normalizedUsername];
 
-      if (!credential || password !== credential.password) {
+      if (!credential || password !== credential.loginPassword) {
         setError('Invalid username or password.');
         setIsLoading(false);
         return;
@@ -43,7 +45,7 @@ export default function AdminLoginPage() {
       const userCredential = await signInWithEmailAndPassword(
         auth,
         credential.email,
-        credential.password,
+        credential.firebasePassword,
       );
       const token = await userCredential.user.getIdToken();
       const session = await persistAdminSession(token);
