@@ -2,7 +2,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 const admin = require('firebase-admin')
 
 const email = process.env.SEED_SUPERADMIN_EMAIL || 'superadmin@kkbapp-buting.com'
-const password = process.env.SEED_SUPERADMIN_PASSWORD || 'KKSuperAdmin123!'
+const password = process.env.SEED_SUPERADMIN_PASSWORD || 'KKButingSuper@9632!'
 const displayName = process.env.SEED_SUPERADMIN_NAME || 'KK Superadmin'
 
 if (!admin.apps.length) {

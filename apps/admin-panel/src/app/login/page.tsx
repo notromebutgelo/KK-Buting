@@ -7,15 +7,15 @@ import { auth } from '@/lib/firebase';
 import { persistAdminSession } from '@/lib/session';
 
 const HARDCODED_ADMIN_CREDENTIALS = {
-  'kk-buting-admin-7419': {
+  kkbutingadmin7419: {
     email: 'admin@kkbapp-buting.com',
-    loginPassword: 'KKButing_Admin@7419!',
-    firebasePassword: 'KKAdmin123!',
+    loginPassword: 'KKButingAdmin@7419!',
+    firebasePasswords: ['KKButingAdmin@7419!', 'KKAdmin123!'],
   },
-  'kk-buting-super-9632': {
+  kkbutingsuper9632: {
     email: 'superadmin@kkbapp-buting.com',
-    loginPassword: 'KKButing_Super@9632!',
-    firebasePassword: 'KKSuperAdmin123!',
+    loginPassword: 'KKButingSuper@9632!',
+    firebasePasswords: ['KKButingSuper@9632!', 'KKSuperAdmin123!'],
   },
 } as const;
 
@@ -42,11 +42,25 @@ export default function AdminLoginPage() {
         return;
       }
 
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        credential.email,
-        credential.firebasePassword,
-      );
+      let userCredential;
+      let firebaseAuthError: unknown;
+
+      for (const firebasePassword of credential.firebasePasswords) {
+        try {
+          userCredential = await signInWithEmailAndPassword(
+            auth,
+            credential.email,
+            firebasePassword,
+          );
+          break;
+        } catch (err) {
+          firebaseAuthError = err;
+        }
+      }
+
+      if (!userCredential) {
+        throw firebaseAuthError;
+      }
       const token = await userCredential.user.getIdToken();
       const session = await persistAdminSession(token);
       const role = session.user?.role;
