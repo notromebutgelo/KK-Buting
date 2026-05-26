@@ -6,9 +6,22 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { persistAdminSession } from '@/lib/session';
 
+const HARDCODED_ADMIN_CREDENTIALS = {
+  'kk-buting-admin-7419': {
+    email: 'admin@kkbapp-buting.com',
+    password: 'KKButing_Admin@7419!',
+  },
+  'kk-buting-super-9632': {
+    email: 'superadmin@kkbapp-buting.com',
+    password: 'KKButing_Super@9632!',
+  },
+} as const;
+
+type AdminLoginUsername = keyof typeof HARDCODED_ADMIN_CREDENTIALS;
+
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -18,7 +31,20 @@ export default function AdminLoginPage() {
     setError('');
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const normalizedUsername = username.trim().toLowerCase() as AdminLoginUsername;
+      const credential = HARDCODED_ADMIN_CREDENTIALS[normalizedUsername];
+
+      if (!credential || password !== credential.password) {
+        setError('Invalid username or password.');
+        setIsLoading(false);
+        return;
+      }
+
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        credential.email,
+        credential.password,
+      );
       const token = await userCredential.user.getIdToken();
       const session = await persistAdminSession(token);
       const role = session.user?.role;
@@ -29,7 +55,7 @@ export default function AdminLoginPage() {
         return;
       }
       window.localStorage.setItem('kk-admin-role', role);
-      window.localStorage.setItem('kk-admin-email', session.user?.email || email);
+      window.localStorage.setItem('kk-admin-email', session.user?.email || credential.email);
       router.push('/dashboard');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed';
@@ -38,7 +64,7 @@ export default function AdminLoginPage() {
         message.includes('user-not-found') ||
         message.includes('invalid-credential')
       ) {
-        setError('Invalid email or password.');
+        setError('Invalid username or password.');
       } else {
         setError('Login failed. Please try again.');
       }
@@ -86,14 +112,15 @@ export default function AdminLoginPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>
-                Email
+                Username
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@kk.gov.ph"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username"
                 required
+                autoComplete="username"
                 className="surface-input rounded-xl px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
               />
             </div>
@@ -108,6 +135,7 @@ export default function AdminLoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
                 className="surface-input rounded-xl px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
               />
             </div>
