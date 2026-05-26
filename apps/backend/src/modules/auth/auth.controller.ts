@@ -1,4 +1,6 @@
 import { Response } from "express";
+import { FieldValue } from "firebase-admin/firestore";
+import { auth, db } from "../../config/firebase";
 import { createUser, getUserById } from "./user.service";
 import { AuthRequest } from "../../middleware/verifyToken";
 import {
@@ -15,6 +17,23 @@ type AuthUserResponse = {
   createdAt?: string;
   mustChangePassword?: boolean;
 };
+
+const HARDCODED_ADMIN_CREDENTIALS = {
+  kkbutingadmin7419: {
+    email: "admin@kkbapp-buting.com",
+    password: "KKButingAdmin@7419!",
+    displayName: "KK Admin",
+    role: "admin",
+  },
+  kkbutingsuper9632: {
+    email: "superadmin@kkbapp-buting.com",
+    password: "KKButingSuper@9632!",
+    displayName: "KK Superadmin",
+    role: "superadmin",
+  },
+} as const;
+
+type HardcodedAdminUsername = keyof typeof HARDCODED_ADMIN_CREDENTIALS;
 
 async function buildAuthUserResponse(
   req: AuthRequest,
@@ -106,6 +125,66 @@ export async function loginUser(req: AuthRequest, res: Response) {
       return res.json({ user: fallbackUser });
     }
     return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function loginHardcodedAdmin(req: AuthRequest, res: Response) {
+  const username = String(req.body?.username || "").trim().toLowerCase() as HardcodedAdminUsername;
+  const password = String(req.body?.password || "");
+  const credential = HARDCODED_ADMIN_CREDENTIALS[username];
+
+  if (!credential || password !== credential.password) {
+    return res.status(401).json({ error: "Invalid username or password." });
+  }
+
+  try {
+    let userRecord;
+
+    try {
+      userRecord = await auth.getUserByEmail(credential.email);
+      await auth.updateUser(userRecord.uid, {
+        displayName: credential.displayName,
+        emailVerified: true,
+      });
+    } catch (error: any) {
+      if (error?.code !== "auth/user-not-found") {
+        throw error;
+      }
+
+      userRecord = await auth.createUser({
+        email: credential.email,
+        password: credential.password,
+        displayName: credential.displayName,
+        emailVerified: true,
+      });
+    }
+
+    await auth.setCustomUserClaims(userRecord.uid, { role: credential.role });
+    await db.collection("users").doc(userRecord.uid).set(
+      {
+        uid: userRecord.uid,
+        UserName: credential.displayName,
+        email: credential.email,
+        role: credential.role,
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    const token = await auth.createCustomToken(userRecord.uid, { role: credential.role });
+
+    return res.json({
+      token,
+      user: {
+        uid: userRecord.uid,
+        email: credential.email,
+        role: credential.role,
+        UserName: credential.displayName,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Unable to sign in admin account." });
   }
 }
 

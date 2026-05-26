@@ -2,24 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { persistAdminSession } from '@/lib/session';
-
-const HARDCODED_ADMIN_CREDENTIALS = {
-  kkbutingadmin7419: {
-    email: 'admin@kkbapp-buting.com',
-    loginPassword: 'KKButingAdmin@7419!',
-    firebasePasswords: ['KKButingAdmin@7419!', 'KKAdmin123!'],
-  },
-  kkbutingsuper9632: {
-    email: 'superadmin@kkbapp-buting.com',
-    loginPassword: 'KKButingSuper@9632!',
-    firebasePasswords: ['KKButingSuper@9632!', 'KKSuperAdmin123!'],
-  },
-} as const;
-
-type AdminLoginUsername = keyof typeof HARDCODED_ADMIN_CREDENTIALS;
+import { resolveApiBaseUrl } from '@/lib/api-base-url';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -33,34 +19,19 @@ export default function AdminLoginPage() {
     setError('');
     setIsLoading(true);
     try {
-      const normalizedUsername = username.trim().toLowerCase() as AdminLoginUsername;
-      const credential = HARDCODED_ADMIN_CREDENTIALS[normalizedUsername];
+      const adminLoginResponse = await fetch(`${resolveApiBaseUrl()}/auth/admin-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ username, password }),
+      });
+      const adminLoginPayload = await adminLoginResponse.json().catch(() => null);
 
-      if (!credential || password !== credential.loginPassword) {
-        setError('Invalid username or password.');
-        setIsLoading(false);
-        return;
+      if (!adminLoginResponse.ok || !adminLoginPayload?.token) {
+        throw new Error(String(adminLoginPayload?.error || 'Invalid username or password.'));
       }
 
-      let userCredential;
-      let firebaseAuthError: unknown;
-
-      for (const firebasePassword of credential.firebasePasswords) {
-        try {
-          userCredential = await signInWithEmailAndPassword(
-            auth,
-            credential.email,
-            firebasePassword,
-          );
-          break;
-        } catch (err) {
-          firebaseAuthError = err;
-        }
-      }
-
-      if (!userCredential) {
-        throw firebaseAuthError;
-      }
+      const userCredential = await signInWithCustomToken(auth, adminLoginPayload.token);
       const token = await userCredential.user.getIdToken();
       const session = await persistAdminSession(token);
       const role = session.user?.role;
@@ -71,7 +42,10 @@ export default function AdminLoginPage() {
         return;
       }
       window.localStorage.setItem('kk-admin-role', role);
-      window.localStorage.setItem('kk-admin-email', session.user?.email || credential.email);
+      window.localStorage.setItem(
+        'kk-admin-email',
+        session.user?.email || adminLoginPayload.user?.email || '',
+      );
       router.push('/dashboard');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed';
