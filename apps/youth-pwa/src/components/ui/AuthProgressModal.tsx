@@ -7,12 +7,16 @@ interface AuthProgressModalProps {
   isOpen: boolean
   title?: string
   message?: string
+  statusLabel?: string
+  hint?: string
 }
 
 export default function AuthProgressModal({
   isOpen,
   title = 'Signing You In',
   message = 'Please wait while we verify your account and prepare your dashboard.',
+  statusLabel,
+  hint,
 }: AuthProgressModalProps) {
   useEffect(() => {
     if (!isOpen) {
@@ -37,7 +41,17 @@ export default function AuthProgressModal({
           <Spinner size="md" className="border-white/30 border-t-[#014384]" />
         </div>
         <h2 className="mt-5 text-xl font-black text-[#014384]">{title}</h2>
+        {statusLabel ? (
+          <span className="mt-3 rounded-full bg-[#edf6ff] px-3 py-1 text-xs font-bold text-[#014384]">
+            {statusLabel}
+          </span>
+        ) : null}
         <p className="mt-2 text-sm leading-6 text-gray-500">{message}</p>
+        {hint ? (
+          <p className="mt-3 border-t border-[#e6eef8] pt-3 text-xs leading-5 text-[#6b7f98]">
+            {hint}
+          </p>
+        ) : null}
       </div>
     </div>
   )

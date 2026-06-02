@@ -2143,7 +2143,7 @@ export function buildProfilingPayload(draft: ProfilingDraft) {
     votedLastSkElections: voted2023,
     registeredNationalVoter: voted2025,
     attendedKkAssembly: attendedAssembly,
-    kkAssemblyTimesAttended: attendedAssembly ? 1 : 0,
+    kkAssemblyTimesAttended: attendedAssembly ? "1" : "0",
     kkAssemblyReason: "",
     permanentAddressBarangay: permanentBarangay,
     permanentAddressStreetAddress: permanentStreetAddress,

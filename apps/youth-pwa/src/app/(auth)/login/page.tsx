@@ -13,7 +13,10 @@ import { getPostAuthRedirect } from "@/services/profiling.service";
 import { useAuthStore } from "@/store/authStore";
 import AlertModal from "@/components/ui/AlertModal";
 import AuthProgressModal from "@/components/ui/AuthProgressModal";
+import AuthStatusToast from "@/components/ui/AuthStatusToast";
 import { persistYouthSession } from "@/lib/session";
+
+type AuthToastTone = "info" | "success" | "error";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,6 +29,8 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleStatus, setGoogleStatus] = useState<"opening" | "syncing" | "slow">("opening");
+  const [toast, setToast] = useState<{ message: string; tone: AuthToastTone } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const authInProgress = isLoading || googleLoading;
@@ -34,7 +39,52 @@ export default function LoginPage() {
     : "Continuing with Google";
   const authProgressMessage = isLoading
     ? "Please wait while we verify your account and open your dashboard."
-    : "Please wait while we complete your Google sign-in and sync your KK account.";
+    : googleStatus === "slow"
+      ? "This is taking longer than usual. We are still syncing your Google sign-in with your KK account."
+      : googleStatus === "syncing"
+        ? "Google sign-in is complete. We are syncing your KK account and checking where to send you next."
+        : "Please choose your Google account in the popup. We will continue automatically after you approve it.";
+  const authProgressStatus = isLoading
+    ? "Signing in"
+    : googleStatus === "slow"
+      ? "Still working"
+      : googleStatus === "syncing"
+        ? "Syncing account"
+        : "Waiting for Google";
+  const authProgressHint = googleLoading
+    ? "Keep this tab open. If the Google popup was closed or blocked, cancel and try Continue with Google again."
+    : undefined;
+
+  useEffect(() => {
+    if (!googleLoading) {
+      return;
+    }
+
+    const syncingTimer = window.setTimeout(() => {
+      setGoogleStatus((status) => (status === "opening" ? "syncing" : status));
+    }, 3500);
+    const slowTimer = window.setTimeout(() => {
+      setGoogleStatus("slow");
+      setToast({
+        tone: "info",
+        message: "Google sign-in is still working. Please keep this page open.",
+      });
+    }, 9000);
+
+    return () => {
+      window.clearTimeout(syncingTimer);
+      window.clearTimeout(slowTimer);
+    };
+  }, [googleLoading]);
+
+  useEffect(() => {
+    if (!toast || googleLoading) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToast(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [toast, googleLoading]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -75,16 +125,28 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     setError(null);
+    setGoogleStatus("opening");
+    setToast({
+      tone: "info",
+      message: "Opening Google sign-in. Choose your account to continue.",
+    });
     setGoogleLoading(true);
 
     try {
       const { user, token } = await signInWithGoogle();
+      setGoogleStatus("syncing");
+      setToast({
+        tone: "success",
+        message: "Google sign-in successful. Opening your KK account...",
+      });
       await persistYouthSession({ token, maxAgeSeconds: 60 * 60 * 24 * 30 });
       setUser(user);
       setToken(token);
       router.push(await getPostAuthRedirect("/home"));
     } catch (err: any) {
-      setError(err?.message || "Google sign-in failed. Please try again.");
+      const message = getGoogleAuthErrorMessage(err);
+      setToast({ tone: "error", message });
+      setError(message);
     } finally {
       setGoogleLoading(false);
     }
@@ -236,12 +298,16 @@ export default function LoginPage() {
         title="Login Failed"
         message={error || ""}
         onClose={() => setError(null)}
+        tone="error"
       />
       <AuthProgressModal
         isOpen={authInProgress}
         title={authProgressTitle}
         message={authProgressMessage}
+        statusLabel={authProgressStatus}
+        hint={authProgressHint}
       />
+      <AuthStatusToast message={toast?.message || null} tone={toast?.tone} />
 
       <style jsx>{`
         /* ---- Root & layout ---- */
@@ -534,4 +600,22 @@ export default function LoginPage() {
       `}</style>
     </div>
   );
+}
+
+function getGoogleAuthErrorMessage(error: any) {
+  const rawMessage = String(error?.message || "");
+
+  if (rawMessage.includes("auth/popup-closed-by-user")) {
+    return "Google sign-in was cancelled. Tap Continue with Google to try again.";
+  }
+
+  if (rawMessage.includes("auth/popup-blocked")) {
+    return "The Google popup was blocked. Allow popups for this site, then try again.";
+  }
+
+  if (rawMessage.includes("auth/network-request-failed")) {
+    return "Network connection failed during Google sign-in. Check your internet and try again.";
+  }
+
+  return rawMessage || "Google sign-in failed. Please try again.";
 }

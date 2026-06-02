@@ -82,11 +82,7 @@ export default function ProfilingReviewPage() {
           "Your profiling answers were saved, but your Digital ID signature upload did not finish. Please tap Submit again to retry the signature upload."
         );
       } else {
-        setError(
-          nextError?.response?.data?.error ||
-            nextError?.message ||
-            "Failed to submit profiling. Please try again."
-        );
+        setError(getProfilingSubmissionErrorMessage(nextError));
       }
     } finally {
       setIsLoading(false);
@@ -163,6 +159,23 @@ export default function ProfilingReviewPage() {
       />
     </div>
   );
+}
+
+function getProfilingSubmissionErrorMessage(error: any) {
+  const responseData = error?.response?.data;
+  const details = Array.isArray(responseData?.details)
+    ? responseData.details.filter(Boolean)
+    : [];
+  const baseMessage =
+    responseData?.error ||
+    error?.message ||
+    "Failed to submit profiling. Please try again.";
+
+  if (details.length === 0) {
+    return baseMessage;
+  }
+
+  return `${baseMessage}\n\nPlease check: ${details.join(" ")}`;
 }
 
 function Field({
