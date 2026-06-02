@@ -732,6 +732,46 @@ const tests = [
       assert.equal(updateCalled, false);
     },
   },
+  {
+    name: "profiling routes accept numeric KK assembly attendance count",
+    async run() {
+      let receivedBody = null;
+
+      const router = loadDistModuleWithMocks("dist/src/modules/profiling/profiling.routes", {
+        "dist/src/middleware/verifyToken": {
+          verifyToken: createVerifyTokenMock(),
+        },
+        "dist/src/modules/profiling/profiling.controller": {
+          submitProfilingHandler: async (req, res) => {
+            receivedBody = req.body;
+            res.status(201).json({ message: "Profiling submitted" });
+          },
+          getProfilingHandler: async (_req, res) => res.json({}),
+          updateProfilingHandler: async (_req, res) => res.json({ message: "Profile updated" }),
+        },
+      }).default;
+
+      await withExpressServer(router, async (baseUrl) => {
+        const response = await requestJson(baseUrl, "/", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "youth",
+          },
+          body: {
+            firstName: "Juan",
+            contactNumber: "09123456789",
+            kkAssemblyTimesAttended: 1,
+          },
+        });
+
+        assert.equal(response.status, 201);
+        assert.equal(response.body.message, "Profiling submitted");
+      });
+
+      assert.equal(receivedBody.kkAssemblyTimesAttended, 1);
+    },
+  },
 ];
 
 (async () => {

@@ -737,7 +737,6 @@ export function validateYouthProfileUpdateRequest(req: Request) {
     "educationalBackground",
     "youthClassification",
     "workStatus",
-    "kkAssemblyTimesAttended",
     "digitalIdEmergencyContactName",
     "digitalIdEmergencyContactRelationship",
     "digitalIdEmergencyContactPhone",
@@ -757,6 +756,7 @@ export function validateYouthProfileUpdateRequest(req: Request) {
 
   validateNumber(errors, body, "age", "age", { min: 0, integer: true });
   validateNumber(errors, body, "yearsInBarangay", "yearsInBarangay", { min: 0, integer: true });
+  validateNumber(errors, body, "kkAssemblyTimesAttended", "kkAssemblyTimesAttended", { min: 0, integer: true });
   validateBoolean(errors, body, "registeredSkVoter", "registeredSkVoter");
   validateBoolean(errors, body, "votedLastSkElections", "votedLastSkElections");
   validateBoolean(errors, body, "registeredNationalVoter", "registeredNationalVoter");
