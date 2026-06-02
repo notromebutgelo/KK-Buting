@@ -57,6 +57,12 @@ function normalizeProfilingData(data: Record<string, unknown>) {
     );
   }
 
+  if ("kkAssemblyTimesAttended" in normalizedData) {
+    normalizedData.kkAssemblyTimesAttended = normalizeNonNegativeInteger(
+      normalizedData.kkAssemblyTimesAttended
+    );
+  }
+
   return normalizedData;
 }
 
@@ -70,4 +76,14 @@ function normalizeProfileContactNumber(value: unknown) {
   return String(value || "")
     .replace(/\D/g, "")
     .slice(0, 11);
+}
+
+function normalizeNonNegativeInteger(value: unknown) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return Math.floor(parsed);
 }

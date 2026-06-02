@@ -733,7 +733,7 @@ const tests = [
     },
   },
   {
-    name: "profiling routes accept numeric KK assembly attendance count",
+    name: "profiling routes accept KK assembly attendance count",
     async run() {
       let receivedBody = null;
 
@@ -761,7 +761,7 @@ const tests = [
           body: {
             firstName: "Juan",
             contactNumber: "09123456789",
-            kkAssemblyTimesAttended: 1,
+            kkAssemblyTimesAttended: "1",
           },
         });
 
@@ -769,7 +769,7 @@ const tests = [
         assert.equal(response.body.message, "Profiling submitted");
       });
 
-      assert.equal(receivedBody.kkAssemblyTimesAttended, 1);
+      assert.equal(receivedBody.kkAssemblyTimesAttended, "1");
     },
   },
 ];
