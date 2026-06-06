@@ -63,7 +63,7 @@ const ALL_NAV_ITEMS = [
     label: 'Merchants',
     icon: Store,
     group: 'Management',
-    superadminOnly: true,
+    superadminOnly: false,
   },
   {
     href: '/points-transactions',
@@ -84,7 +84,7 @@ const ALL_NAV_ITEMS = [
     label: 'Digital IDs',
     icon: CreditCard,
     group: 'Management',
-    superadminOnly: true,
+    superadminOnly: false,
   },
   {
     href: '/vouchers',

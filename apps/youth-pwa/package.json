@@ -12,7 +12,7 @@
     "firebase": "^10.0.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.7.0",
-    "next": "14.2.3",
+    "next": "^14.2.35",
     "qr-scanner": "^1.4.2",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",

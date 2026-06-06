@@ -1,19 +1,18 @@
 import axios from 'axios'
-import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  updatePassword,
-} from 'firebase/auth'
 
 import api, { API_BASE_URL } from '../lib/api'
-import { auth } from '../lib/firebase'
+import {
+  signInWithFirebasePassword,
+  updateFirebasePassword,
+} from '../lib/firebaseIdentity'
 import type { MerchantUser } from '../store/authStore'
+import { useAuthStore } from '../store/authStore'
 
 type AuthPayload = {
   user: MerchantUser
   token: string
+  refreshToken: string
+  expiresAt: number
 }
 
 function normalizeUser(payload: Record<string, unknown>, fallbackEmail: string): MerchantUser {
@@ -39,27 +38,49 @@ function mapApiError(error: unknown): never {
     )
   }
 
+  if (axios.isAxiosError(error) && error.response) {
+    const status = error.response.status
+
+    if (status === 401) {
+      throw new Error('Your login could not be verified. Please sign in again.')
+    }
+
+    if (status === 403) {
+      throw new Error('This account does not have merchant access yet. Contact SK admin.')
+    }
+
+    if (status === 404) {
+      throw new Error('This merchant account is not registered in KK yet. Contact SK admin.')
+    }
+
+    throw new Error('We could not complete sign in right now. Please try again.')
+  }
+
   throw error
 }
 
 export async function signIn(email: string, password: string): Promise<AuthPayload> {
   try {
-    const credential = await signInWithEmailAndPassword(auth, email.trim(), password)
-    const token = await credential.user.getIdToken(true)
+    const firebaseSession = await signInWithFirebasePassword(email, password)
     const response = await api.post(
       '/auth/login',
       { password },
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${firebaseSession.idToken}` },
       }
     )
-    const user = normalizeUser(response.data.user ?? response.data, credential.user.email ?? email)
+    const user = normalizeUser(response.data.user ?? response.data, firebaseSession.email || email)
 
     if (user.role !== 'merchant') {
       throw new Error('This account does not have merchant access yet.')
     }
 
-    return { user, token }
+    return {
+      user,
+      token: firebaseSession.idToken,
+      refreshToken: firebaseSession.refreshToken,
+      expiresAt: firebaseSession.expiresAt,
+    }
   } catch (error) {
     mapApiError(error)
   }
@@ -68,42 +89,46 @@ export async function signIn(email: string, password: string): Promise<AuthPaylo
 export async function getCurrentMerchant() {
   try {
     const response = await api.get('/auth/me')
-    return normalizeUser(response.data.user ?? response.data, auth.currentUser?.email ?? '')
+    const fallbackEmail = useAuthStore.getState().user?.email ?? ''
+    return normalizeUser(response.data.user ?? response.data, fallbackEmail)
   } catch (error) {
     mapApiError(error)
   }
 }
 
 export async function signOut() {
-  await firebaseSignOut(auth)
+  return Promise.resolve()
 }
 
-export async function changePassword(currentPassword: string, nextPassword: string) {
-  const currentUser = auth.currentUser
-
-  if (!currentUser || !currentUser.email) {
-    throw new Error('No signed-in merchant account is available.')
-  }
-
-  const credential = EmailAuthProvider.credential(currentUser.email, currentPassword)
-  await reauthenticateWithCredential(currentUser, credential)
-  await updatePassword(currentUser, nextPassword)
-
-  const refreshedToken = await currentUser.getIdToken(true)
-  await api.post(
-    '/auth/password-changed',
-    {},
-    {
-      headers: { Authorization: `Bearer ${refreshedToken}` },
+export async function changePassword(currentPassword: string, nextPassword: string, accountEmail?: string) {
+  try {
+    const expectedEmail = String(accountEmail || useAuthStore.getState().user?.email || '').trim()
+    if (!expectedEmail) {
+      throw new Error('No signed-in merchant account is available.')
     }
-  )
 
-  const response = await api.get('/auth/me', {
-    headers: { Authorization: `Bearer ${refreshedToken}` },
-  })
+    const verifiedSession = await signInWithFirebasePassword(expectedEmail, currentPassword, 'password')
+    const updatedSession = await updateFirebasePassword(verifiedSession.idToken, nextPassword)
+    const refreshedToken = updatedSession.idToken
+    await api.post(
+      '/auth/password-changed',
+      {},
+      {
+        headers: { Authorization: `Bearer ${refreshedToken}` },
+      }
+    )
 
-  return {
-    user: normalizeUser(response.data.user ?? response.data, currentUser.email),
-    token: refreshedToken,
+    const response = await api.get('/auth/me', {
+      headers: { Authorization: `Bearer ${refreshedToken}` },
+    })
+
+    return {
+      user: normalizeUser(response.data.user ?? response.data, updatedSession.email || expectedEmail),
+      token: refreshedToken,
+      refreshToken: updatedSession.refreshToken || verifiedSession.refreshToken,
+      expiresAt: updatedSession.expiresAt,
+    }
+  } catch (error) {
+    mapApiError(error)
   }
 }

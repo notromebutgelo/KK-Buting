@@ -1487,6 +1487,13 @@ export async function updateMerchant(
   data: Record<string, unknown>,
   adminEmail: string
 ) {
+  const merchantRef = db.collection("merchants").doc(merchantId);
+  const merchantSnap = await merchantRef.get();
+  if (!merchantSnap.exists) {
+    throw new Error("Merchant not found");
+  }
+
+  const merchant = merchantSnap.data() || {};
   const allowedKeys = [
     "name",
     "businessName",
@@ -1498,6 +1505,7 @@ export async function updateMerchant(
     "bannerUrl",
     "logoUrl",
     "ownerName",
+    "contactNumber",
     "discountInfo",
     "termsAndConditions",
     "pointsPolicy",
@@ -1512,15 +1520,33 @@ export async function updateMerchant(
 
   for (const [key, value] of Object.entries(data)) {
     if (allowedKeys.includes(key)) {
-      payload[key] = value;
+      payload[key] =
+        key === "termsAndConditions" && Array.isArray(value)
+          ? value.map((entry) => String(entry || "").trim()).filter(Boolean).join("\n")
+          : value;
     }
   }
 
   if (payload.pointsRate != null) {
-    payload.pointsRate = Number(payload.pointsRate || 10);
+    payload.pointsRate = Number(payload.pointsRate);
   }
 
-  await db.collection("merchants").doc(merchantId).set(payload, { merge: true });
+  if (payload.businessName && !payload.name) payload.name = payload.businessName;
+  if (payload.name && !payload.businessName) payload.businessName = payload.name;
+  if (payload.shortDescription && !payload.description) payload.description = payload.shortDescription;
+  if (payload.description && !payload.shortDescription) payload.shortDescription = payload.description;
+
+  await merchantRef.set(payload, { merge: true });
+
+  const ownerId = String(merchant.ownerId || "");
+  if (ownerId && (payload.ownerName !== undefined || payload.contactNumber !== undefined)) {
+    const ownerPayload: AnyRecord = {
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (payload.ownerName !== undefined) ownerPayload.UserName = payload.ownerName;
+    if (payload.contactNumber !== undefined) ownerPayload.contactNumber = payload.contactNumber;
+    await db.collection("users").doc(ownerId).set(ownerPayload, { merge: true });
+  }
 }
 
 export async function updateMerchantStatus(

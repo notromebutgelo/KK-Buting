@@ -1,7 +1,8 @@
 import React from 'react'
-import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import { useAuthStore } from '../store/authStore'
 import LoginSreen from '../screens/auth/LoginSreen'
@@ -27,10 +28,25 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 
-function FullScreenLoader() {
+function FullScreenLoader({
+  title,
+  message,
+}: {
+  title: string
+  message: string
+}) {
   return (
     <View style={styles.loader}>
-      <ActivityIndicator size="large" color="#0f766e" />
+      <View style={styles.loadingCard}>
+        <View style={styles.loadingIcon}>
+          <MaterialCommunityIcons name="storefront-outline" size={30} color="#014384" />
+        </View>
+        <ActivityIndicator size="large" color="#014384" />
+        <View style={styles.loadingCopy}>
+          <Text style={styles.loadingTitle}>{title}</Text>
+          <Text style={styles.loadingMessage}>{message}</Text>
+        </View>
+      </View>
     </View>
   )
 }
@@ -40,8 +56,22 @@ export default function AppNavigator() {
   const isLoading = useAuthStore((state) => state.isLoading)
   const hasHydrated = useAuthStore((state) => state.hasHydrated)
 
-  if (!hasHydrated || isLoading) {
-    return <FullScreenLoader />
+  if (!hasHydrated) {
+    return (
+      <FullScreenLoader
+        title="Opening Merchant Console"
+        message="Please wait while we restore your saved session."
+      />
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <FullScreenLoader
+        title="Preparing Your Workspace"
+        message="Please wait while we verify your merchant account and load access details."
+      />
+    )
   }
 
   return (
@@ -75,8 +105,51 @@ export default function AppNavigator() {
 const styles = StyleSheet.create({
   loader: {
     flex: 1,
-    backgroundColor: '#f6f6ef',
+    backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 24,
+  },
+  loadingCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    gap: 16,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(1, 67, 132, 0.08)',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    shadowColor: '#014384',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 6,
+  },
+  loadingIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef4fb',
+  },
+  loadingCopy: {
+    gap: 8,
+    alignItems: 'center',
+  },
+  loadingTitle: {
+    color: '#014384',
+    fontSize: 19,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  loadingMessage: {
+    color: '#60748f',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    textAlign: 'center',
   },
 })

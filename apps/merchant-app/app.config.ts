@@ -5,6 +5,7 @@ const config: ExpoConfig = {
   slug: 'kk-merchant-app',
   scheme: 'kkmerchant',
   version: '1.0.0',
+  icon: './assets/icon.png',
   orientation: 'portrait',
   userInterfaceStyle: 'light',
   assetBundlePatterns: ['**/*'],
@@ -13,6 +14,10 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.kksystem.merchant',
+    adaptiveIcon: {
+      foregroundImage: './assets/icon.png',
+      backgroundColor: '#001b5f',
+    },
   },
   plugins: [
     [
@@ -33,6 +38,17 @@ const config: ExpoConfig = {
   },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL,
+    firebase: {
+      apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+    },
+    eas: {
+      projectId: '9b8f3495-707b-48ab-a734-6376254889ba',
+    },
   },
 }
 

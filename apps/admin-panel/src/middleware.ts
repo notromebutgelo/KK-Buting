@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 const SUPERADMIN_ONLY_ROUTES = [
-  '/merchants',
   '/rewards',
   '/points-transactions',
   '/reports',
-  '/digital-ids',
 ]
 
 export function middleware(request: NextRequest) {

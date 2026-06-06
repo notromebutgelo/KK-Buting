@@ -5,9 +5,11 @@ import {
   Clock3,
   Eye,
   EyeOff,
+  ImageIcon,
   MoreHorizontal,
   Plus,
   Repeat2,
+  Save,
   Search,
   Store,
   UsersRound,
@@ -31,7 +33,9 @@ type MerchantStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
 interface Merchant {
   id: string
   name: string
+  businessName?: string
   description?: string
+  shortDescription?: string
   category?: string
   address?: string
   status: MerchantStatus
@@ -43,10 +47,28 @@ interface Merchant {
   createdAt?: string
   imageUrl?: string
   logoUrl?: string
+  bannerUrl?: string
   businessInfo?: string
   discountInfo?: string
   termsAndConditions?: string
+  pointsPolicy?: string
   pointsRate?: number
+}
+
+interface MerchantEditor {
+  businessName: string
+  category: string
+  address: string
+  ownerName: string
+  contactNumber: string
+  shortDescription: string
+  businessInfo: string
+  discountInfo: string
+  termsAndConditions: string
+  pointsPolicy: string
+  pointsRate: string
+  logoUrl: string
+  bannerUrl: string
 }
 
 interface MerchantTransaction {
@@ -93,6 +115,24 @@ const merchantCreationCategoryOptions = [
 const inputClass =
   'surface-input w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30'
 
+function createMerchantEditor(merchant?: Merchant | null): MerchantEditor {
+  return {
+    businessName: merchant?.businessName || merchant?.name || '',
+    category: merchant?.category || '',
+    address: merchant?.address || '',
+    ownerName: merchant?.ownerName || '',
+    contactNumber: merchant?.contactNumber || merchant?.ownerPhone || '',
+    shortDescription: merchant?.shortDescription || merchant?.description || '',
+    businessInfo: merchant?.businessInfo || '',
+    discountInfo: merchant?.discountInfo || '',
+    termsAndConditions: merchant?.termsAndConditions || '',
+    pointsPolicy: merchant?.pointsPolicy || '',
+    pointsRate: String(merchant?.pointsRate || 10),
+    logoUrl: merchant?.logoUrl || '',
+    bannerUrl: merchant?.bannerUrl || merchant?.imageUrl || '',
+  }
+}
+
 export default function MerchantsPage() {
   const [adminRole, setAdminRole] = useState('admin')
   const [merchants, setMerchants] = useState<Merchant[]>([])
@@ -112,7 +152,7 @@ export default function MerchantsPage() {
   const [message, setMessage] = useState('')
   const [showDirectoryDetails, setShowDirectoryDetails] = useState(false)
   const [openActionMerchantId, setOpenActionMerchantId] = useState<string | null>(null)
-  const [editor, setEditor] = useState({ discountInfo: '', termsAndConditions: '', pointsRate: '10' })
+  const [editor, setEditor] = useState<MerchantEditor>(() => createMerchantEditor())
   const actionMenuRef = useRef<HTMLDivElement | null>(null)
 
   const isSuperadmin = adminRole === 'superadmin'
@@ -216,11 +256,7 @@ export default function MerchantsPage() {
       return
     }
 
-    setEditor({
-      discountInfo: selectedMerchant.discountInfo || '',
-      termsAndConditions: selectedMerchant.termsAndConditions || '',
-      pointsRate: String(selectedMerchant.pointsRate || 10),
-    })
+    setEditor(createMerchantEditor(selectedMerchant))
 
     let mounted = true
 
@@ -340,6 +376,17 @@ export default function MerchantsPage() {
 
   async function handleSaveMerchantProfile() {
     if (!selectedMerchant) return
+    const businessName = editor.businessName.trim()
+    const pointsRate = Number(editor.pointsRate)
+
+    if (!businessName) {
+      setMessage('Business name is required.')
+      return
+    }
+    if (!Number.isFinite(pointsRate) || pointsRate <= 0) {
+      setMessage('Points rate must be greater than zero.')
+      return
+    }
 
     setLoadingLabel('Saving merchant profile')
     setIsSaving(true)
@@ -347,9 +394,22 @@ export default function MerchantsPage() {
 
     try {
       await api.patch(`/admin/merchants/${selectedMerchant.id}`, {
-        discountInfo: editor.discountInfo,
-        termsAndConditions: editor.termsAndConditions,
-        pointsRate: Number(editor.pointsRate || 10),
+        name: businessName,
+        businessName,
+        category: editor.category.trim(),
+        address: editor.address.trim(),
+        ownerName: editor.ownerName.trim(),
+        contactNumber: editor.contactNumber.trim(),
+        description: editor.shortDescription.trim(),
+        shortDescription: editor.shortDescription.trim(),
+        businessInfo: editor.businessInfo.trim(),
+        discountInfo: editor.discountInfo.trim(),
+        termsAndConditions: editor.termsAndConditions.trim(),
+        pointsPolicy: editor.pointsPolicy.trim(),
+        pointsRate,
+        logoUrl: editor.logoUrl.trim(),
+        bannerUrl: editor.bannerUrl.trim(),
+        imageUrl: editor.bannerUrl.trim() || editor.logoUrl.trim(),
       })
       setMessage('Merchant profile updated successfully.')
       await refreshMerchants(selectedMerchant.id)
@@ -362,7 +422,7 @@ export default function MerchantsPage() {
 
   function generateEmail(name: string) {
     const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'merchant'
-    return `${slug}@kkbuting.merchant`
+    return `${slug}@kkbuting.test`
   }
 
   function generatePassword() {
@@ -836,8 +896,8 @@ export default function MerchantsPage() {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-visible">
-                    <table className="w-full table-fixed">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[940px] w-full table-fixed">
                       <colgroup>
                         <col className="w-[31%]" />
                         <col className="w-[16%]" />
@@ -1311,6 +1371,10 @@ export default function MerchantsPage() {
                           <DetailTile label="Business category" value={selectedMerchant.category || 'Uncategorized'} />
                           <DetailTile label="Owner" value={selectedMerchant.ownerName || 'Unknown owner'} />
                           <DetailTile label="Email" value={selectedMerchant.ownerEmail || 'No owner email'} />
+                          <DetailTile
+                            label="Contact number"
+                            value={selectedMerchant.contactNumber || selectedMerchant.ownerPhone || 'No phone saved'}
+                          />
                           <DetailTile label="Date joined" value={formatDateTime(selectedMerchant.createdAt)} />
                           <DetailTile
                             label="Points rate"
@@ -1338,10 +1402,15 @@ export default function MerchantsPage() {
 
                         <div className="mt-4 space-y-3">
                           <DetailRow
+                            label="Short description"
+                            value={selectedMerchant.shortDescription || selectedMerchant.description || 'No short description yet'}
+                          />
+                          <DetailRow
                             label="Business info"
                             value={selectedMerchant.businessInfo || selectedMerchant.description || 'No business info yet'}
                           />
                           <DetailRow label="Discount info" value={selectedMerchant.discountInfo || 'No discount copy yet'} />
+                          <DetailRow label="Points policy" value={selectedMerchant.pointsPolicy || 'No points policy added yet'} />
                           <DetailRow
                             label="Terms"
                             value={selectedMerchant.termsAndConditions || 'No terms and conditions added yet'}
@@ -1349,63 +1418,16 @@ export default function MerchantsPage() {
                         </div>
                       </div>
 
-                      <div
-                        className="rounded-2xl border p-4"
-                        style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                              Discount and terms
-                            </h3>
-                            <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
-                              Admin can update these merchant-facing details on behalf of the partner.
-                            </p>
-                          </div>
-                          <DashboardPill tone={isSuperadmin ? 'soft' : 'default'}>
-                            {isSuperadmin ? 'Superadmin access' : 'Admin access'}
-                          </DashboardPill>
-                        </div>
-
-                        <div className="mt-4 grid gap-3">
-                          <textarea
-                            value={editor.discountInfo}
-                            onChange={(e) => setEditor((current) => ({ ...current, discountInfo: e.target.value }))}
-                            rows={3}
-                            placeholder="Discount information for youth members"
-                            className={inputClass}
-                          />
-                          <textarea
-                            value={editor.termsAndConditions}
-                            onChange={(e) => setEditor((current) => ({ ...current, termsAndConditions: e.target.value }))}
-                            rows={4}
-                            placeholder="Terms and conditions shown to the merchant and youth members"
-                            className={inputClass}
-                          />
-                          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                            <input
-                              type="number"
-                              min="1"
-                              value={editor.pointsRate}
-                              onChange={(e) => setEditor((current) => ({ ...current, pointsRate: e.target.value }))}
-                              className={inputClass}
-                              placeholder="Points rate in pesos"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => void handleSaveMerchantProfile()}
-                              disabled={isSaving}
-                              className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                              style={{ background: 'var(--accent)' }}
-                            >
-                              Save details
-                            </button>
-                          </div>
-                          <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
-                            Default conversion is PHP 100 = 10 points.
-                          </p>
-                        </div>
-                      </div>
+                      <MerchantProfileEditor
+                        editor={editor}
+                        loginEmail={selectedMerchant.ownerEmail || ''}
+                        isSaving={isSaving}
+                        roleLabel={isSuperadmin ? 'Superadmin access' : 'Admin access'}
+                        onChange={(field, value) =>
+                          setEditor((current) => ({ ...current, [field]: value }))
+                        }
+                        onSave={() => void handleSaveMerchantProfile()}
+                      />
 
                       <div
                         className="rounded-2xl border p-4"
@@ -1566,10 +1588,15 @@ export default function MerchantsPage() {
 
                   <div className="mt-4 space-y-3">
                     <DetailRow
+                      label="Short description"
+                      value={selectedMerchant.shortDescription || selectedMerchant.description || 'No short description yet'}
+                    />
+                    <DetailRow
                       label="Business info"
                       value={selectedMerchant.businessInfo || selectedMerchant.description || 'No business info yet'}
                     />
                     <DetailRow label="Discount info" value={selectedMerchant.discountInfo || 'No discount copy yet'} />
+                    <DetailRow label="Points policy" value={selectedMerchant.pointsPolicy || 'No points policy added yet'} />
                     <DetailRow
                       label="Terms"
                       value={selectedMerchant.termsAndConditions || 'No terms and conditions added yet'}
@@ -1577,63 +1604,17 @@ export default function MerchantsPage() {
                   </div>
                 </div>
 
-                <div
-                  className="rounded-2xl border p-4 xl:col-span-2"
-                  style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                        Discount and terms
-                      </h3>
-                      <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
-                        Admin can update these merchant-facing details on behalf of the partner.
-                      </p>
-                    </div>
-                    <DashboardPill tone={isSuperadmin ? 'soft' : 'default'}>
-                      {isSuperadmin ? 'Superadmin access' : 'Admin access'}
-                    </DashboardPill>
-                  </div>
-
-                  <div className="mt-4 grid gap-3">
-                    <textarea
-                      value={editor.discountInfo}
-                      onChange={(e) => setEditor((current) => ({ ...current, discountInfo: e.target.value }))}
-                      rows={3}
-                      placeholder="Discount information for youth members"
-                      className={inputClass}
-                    />
-                    <textarea
-                      value={editor.termsAndConditions}
-                      onChange={(e) => setEditor((current) => ({ ...current, termsAndConditions: e.target.value }))}
-                      rows={4}
-                      placeholder="Terms and conditions shown to the merchant and youth members"
-                      className={inputClass}
-                    />
-                    <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                      <input
-                        type="number"
-                        min="1"
-                        value={editor.pointsRate}
-                        onChange={(e) => setEditor((current) => ({ ...current, pointsRate: e.target.value }))}
-                        className={inputClass}
-                        placeholder="Points rate in pesos"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void handleSaveMerchantProfile()}
-                        disabled={isSaving}
-                        className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                        style={{ background: 'var(--accent)' }}
-                      >
-                        Save details
-                      </button>
-                    </div>
-                    <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
-                      Default conversion is PHP 100 = 10 points.
-                    </p>
-                  </div>
-                </div>
+                <MerchantProfileEditor
+                  className="xl:col-span-2"
+                  editor={editor}
+                  loginEmail={selectedMerchant.ownerEmail || ''}
+                  isSaving={isSaving}
+                  roleLabel={isSuperadmin ? 'Superadmin access' : 'Admin access'}
+                  onChange={(field, value) =>
+                    setEditor((current) => ({ ...current, [field]: value }))
+                  }
+                  onSave={() => void handleSaveMerchantProfile()}
+                />
 
                 <div
                   className="rounded-2xl border p-4 xl:col-span-2"
@@ -1684,6 +1665,253 @@ export default function MerchantsPage() {
         </div>
       ) : null}
     </>
+  )
+}
+
+function MerchantProfileEditor({
+  editor,
+  loginEmail,
+  isSaving,
+  roleLabel,
+  onChange,
+  onSave,
+  className,
+}: {
+  editor: MerchantEditor
+  loginEmail: string
+  isSaving: boolean
+  roleLabel: string
+  onChange: (field: keyof MerchantEditor, value: string) => void
+  onSave: () => void
+  className?: string
+}) {
+  const hasCustomCategory =
+    Boolean(editor.category) && !merchantCreationCategoryOptions.includes(editor.category)
+
+  return (
+    <div
+      className={cn('rounded-2xl border p-4', className)}
+      style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            Business information
+          </h3>
+          <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+            Update the merchant directory record and the storefront information shown to youth members.
+          </p>
+        </div>
+        <DashboardPill tone={roleLabel.startsWith('Superadmin') ? 'soft' : 'default'}>
+          {roleLabel}
+        </DashboardPill>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <AdminField label="Business name">
+          <input
+            value={editor.businessName}
+            onChange={(event) => onChange('businessName', event.target.value)}
+            placeholder="Merchant business name"
+            className={inputClass}
+          />
+        </AdminField>
+
+        <AdminField label="Category">
+          <select
+            value={editor.category}
+            onChange={(event) => onChange('category', event.target.value)}
+            className={inputClass}
+          >
+            <option value="">Select category</option>
+            {hasCustomCategory ? <option value={editor.category}>{editor.category}</option> : null}
+            {merchantCreationCategoryOptions.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </AdminField>
+
+        <AdminField label="Owner / contact name">
+          <input
+            value={editor.ownerName}
+            onChange={(event) => onChange('ownerName', event.target.value)}
+            placeholder="Primary merchant contact"
+            className={inputClass}
+          />
+        </AdminField>
+
+        <AdminField label="Contact number">
+          <input
+            type="tel"
+            value={editor.contactNumber}
+            onChange={(event) => onChange('contactNumber', event.target.value)}
+            placeholder="e.g. 09171234567"
+            className={inputClass}
+          />
+        </AdminField>
+
+        <AdminField label="Login email" hint="Firebase login email is managed separately from storefront details.">
+          <input value={loginEmail || 'No login email'} disabled className={cn(inputClass, 'cursor-not-allowed opacity-70')} />
+        </AdminField>
+
+        <AdminField label="Points rate" hint="Peso amount required to earn one point.">
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={editor.pointsRate}
+            onChange={(event) => onChange('pointsRate', event.target.value)}
+            placeholder="10"
+            className={inputClass}
+          />
+        </AdminField>
+
+        <div className="md:col-span-2">
+          <AdminField label="Business address">
+            <input
+              value={editor.address}
+              onChange={(event) => onChange('address', event.target.value)}
+              placeholder="Complete storefront address"
+              className={inputClass}
+            />
+          </AdminField>
+        </div>
+
+        <div className="md:col-span-2">
+          <AdminField label="Short storefront description">
+            <textarea
+              value={editor.shortDescription}
+              onChange={(event) => onChange('shortDescription', event.target.value)}
+              rows={2}
+              placeholder="A short summary used in merchant cards and search results"
+              className={inputClass}
+            />
+          </AdminField>
+        </div>
+
+        <div className="md:col-span-2">
+          <AdminField label="Business information">
+            <textarea
+              value={editor.businessInfo}
+              onChange={(event) => onChange('businessInfo', event.target.value)}
+              rows={4}
+              placeholder="Products, services, operating details, and other useful business information"
+              className={inputClass}
+            />
+          </AdminField>
+        </div>
+
+        <AdminField label="Discount information">
+          <textarea
+            value={editor.discountInfo}
+            onChange={(event) => onChange('discountInfo', event.target.value)}
+            rows={4}
+            placeholder="Discounts available to eligible youth members"
+            className={inputClass}
+          />
+        </AdminField>
+
+        <AdminField label="Points policy">
+          <textarea
+            value={editor.pointsPolicy}
+            onChange={(event) => onChange('pointsPolicy', event.target.value)}
+            rows={4}
+            placeholder="How customers earn points at this merchant"
+            className={inputClass}
+          />
+        </AdminField>
+
+        <div className="md:col-span-2">
+          <AdminField label="Terms and conditions">
+            <textarea
+              value={editor.termsAndConditions}
+              onChange={(event) => onChange('termsAndConditions', event.target.value)}
+              rows={4}
+              placeholder="Enter one condition per line"
+              className={inputClass}
+            />
+          </AdminField>
+        </div>
+
+        <AdminField label="Logo URL">
+          <input
+            type="url"
+            value={editor.logoUrl}
+            onChange={(event) => onChange('logoUrl', event.target.value)}
+            placeholder="https://..."
+            className={inputClass}
+          />
+        </AdminField>
+
+        <AdminField label="Banner URL">
+          <input
+            type="url"
+            value={editor.bannerUrl}
+            onChange={(event) => onChange('bannerUrl', event.target.value)}
+            placeholder="https://..."
+            className={inputClass}
+          />
+        </AdminField>
+
+        {(editor.logoUrl || editor.bannerUrl) ? (
+          <div className="grid gap-3 md:col-span-2 sm:grid-cols-[120px_minmax(0,1fr)]">
+            <AssetPreview
+              label="Logo preview"
+              src={editor.logoUrl}
+              className="aspect-square"
+            />
+            <AssetPreview
+              label="Banner preview"
+              src={editor.bannerUrl}
+              className="aspect-[16/6]"
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-5 flex justify-end border-t pt-4" style={{ borderColor: 'var(--stroke)' }}>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={isSaving}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ background: 'var(--accent)' }}
+        >
+          <Save size={16} />
+          {isSaving ? 'Saving...' : 'Save business information'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function AssetPreview({
+  label,
+  src,
+  className,
+}: {
+  label: string
+  src: string
+  className: string
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--muted)' }}>
+        {label}
+      </p>
+      <div
+        className={cn('flex w-full items-center justify-center overflow-hidden rounded-xl border', className)}
+        style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}
+      >
+        {src ? (
+          <img src={src} alt={label} className="h-full w-full object-cover" />
+        ) : (
+          <ImageIcon size={20} style={{ color: 'var(--muted)' }} />
+        )}
+      </div>
+    </div>
   )
 }
 

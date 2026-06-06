@@ -266,6 +266,9 @@ export async function updateMerchantHandler(req: AuthRequest, res: Response) {
     await updateMerchant(req.params.merchantId, req.body, req.user?.email || "admin");
     return res.json({ message: "Merchant updated" });
   } catch (err: any) {
+    if (err.message === "Merchant not found") {
+      return res.status(404).json({ error: err.message });
+    }
     return res.status(500).json({ error: err.message });
   }
 }
@@ -523,6 +526,9 @@ export async function createMerchantAccountHandler(req: AuthRequest, res: Respon
     const message = err.message || "Failed to create merchant account.";
     if (message.includes("email-already-exists") || message.includes("EMAIL_EXISTS")) {
       return res.status(409).json({ error: "An account with this email already exists." });
+    }
+    if (message.includes("invalid-email") || message.includes("INVALID_EMAIL")) {
+      return res.status(400).json({ error: "Enter a valid merchant login email address." });
     }
     return res.status(500).json({ error: message });
   }

@@ -62,10 +62,11 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.headerCopyBlock}>
               <Text style={styles.headerGreeting}>{greeting},</Text>
-              <View style={styles.headerNameRow}>
-                <Text style={styles.headerMerchantName} numberOfLines={1}>
-                  {brandName}
-                </Text>
+              <Text style={styles.headerMerchantName} numberOfLines={2}>
+                {brandName}
+              </Text>
+              <View style={styles.headerMetaRow}>
+                <Text style={styles.headerSubtitle}>Merchant Workspace</Text>
                 {profile ? (
                   <View style={[styles.headerStatusPill, { backgroundColor: statusTone.pillBackground }]}>
                     <View style={[styles.headerStatusDot, { backgroundColor: statusTone.dotColor }]} />
@@ -75,7 +76,6 @@ export default function DashboardScreen() {
                   </View>
                 ) : null}
               </View>
-              <Text style={styles.headerSubtitle}>Merchant Workspace</Text>
             </View>
           </View>
 
@@ -348,20 +348,20 @@ const styles = StyleSheet.create({
   },
   topHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 14,
   },
   topHeaderIdentity: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+    alignItems: 'flex-start',
+    gap: 12,
   },
   headerLogoWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 22,
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     backgroundColor: '#ffffff',
     padding: 6,
     shadowColor: '#014384',
@@ -373,69 +373,74 @@ const styles = StyleSheet.create({
   headerLogoImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: '#ffffff',
   },
   headerLogoFallback: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#014384',
   },
   headerLogoFallbackText: {
     color: '#ffffff',
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '900',
   },
   headerCopyBlock: {
     flex: 1,
-    gap: 4,
+    gap: 5,
+    paddingTop: 1,
   },
   headerGreeting: {
     color: '#60748f',
     fontSize: 15,
     lineHeight: 21,
   },
-  headerNameRow: {
+  headerMerchantName: {
+    width: '100%',
+    color: '#014384',
+    fontSize: 23,
+    fontWeight: '900',
+    lineHeight: 28,
+  },
+  headerMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     flexWrap: 'wrap',
-  },
-  headerMerchantName: {
-    flexShrink: 1,
-    color: '#014384',
-    fontSize: 26,
-    fontWeight: '900',
-    lineHeight: 31,
+    gap: 8,
+    paddingTop: 1,
   },
   headerStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   headerStatusDot: {
-    width: 10,
-    height: 10,
+    width: 8,
+    height: 8,
     borderRadius: 999,
   },
   headerStatusText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
+    lineHeight: 15,
   },
   headerSubtitle: {
     color: '#60748f',
     fontSize: 14,
     lineHeight: 20,
+    fontWeight: '700',
   },
   notificationButton: {
     width: 52,
     height: 52,
     borderRadius: 18,
+    marginTop: 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',

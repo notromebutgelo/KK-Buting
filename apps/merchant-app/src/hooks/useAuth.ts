@@ -1,62 +1,68 @@
 import axios from 'axios'
 import { useEffect } from 'react'
-import { onIdTokenChanged } from 'firebase/auth'
 
-import { auth } from '../lib/firebase'
 import { getCurrentMerchant } from '../services/auth.service'
+import type { MerchantUser } from '../store/authStore'
 import { useAuthStore } from '../store/authStore'
+
+function toMerchantUser(payload: Awaited<ReturnType<typeof getCurrentMerchant>>, existingUser?: MerchantUser | null) {
+  return {
+    uid: payload.uid || existingUser?.uid || '',
+    email: payload.email || existingUser?.email || '',
+    UserName:
+      payload.UserName ||
+      existingUser?.UserName ||
+      existingUser?.email?.split('@')[0] ||
+      'Merchant',
+    role: payload.role || 'merchant',
+    createdAt: payload.createdAt,
+    mustChangePassword: Boolean(payload.mustChangePassword),
+  }
+}
 
 export function useAuth() {
   const hydrate = useAuthStore((state) => state.hydrate)
   const setUser = useAuthStore((state) => state.setUser)
-  const setToken = useAuthStore((state) => state.setToken)
   const setLoading = useAuthStore((state) => state.setLoading)
   const logout = useAuthStore((state) => state.logout)
 
   useEffect(() => {
-    void hydrate()
-  }, [hydrate])
+    let active = true
 
-  useEffect(() => {
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        await logout()
+    void (async () => {
+      await hydrate()
+
+      if (!active) return
+
+      const existingState = useAuthStore.getState()
+      if (!existingState.user || !existingState.token) {
+        setLoading(false)
         return
       }
 
-      const existingUser = useAuthStore.getState().user
-
       try {
         setLoading(true)
-        const token = await firebaseUser.getIdToken()
-        setToken(token)
         const payload = await getCurrentMerchant()
-
-        setUser({
-          uid: payload.uid || firebaseUser.uid,
-          email: payload.email || firebaseUser.email || '',
-          UserName:
-            payload.UserName ||
-            firebaseUser.displayName ||
-            firebaseUser.email?.split('@')[0] ||
-            'Merchant',
-          role: payload.role || 'merchant',
-          createdAt: payload.createdAt,
-          mustChangePassword: Boolean(payload.mustChangePassword),
-        })
+        if (active) {
+          setUser(toMerchantUser(payload, existingState.user))
+        }
       } catch (error) {
         const status = axios.isAxiosError(error) ? error.response?.status : undefined
 
-        if (status === 401 || status === 403 || !existingUser) {
+        if (status === 401 || status === 403 || !existingState.user) {
           await logout()
         }
       } finally {
-        setLoading(false)
+        if (active) {
+          setLoading(false)
+        }
       }
-    })
+    })()
 
-    return () => unsubscribe()
-  }, [logout, setLoading, setToken, setUser])
+    return () => {
+      active = false
+    }
+  }, [hydrate, logout, setLoading, setUser])
 
   return useAuthStore()
 }

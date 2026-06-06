@@ -3,12 +3,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import DashboardScreen from '../screens/dashboards/DashboardScreen'
-import NotificationsScreen from '../screens/notifications/NotificationsScreen'
-import ProfileScreen from '../screens/profile/ProfileScreen'
-import ScanScreen from '../screens/scanner/ScanScreen'
-import ShopProfileScreen from '../screens/shop/ShopProfileScreen'
-
 export type MerchantTabParamList = {
   Home: undefined
   Scan: undefined
@@ -18,6 +12,31 @@ export type MerchantTabParamList = {
 }
 
 const Tab = createBottomTabNavigator<MerchantTabParamList>()
+
+type ScreenModule = {
+  default: React.ComponentType<any>
+}
+
+declare const require: {
+  (path: '../screens/dashboards/DashboardScreen'): ScreenModule
+  (path: '../screens/scanner/ScanScreen'): ScreenModule
+  (path: '../screens/shop/ShopProfileScreen'): ScreenModule
+  (path: '../screens/notifications/NotificationsScreen'): ScreenModule
+  (path: '../screens/profile/ProfileScreen'): ScreenModule
+}
+
+function createLazyScreen(loadScreen: () => ScreenModule) {
+  return function LazyScreen(props: any) {
+    const Screen = React.useMemo(() => loadScreen().default, [])
+    return <Screen {...props} />
+  }
+}
+
+const DashboardScreen = createLazyScreen(() => require('../screens/dashboards/DashboardScreen'))
+const ScanScreen = createLazyScreen(() => require('../screens/scanner/ScanScreen'))
+const ShopProfileScreen = createLazyScreen(() => require('../screens/shop/ShopProfileScreen'))
+const NotificationsScreen = createLazyScreen(() => require('../screens/notifications/NotificationsScreen'))
+const ProfileScreen = createLazyScreen(() => require('../screens/profile/ProfileScreen'))
 
 function getTabIcon(routeName: keyof MerchantTabParamList, focused: boolean) {
   if (routeName === 'Home') return focused ? 'view-dashboard' : 'view-dashboard-outline'

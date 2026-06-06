@@ -476,22 +476,17 @@ export function validateMerchantProfileUpdateRequest(req: Request) {
     "discountInfo",
     "pointsPolicy",
     "ownerName",
-    "ownerEmail",
+    "businessInfo",
   ];
 
   for (const field of stringFields) {
-    validateString(errors, body, field, field, { maxLength: 2000, email: field === "ownerEmail" });
+    validateString(errors, body, field, field, { maxLength: 2000 });
   }
 
   validateNumber(errors, body, "pointsRate", "pointsRate", { min: 0 });
   validateStringOrStringArray(errors, body, "termsAndConditions", "termsAndConditions", { maxLength: 2000 });
 
-  const businessInfo = body.businessInfo;
-  if (businessInfo !== undefined && businessInfo !== null && !isPlainObject(businessInfo) && typeof businessInfo !== "string") {
-    errors.push("businessInfo must be an object or string.");
-  }
-
-  if (!hasAnyKey(body, [...stringFields, "pointsRate", "termsAndConditions", "businessInfo"])) {
+  if (!hasAnyKey(body, [...stringFields, "pointsRate", "termsAndConditions"])) {
     errors.push("At least one merchant profile field must be provided.");
   }
 

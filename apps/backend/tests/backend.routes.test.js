@@ -22,6 +22,53 @@ function createVerifyTokenMock() {
   };
 }
 
+function createAdminControllerMocks(overrides = {}) {
+  return {
+    getDashboard: async (_req, res) => res.json({}),
+    listVerificationProfiles: async (_req, res) => res.json({ profiles: [] }),
+    getVerificationProfileHandler: async (_req, res) => res.json({ profile: {} }),
+    approveVerificationHandler: async (_req, res) => res.json({ message: "ok" }),
+    rejectVerificationHandler: async (_req, res) => res.json({ message: "ok" }),
+    reviewVerificationDocumentHandler: async (_req, res) => res.json({ message: "ok" }),
+    requestVerificationResubmissionHandler: async (_req, res) => res.json({ message: "ok" }),
+    bulkApproveVerificationHandler: async (_req, res) => res.json({ approved: 1 }),
+    listRewards: async (_req, res) => res.json({ rewards: [] }),
+    addReward: async (_req, res) => res.status(201).json({ id: "reward-1" }),
+    updateRewardHandler: async (_req, res) => res.json({ message: "ok" }),
+    listRewardRedemptionsHandler: async (_req, res) => res.json({ redemptions: [] }),
+    markRewardRedemptionClaimedHandler: async (_req, res) => res.json({ message: "ok" }),
+    listMerchants: async (_req, res) => res.json({ merchants: [] }),
+    getMerchantHandler: async (_req, res) => res.json({ merchant: {} }),
+    listPendingMerchants: async (_req, res) => res.json({ merchants: [] }),
+    approveMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
+    updateMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
+    updateMerchantStatusHandler: async (_req, res) => res.json({ message: "ok" }),
+    listMerchantTransactionsHandler: async (_req, res) => res.json({ transactions: [] }),
+    getPointsTransactionsOverviewHandler: async (_req, res) => res.json({ transactions: [] }),
+    updatePointsConversionRateHandler: async (_req, res) => res.json({ message: "ok" }),
+    listYouth: async (_req, res) => res.json({ users: [] }),
+    getYouthHandler: async (_req, res) => res.json({ user: {} }),
+    updateYouthProfileHandler: async (_req, res) => res.json({ message: "ok" }),
+    updateYouthStatusHandler: async (_req, res) => res.json({ message: "ok" }),
+    archiveYouthHandler: async (_req, res) => res.json({ message: "ok" }),
+    adjustYouthPointsHandler: async (_req, res) => res.json({ message: "ok" }),
+    listDigitalIds: async (_req, res) => res.json({ members: [] }),
+    getDigitalIdMemberHandler: async (_req, res) => res.json({ member: {} }),
+    generateDigitalIdHandler: async (_req, res) => res.status(201).json({ memberId: "user-1" }),
+    submitDigitalIdForApprovalHandler: async (_req, res) => res.json({ message: "ok" }),
+    approveDigitalIdHandler: async (_req, res) => res.json({ message: "ok" }),
+    deactivateDigitalIdHandler: async (_req, res) => res.json({ message: "ok" }),
+    regenerateDigitalIdHandler: async (_req, res) => res.json({ memberId: "user-1" }),
+    listPhysicalIdRequestsHandler: async (_req, res) => res.json({ requests: [] }),
+    getPhysicalIdRequestHandler: async (_req, res) => res.json({ request: {} }),
+    updatePhysicalIdRequestHandler: async (_req, res) => res.json({ message: "ok", request: {} }),
+    getReportsHandler: async (_req, res) => res.json({}),
+    createMerchantAccountHandler: async (_req, res) =>
+      res.status(201).json({ merchant: { merchantId: "merchant-1" } }),
+    ...overrides,
+  };
+}
+
 const tests = [
   {
     name: "notifications routes return notifications and mark them read",
@@ -430,6 +477,133 @@ const tests = [
       });
 
       assert.equal(controllerCalled, false);
+    },
+  },
+  {
+    name: "admin merchant and Digital ID routes expose shared workspaces while preserving superadmin actions",
+    async run() {
+      const calls = [];
+      const router = loadDistModuleWithMocks("dist/src/modules/admin/admin.routes", {
+        "dist/src/middleware/verifyToken": {
+          verifyToken: createVerifyTokenMock(),
+        },
+        "dist/src/modules/admin/admin.controller": createAdminControllerMocks({
+          listMerchants: async (_req, res) => {
+            calls.push("list-merchants");
+            res.json({ merchants: [{ id: "merchant-1" }] });
+          },
+          listPendingMerchants: async (_req, res) => {
+            calls.push("list-pending");
+            res.json({ merchants: [{ id: "pending-1" }] });
+          },
+          getMerchantHandler: async (req, res) => {
+            calls.push(`get-merchant:${req.params.merchantId}`);
+            res.json({ merchant: { id: req.params.merchantId } });
+          },
+          updateMerchantHandler: async (req, res) => {
+            calls.push(["update-merchant", req.params.merchantId, req.body]);
+            res.json({ message: "Merchant updated" });
+          },
+          listDigitalIds: async (_req, res) => {
+            calls.push("list-digital-ids");
+            res.json({ members: [{ uid: "youth-1" }] });
+          },
+          approveDigitalIdHandler: async (req, res) => {
+            calls.push(`approve-digital-id:${req.params.userId}`);
+            res.json({ message: "Digital ID generated and activated" });
+          },
+        }),
+      }).default;
+
+      await withExpressServer(router, async (baseUrl) => {
+        const adminHeaders = {
+          Authorization: "Bearer token",
+          "x-test-role": "admin",
+          "x-test-email": "admin@example.com",
+        };
+
+        const merchants = await requestJson(baseUrl, "/merchants", {
+          headers: adminHeaders,
+        });
+        assert.equal(merchants.status, 200);
+        assert.equal(merchants.body.merchants[0].id, "merchant-1");
+
+        const pending = await requestJson(baseUrl, "/merchants/pending", {
+          headers: adminHeaders,
+        });
+        assert.equal(pending.status, 200);
+        assert.equal(pending.body.merchants[0].id, "pending-1");
+
+        const update = await requestJson(baseUrl, "/merchants/merchant-1", {
+          method: "PATCH",
+          headers: adminHeaders,
+          body: {
+            businessName: "Cafe Buting",
+            contactNumber: "09171234567",
+            businessInfo: "Open daily.",
+            pointsRate: 10,
+          },
+        });
+        assert.equal(update.status, 200);
+        assert.equal(update.body.message, "Merchant updated");
+
+        const digitalIds = await requestJson(baseUrl, "/digital-ids", {
+          headers: adminHeaders,
+        });
+        assert.equal(digitalIds.status, 200);
+        assert.equal(digitalIds.body.members[0].uid, "youth-1");
+
+        const forbiddenIssue = await requestJson(baseUrl, "/digital-ids/youth-1/approve", {
+          method: "POST",
+          headers: adminHeaders,
+        });
+        assert.equal(forbiddenIssue.status, 403);
+
+        const forbiddenCreate = await requestJson(baseUrl, "/merchants/create", {
+          method: "POST",
+          headers: adminHeaders,
+          body: {
+            name: "Cafe Buting",
+            email: "cafe@example.com",
+            password: "temporary-password",
+          },
+        });
+        assert.equal(forbiddenCreate.status, 403);
+
+        const forbiddenMerchantApproval = await requestJson(baseUrl, "/merchants/merchant-1/approve", {
+          method: "PATCH",
+          headers: adminHeaders,
+        });
+        assert.equal(forbiddenMerchantApproval.status, 403);
+
+        const superadminIssue = await requestJson(baseUrl, "/digital-ids/youth-1/approve", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "superadmin",
+          },
+        });
+        assert.equal(superadminIssue.status, 200);
+      });
+
+      assert.ok(calls.includes("list-merchants"));
+      assert.ok(calls.includes("list-pending"));
+      assert.equal(calls.includes("get-merchant:pending"), false);
+      assert.ok(calls.includes("list-digital-ids"));
+      assert.ok(calls.includes("approve-digital-id:youth-1"));
+      assert.deepEqual(
+        calls.find((entry) => Array.isArray(entry) && entry[0] === "update-merchant"),
+        [
+          "update-merchant",
+          "merchant-1",
+          {
+            businessName: "Cafe Buting",
+            contactNumber: "09171234567",
+            businessInfo: "Open daily.",
+            pointsRate: 10,
+          },
+        ]
+      );
     },
   },
   {

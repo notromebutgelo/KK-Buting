@@ -174,6 +174,14 @@ The current live points default in code is now:
 
 ### Recently completed work
 
+- admin and superadmin merchant-management plus Digital ID access are now aligned across the frontend and backend
+  - regular admins can now open both the Merchants and Digital IDs workspaces from the sidebar and middleware-protected routes, while merchant account creation, lifecycle actions, and Digital ID issuance/deactivation/regeneration remain superadmin-only
+  - the merchant detail workflow now includes a complete shared business-information editor for business identity, owner contact details, storefront descriptions, discounts, points policy/rate, terms, and logo/banner URLs with previews
+  - admin merchant updates now keep name/description aliases aligned, normalize terms, update the linked merchant owner contact record, and reject missing merchant IDs instead of creating partial records
+  - the pending-merchants route is registered before the dynamic merchant-detail route so `/merchants/pending` cannot be interpreted as a merchant ID
+  - both admin roles can download individual active Digital ID PDFs, batch-export selected active IDs as ZIP files, and open a direct print preview; issuance controls remain restricted to superadmin
+  - responsive browser verification covered the merchant editor at desktop and mobile widths, merchant directory overflow behavior, admin Digital ID controls, batch-selection enablement, and the PDF print-preview flow
+  - verification after rollout: backend helper/service/route/integration tests, admin TypeScript checks, and the admin production build all passed
 - the merchant app QR transaction flow now enforces amount-first scanning and backend one-time-use QR redemption
   - `apps/merchant-app/src/screens/scanner/ScanScreen.tsx` now requires the merchant to enter a valid purchase amount before the QR camera session can be opened, so the scanner is no longer initialized while key transaction details are still blank
   - the same screen now treats scanning as a deliberate session: merchants can open, close, or fully reset the scanner, while successful scans clear the active session and amount to prevent accidental carry-over into the next transaction

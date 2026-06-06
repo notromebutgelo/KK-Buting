@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,12 +19,18 @@ import type { RootStackParamList } from '../../navigation/AppNavigator'
 import { changePassword, signOut } from '../../services/auth.service'
 import { useAuthStore } from '../../store/authStore'
 
+type PasswordToast = {
+  title: string
+  message: string
+  tone: 'success' | 'error' | 'info'
+}
+
 export default function ForcePasswordChangeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const route = useRoute<any>()
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
-  const setToken = useAuthStore((state) => state.setToken)
+  const setAuthSession = useAuthStore((state) => state.setAuthSession)
   const logout = useAuthStore((state) => state.logout)
   const isForcedFlow = route.name === 'ForcePasswordChange'
 
@@ -35,50 +41,93 @@ export default function ForcePasswordChangeScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [toast, setToast] = useState<PasswordToast | null>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current)
+    }
+  }, [])
+
+  const showToast = (nextToast: PasswordToast, duration = 4200) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
+    }
+    setToast(nextToast)
+    toastTimerRef.current = setTimeout(() => setToast(null), duration)
+  }
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Missing details', 'Fill in your current password and your new password.')
+      showToast({
+        title: 'Missing details',
+        message: 'Fill in your current password and your new password.',
+        tone: 'info',
+      })
       return
     }
 
     if (newPassword.length < 8) {
-      Alert.alert('Weak password', 'Your new password must be at least 8 characters long.')
+      showToast({
+        title: 'Weak password',
+        message: 'Your new password must be at least 8 characters long.',
+        tone: 'info',
+      })
       return
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Passwords do not match', 'Confirm your new password exactly to continue.')
+      showToast({
+        title: 'Passwords do not match',
+        message: 'Confirm your new password exactly to continue.',
+        tone: 'info',
+      })
       return
     }
 
     if (currentPassword === newPassword) {
-      Alert.alert('Choose a different password', 'Your new password must be different from the temporary password provided by the superadmin.')
+      showToast({
+        title: 'Choose a different password',
+        message: 'Your new password must be different from the temporary password provided by the superadmin.',
+        tone: 'info',
+      })
       return
     }
 
     try {
       setSubmitting(true)
-      const payload = await changePassword(currentPassword, newPassword)
-      setToken(payload.token)
-      setUser(payload.user)
+      const payload = await changePassword(currentPassword.trim(), newPassword, user?.email)
+      setAuthSession(payload.token, payload.refreshToken, payload.expiresAt)
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
 
       if (isForcedFlow) {
-        Alert.alert('Password updated', 'Your password has been changed. You can now access the merchant workspace.')
+        showToast({
+          title: 'Password updated',
+          message: 'Your password has been changed. Opening your merchant workspace now.',
+          tone: 'success',
+        }, 1600)
+        transitionTimerRef.current = setTimeout(() => setUser(payload.user), 1200)
       } else {
-        Alert.alert('Password updated', 'Your merchant password was changed inside the app.', [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ])
+        setUser(payload.user)
+        showToast({
+          title: 'Password updated',
+          message: 'Your merchant password was changed inside the app.',
+          tone: 'success',
+        }, 1800)
+        transitionTimerRef.current = setTimeout(() => navigation.goBack(), 1400)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to change password.'
-      Alert.alert('Password change failed', message)
+      showToast({
+        title: 'Password change failed',
+        message,
+        tone: 'error',
+      })
     } finally {
       setSubmitting(false)
     }
@@ -95,6 +144,39 @@ export default function ForcePasswordChangeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {toast ? (
+        <View
+          style={[
+            styles.toast,
+            toast.tone === 'success'
+              ? styles.successToast
+              : toast.tone === 'error'
+                ? styles.errorToast
+                : styles.infoToast,
+          ]}
+        >
+          <View style={styles.toastIcon}>
+            <MaterialCommunityIcons
+              name={
+                toast.tone === 'success'
+                  ? 'check-circle-outline'
+                  : toast.tone === 'error'
+                    ? 'lock-alert-outline'
+                    : 'information-outline'
+              }
+              size={20}
+              color={toast.tone === 'success' ? '#087443' : toast.tone === 'error' ? '#b42318' : '#014384'}
+            />
+          </View>
+          <View style={styles.toastBody}>
+            <Text style={styles.toastTitle}>{toast.title}</Text>
+            <Text style={styles.toastMessage}>{toast.message}</Text>
+          </View>
+          <Pressable style={styles.toastClose} onPress={() => setToast(null)} accessibilityLabel="Dismiss message">
+            <MaterialCommunityIcons name="close" size={18} color="#60748f" />
+          </Pressable>
+        </View>
+      ) : null}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
@@ -231,6 +313,62 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f0f0f0',
+  },
+  toast: {
+    position: 'absolute',
+    top: 14,
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    elevation: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    shadowColor: '#014384',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+  },
+  successToast: {
+    backgroundColor: '#f1fff7',
+    borderColor: '#c9f2dc',
+  },
+  errorToast: {
+    backgroundColor: '#fff7f6',
+    borderColor: '#ffd8d3',
+  },
+  infoToast: {
+    backgroundColor: '#f3f8ff',
+    borderColor: '#d9e8fb',
+  },
+  toastIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  toastBody: {
+    flex: 1,
+    gap: 3,
+  },
+  toastTitle: {
+    color: '#014384',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  toastMessage: {
+    color: '#35506d',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  toastClose: {
+    padding: 4,
   },
   container: {
     flex: 1,

@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 
 const { createDoc, loadDistModuleWithMocks } = require("./test-utils");
-const { FakeFirestore, FieldValue } = require("./fake-firestore");
+const { FakeFirestore, FakeTimestamp, FieldValue } = require("./fake-firestore");
 
 const tests = [
   {
@@ -726,6 +726,100 @@ const tests = [
         claimedOnly.map((entry) => entry.id),
         ["tx-claimed"]
       );
+    },
+  },
+  {
+    name: "admin.service updates complete merchant business information and owner contact details",
+    async run() {
+      const db = new FakeFirestore({
+        merchants: {
+          "merchant-1": {
+            name: "Old Merchant",
+            businessName: "Old Merchant",
+            ownerId: "owner-1",
+            ownerName: "Old Owner",
+            contactNumber: "09000000000",
+            pointsRate: 10,
+          },
+        },
+        users: {
+          "owner-1": {
+            uid: "owner-1",
+            UserName: "Old Owner",
+            contactNumber: "09000000000",
+            role: "merchant",
+          },
+        },
+      });
+
+      const service = loadDistModuleWithMocks("dist/src/modules/admin/admin.service", {
+        "dist/src/config/firebase": { db, auth: {} },
+        "module:firebase-admin/firestore": {
+          FieldValue,
+          Timestamp: FakeTimestamp,
+        },
+        "dist/utils/generateIdNumber": {
+          generateIdNumber: async () => "KK-001",
+        },
+        "dist/src/modules/auth/user.service": {
+          setUserRole: async () => undefined,
+        },
+        "dist/src/modules/auth/merchantPasswordPolicy.service": {
+          createMerchantTemporaryPasswordPolicy: async () => undefined,
+        },
+        "dist/src/modules/merchants/merhcants.service": {
+          getMerchantById: async () => null,
+        },
+        "dist/src/modules/notifications/notifications.service": {
+          createNotification: async () => undefined,
+          createNotificationsForRoles: async () => ({ notified: 0 }),
+        },
+      });
+
+      await service.updateMerchant(
+        "merchant-1",
+        {
+          businessName: "Cafe Buting",
+          category: "Cafe & Milk Tea",
+          address: "123 Buting Street",
+          ownerName: "Juan Dela Cruz",
+          contactNumber: "09171234567",
+          shortDescription: "Neighborhood drinks and snacks.",
+          businessInfo: "Open daily from 8 AM to 9 PM.",
+          discountInfo: "10% off for active KK members.",
+          termsAndConditions: [
+            "Present the active Digital ID before checkout.",
+            "Cannot be combined with another offer.",
+          ],
+          pointsPolicy: "Earn one point for every PHP 10 spent.",
+          pointsRate: 10,
+          logoUrl: "https://cdn.example.com/logo.png",
+          bannerUrl: "https://cdn.example.com/banner.png",
+        },
+        "admin@example.com"
+      );
+
+      const merchant = db.getDocData("merchants", "merchant-1");
+      assert.equal(merchant.name, "Cafe Buting");
+      assert.equal(merchant.businessName, "Cafe Buting");
+      assert.equal(merchant.description, "Neighborhood drinks and snacks.");
+      assert.equal(merchant.shortDescription, "Neighborhood drinks and snacks.");
+      assert.equal(merchant.businessInfo, "Open daily from 8 AM to 9 PM.");
+      assert.equal(
+        merchant.termsAndConditions,
+        "Present the active Digital ID before checkout.\nCannot be combined with another offer."
+      );
+      assert.equal(merchant.updatedBy, "admin@example.com");
+
+      const owner = db.getDocData("users", "owner-1");
+      assert.equal(owner.UserName, "Juan Dela Cruz");
+      assert.equal(owner.contactNumber, "09171234567");
+
+      await assert.rejects(
+        () => service.updateMerchant("missing", { businessName: "Missing" }, "admin@example.com"),
+        /Merchant not found/
+      );
+      assert.equal(db.getDocData("merchants", "missing"), null);
     },
   },
 ];

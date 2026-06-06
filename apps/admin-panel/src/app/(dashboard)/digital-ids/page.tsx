@@ -9,6 +9,7 @@ import {
   FileText,
   Hourglass,
   MoreVertical,
+  Printer,
   RotateCw,
   Search,
   XCircle,
@@ -115,6 +116,7 @@ export default function DigitalIdsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [isBatchDownloading, setIsBatchDownloading] = useState(false)
+  const [pdfAction, setPdfAction] = useState<'download' | 'print' | null>(null)
   const [adminRole, setAdminRole] = useState('admin')
   const [message, setMessage] = useState('')
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
@@ -303,14 +305,54 @@ export default function DigitalIdsPage() {
     }
   }
 
-  const handleDownloadPdf = async (member: DigitalIdMember | DigitalIdDetail) => {
-    const detail =
+  const resolveDigitalIdDetail = async (member: DigitalIdMember | DigitalIdDetail) =>
       'profile' in member && member.profile
         ? (member as DigitalIdDetail)
         : (await api.get<{ member: DigitalIdDetail }>(`/admin/digital-ids/${member.uid}`)).data.member
 
-    const pdf = await buildDigitalIdPdf(detail)
-    pdf.save(`${(detail.memberId || detail.profile?.idNumber || detail.uid).replace(/[^\w-]+/g, '_')}.pdf`)
+  const handleDownloadPdf = async (member: DigitalIdMember | DigitalIdDetail) => {
+    setPdfAction('download')
+    setMessage('')
+
+    try {
+      const detail = await resolveDigitalIdDetail(member)
+      const pdf = await buildDigitalIdPdf(detail)
+      pdf.save(`${(detail.memberId || detail.profile?.idNumber || detail.uid).replace(/[^\w-]+/g, '_')}.pdf`)
+      setMessage('Digital ID PDF downloaded successfully.')
+    } catch (error: any) {
+      setMessage(error?.response?.data?.error || 'We could not prepare this Digital ID PDF.')
+    } finally {
+      setPdfAction(null)
+    }
+  }
+
+  const handlePrintPdf = async (member: DigitalIdMember | DigitalIdDetail) => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      setMessage('Allow pop-ups for this site to open the print preview.')
+      return
+    }
+
+    printWindow.document.title = 'Preparing Digital ID'
+    printWindow.document.body.innerHTML =
+      '<p style="font-family:Arial,sans-serif;padding:24px;color:#173b68">Preparing Digital ID print preview...</p>'
+    setPdfAction('print')
+    setMessage('')
+
+    try {
+      const detail = await resolveDigitalIdDetail(member)
+      const pdf = await buildDigitalIdPdf(detail)
+      pdf.autoPrint()
+      const url = URL.createObjectURL(pdf.output('blob'))
+      printWindow.location.replace(url)
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      setMessage('Digital ID print preview opened in a new tab.')
+    } catch (error: any) {
+      printWindow.close()
+      setMessage(error?.response?.data?.error || 'We could not prepare this Digital ID for printing.')
+    } finally {
+      setPdfAction(null)
+    }
   }
 
   const handleBatchDownload = async () => {
@@ -349,6 +391,8 @@ export default function DigitalIdsPage() {
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
       setMessage(`Downloaded ${activeIds.length} active IDs as ZIP.`)
+    } catch (error: any) {
+      setMessage(error?.response?.data?.error || 'We could not prepare the selected Digital IDs.')
     } finally {
       setIsBatchDownloading(false)
     }
@@ -382,7 +426,7 @@ export default function DigitalIdsPage() {
           <button
             type="button"
             onClick={handleBatchDownload}
-            disabled={!isSuperadmin || isBatchDownloading || selectedIds.length === 0}
+            disabled={isBatchDownloading || selectedIds.length === 0}
             className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-[color:var(--surface-muted)] disabled:opacity-60"
             style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)', background: 'var(--card)' }}
           >
@@ -692,7 +736,8 @@ export default function DigitalIdsPage() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <SecondaryButton label="Generate and Issue ID" onClick={() => handleAction('approve', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} icon="issue" /> : null}
                     {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <SecondaryButton label="Generate and Issue ID" onClick={() => handleAction('approve', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} icon="issue" /> : null}
-                    {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label="Download PDF" onClick={() => handleDownloadPdf(selectedMember)} icon="download" /> : null}
+                    {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label={pdfAction === 'download' ? 'Preparing PDF...' : 'Download PDF'} onClick={() => handleDownloadPdf(selectedMember)} disabled={pdfAction !== null} icon="download" /> : null}
+                    {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label={pdfAction === 'print' ? 'Preparing print...' : 'Print ID'} onClick={() => handlePrintPdf(selectedMember)} disabled={pdfAction !== null} icon="print" /> : null}
                     {selectedMember.memberId && isSuperadmin ? <SecondaryButton label="Regenerate ID" onClick={() => handleAction('regenerate', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} icon="refresh" /> : null}
                   </div>
                   {selectedMember.digitalIdStatus === 'active' && isSuperadmin ? <DangerButton label="Deactivate ID" onClick={() => handleAction('deactivate', selectedMember)} disabled={isActionLoading} /> : null}
@@ -765,7 +810,7 @@ function SecondaryButton({
   label: string
   onClick: () => void
   disabled?: boolean
-  icon?: 'download' | 'refresh' | 'issue'
+  icon?: 'download' | 'print' | 'refresh' | 'issue'
 }) {
   return (
     <button
@@ -982,9 +1027,13 @@ function PreviewToggleButton({
   )
 }
 
-function SecondaryButtonIcon({ icon }: { icon: 'download' | 'refresh' | 'issue' }) {
+function SecondaryButtonIcon({ icon }: { icon: 'download' | 'print' | 'refresh' | 'issue' }) {
   if (icon === 'download') {
     return <Download className="h-4 w-4" />
+  }
+
+  if (icon === 'print') {
+    return <Printer className="h-4 w-4" />
   }
 
   if (icon === 'refresh') {

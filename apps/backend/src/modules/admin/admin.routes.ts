@@ -92,9 +92,9 @@ router.get("/rewards/redemptions", ...adminOrSuperadmin, listRewardRedemptionsHa
 router.patch("/rewards/redemptions/:transactionId/claim", ...adminOrSuperadmin, markRewardRedemptionClaimedHandler);
 router.post("/merchants/create", ...superadminOnly, validateRequest(validateMerchantAccountRequest), createMerchantAccountHandler);
 router.get("/merchants", ...adminOrSuperadmin, listMerchants);
-router.get("/merchants/:merchantId", ...adminOrSuperadmin, getMerchantHandler);
 router.get("/merchants/pending", ...adminOrSuperadmin, listPendingMerchants);
-router.patch("/merchants/:merchantId/approve", ...adminOrSuperadmin, approveMerchantHandler);
+router.get("/merchants/:merchantId", ...adminOrSuperadmin, getMerchantHandler);
+router.patch("/merchants/:merchantId/approve", ...superadminOnly, approveMerchantHandler);
 router.patch("/merchants/:merchantId", ...adminOrSuperadmin, validateRequest(validateMerchantProfileUpdateRequest), updateMerchantHandler);
 router.patch("/merchants/:merchantId/status", ...superadminOnly, validateRequest(validateMerchantStatusRequest), updateMerchantStatusHandler);
 router.get("/merchants/:merchantId/transactions", ...adminOrSuperadmin, listMerchantTransactionsHandler);

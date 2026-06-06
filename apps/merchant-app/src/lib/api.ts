@@ -2,7 +2,7 @@ import axios from 'axios'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 
-import { auth } from './firebase'
+import { refreshFirebaseIdToken } from './firebaseIdentity'
 import { useAuthStore } from '../store/authStore'
 
 const DEFAULT_API_PORT = '4000'
@@ -197,14 +197,26 @@ api.interceptors.request.use(async (config) => {
     throw new Error(API_CONFIGURATION_ERROR)
   }
 
-  const currentToken = useAuthStore.getState().token
-  const refreshedToken = auth.currentUser ? await auth.currentUser.getIdToken() : currentToken
+  const currentState = useAuthStore.getState()
+  let token = currentState.token
+  const refreshToken = currentState.refreshToken
+  const shouldRefreshToken =
+    !!refreshToken &&
+    (!token || !currentState.tokenExpiresAt || Date.now() > currentState.tokenExpiresAt - 120000)
 
-  if (refreshedToken && refreshedToken !== currentToken) {
-    useAuthStore.getState().setToken(refreshedToken)
+  if (shouldRefreshToken) {
+    try {
+      const refreshedSession = await refreshFirebaseIdToken(refreshToken)
+      token = refreshedSession.idToken
+      useAuthStore
+        .getState()
+        .setAuthSession(refreshedSession.idToken, refreshedSession.refreshToken, refreshedSession.expiresAt)
+    } catch (error) {
+      await useAuthStore.getState().logout()
+      throw error
+    }
   }
 
-  const token = refreshedToken || currentToken
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

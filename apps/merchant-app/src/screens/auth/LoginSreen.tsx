@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   KeyboardAvoidingView,
@@ -16,38 +16,88 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { signIn } from '../../services/auth.service'
 import { useAuthStore } from '../../store/authStore'
 
+type LoginToast = {
+  title: string
+  message: string
+  tone: 'error' | 'info'
+}
+
 export default function LoginSreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [toast, setToast] = useState<LoginToast | null>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const setUser = useAuthStore((state) => state.setUser)
-  const setToken = useAuthStore((state) => state.setToken)
-  const setLoading = useAuthStore((state) => state.setLoading)
+  const setAuthSession = useAuthStore((state) => state.setAuthSession)
+  const setInteractiveLogin = useAuthStore((state) => state.setInteractiveLogin)
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current)
+      }
+    }
+  }, [])
+
+  const showToast = (nextToast: LoginToast) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
+    }
+    setToast(nextToast)
+    toastTimerRef.current = setTimeout(() => setToast(null), 4200)
+  }
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Missing details', 'Enter your merchant email and password.')
+      showToast({
+        title: 'Missing details',
+        message: 'Enter your merchant email and password.',
+        tone: 'info',
+      })
       return
     }
 
     try {
       setSubmitting(true)
-      setLoading(true)
+      setInteractiveLogin(true)
       const payload = await signIn(email, password)
-      setToken(payload.token)
+      setAuthSession(payload.token, payload.refreshToken, payload.expiresAt)
       setUser(payload.user)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to sign in.'
-      Alert.alert('Login failed', message)
+      showToast({
+        title: 'Login failed',
+        message,
+        tone: 'error',
+      })
     } finally {
       setSubmitting(false)
-      setLoading(false)
+      setInteractiveLogin(false)
     }
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {toast ? (
+        <View style={[styles.toast, toast.tone === 'error' ? styles.errorToast : styles.infoToast]}>
+          <View style={styles.toastIcon}>
+            <MaterialCommunityIcons
+              name={toast.tone === 'error' ? 'lock-alert-outline' : 'information-outline'}
+              size={20}
+              color={toast.tone === 'error' ? '#b42318' : '#014384'}
+            />
+          </View>
+          <View style={styles.toastBody}>
+            <Text style={styles.toastTitle}>{toast.title}</Text>
+            <Text style={styles.toastMessage}>{toast.message}</Text>
+          </View>
+          <Pressable style={styles.toastClose} onPress={() => setToast(null)} accessibilityLabel="Dismiss message">
+            <MaterialCommunityIcons name="close" size={18} color="#60748f" />
+          </Pressable>
+        </View>
+      ) : null}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
@@ -138,6 +188,58 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f0f0f0',
+  },
+  toast: {
+    position: 'absolute',
+    top: 14,
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    elevation: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    shadowColor: '#014384',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+  },
+  errorToast: {
+    backgroundColor: '#fff7f6',
+    borderColor: '#ffd8d3',
+  },
+  infoToast: {
+    backgroundColor: '#f3f8ff',
+    borderColor: '#d9e8fb',
+  },
+  toastIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  toastBody: {
+    flex: 1,
+    gap: 3,
+  },
+  toastTitle: {
+    color: '#014384',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  toastMessage: {
+    color: '#35506d',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  toastClose: {
+    padding: 4,
   },
   container: {
     flex: 1,
