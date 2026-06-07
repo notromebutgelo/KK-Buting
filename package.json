@@ -26,6 +26,10 @@
     "typecheck:merchant": "npm run typecheck --workspace merchant-app",
     "test:backend": "npm run test --workspace backend"
   },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
   "devDependencies": {
     "concurrently": "^9.0.1"
   }
