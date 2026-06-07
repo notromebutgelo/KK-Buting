@@ -10,6 +10,20 @@ type YouthVoucherSummary = AnyRecord & {
   claimedByMe: boolean;
 };
 
+const TARGETED_VOUCHER = "targeted";
+const PUBLIC_VOUCHER = "public";
+const MAX_TARGET_RECIPIENTS = 500;
+const DEFAULT_EXPIRED_VISIBILITY_DAYS = 30;
+const MAX_EXPIRED_VISIBILITY_DAYS = 365;
+const EXPIRED_VISIBILITY_DURATION = "duration";
+const EXPIRED_VISIBILITY_MANUAL = "manual";
+
+function makeError(message: string, status: number): Error {
+  const err = new Error(message) as any;
+  err.status = status;
+  return err;
+}
+
 function toIso(value: any): string | undefined {
   if (!value) return undefined;
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -35,9 +49,107 @@ function isExpired(expiresAt: string | null | undefined): boolean {
   return !Number.isNaN(t) && t < Date.now();
 }
 
-function normalizeVoucher(data: AnyRecord): AnyRecord {
+function normalizeTargetUserIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((entry) => String(entry || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function resolveVisibilityType(value: unknown) {
+  return String(value || "").trim().toLowerCase() === TARGETED_VOUCHER
+    ? TARGETED_VOUCHER
+    : PUBLIC_VOUCHER;
+}
+
+function normalizeBoolean(value: unknown) {
+  return value === true || value === "true";
+}
+
+function normalizeExpiredVisibilityMode(value: unknown) {
+  return String(value || "").trim().toLowerCase() === EXPIRED_VISIBILITY_MANUAL
+    ? EXPIRED_VISIBILITY_MANUAL
+    : EXPIRED_VISIBILITY_DURATION;
+}
+
+function normalizeExpiredVisibilityDays(value: unknown) {
+  const numericValue = Number(value ?? DEFAULT_EXPIRED_VISIBILITY_DAYS);
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_EXPIRED_VISIBILITY_DAYS;
+  }
+
+  return Math.min(
+    Math.max(Math.trunc(numericValue), 1),
+    MAX_EXPIRED_VISIBILITY_DAYS
+  );
+}
+
+function getExpiredReferenceTime(voucher: AnyRecord) {
+  const referenceValue = voucher.expiresAt || voucher.expiredAt;
+  if (!referenceValue) return null;
+
+  const timestamp = new Date(String(referenceValue)).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function getExpiredVisibleUntil(voucher: AnyRecord) {
+  if (normalizeExpiredVisibilityMode(voucher.expiredVisibilityMode) !== EXPIRED_VISIBILITY_DURATION) {
+    return null;
+  }
+
+  const referenceTime = getExpiredReferenceTime(voucher);
+  if (!referenceTime) return null;
+
+  const days = normalizeExpiredVisibilityDays(voucher.expiredVisibilityDays);
+  return new Date(referenceTime + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function isExpiredVoucherVisibleToYouth(voucher: AnyRecord) {
+  if (normalizeBoolean(voucher.expiredHiddenFromYouth)) {
+    return false;
+  }
+
+  if (normalizeExpiredVisibilityMode(voucher.expiredVisibilityMode) === EXPIRED_VISIBILITY_MANUAL) {
+    return true;
+  }
+
+  const visibleUntil = getExpiredVisibleUntil(voucher);
+  if (!visibleUntil) {
+    return true;
+  }
+
+  return new Date(visibleUntil).getTime() >= Date.now();
+}
+
+function canUserAccessVoucher(voucher: AnyRecord, uid: string) {
+  if (resolveVisibilityType(voucher.visibilityType) === PUBLIC_VOUCHER) {
+    return true;
+  }
+
+  return normalizeTargetUserIds(voucher.targetUserIds).includes(uid);
+}
+
+function normalizeVoucher(
+  data: AnyRecord,
+  options: { includeTargetUserIds?: boolean } = {}
+): AnyRecord {
   const v = serializeRecord(data);
   const computedStatus = isExpired(v.expiresAt) ? "expired" : String(v.status || "active");
+  const visibilityType = resolveVisibilityType(v.visibilityType);
+  const expiredVisibilityMode = normalizeExpiredVisibilityMode(v.expiredVisibilityMode);
+  const expiredVisibilityDays = normalizeExpiredVisibilityDays(v.expiredVisibilityDays);
+  const expiredVisibleUntil = getExpiredVisibleUntil({
+    ...v,
+    expiredVisibilityMode,
+    expiredVisibilityDays,
+  });
+  const targetUserIds =
+    visibilityType === TARGETED_VOUCHER ? normalizeTargetUserIds(v.targetUserIds) : [];
+
   return {
     id: String(v.id || ""),
     title: String(v.title || ""),
@@ -47,17 +159,111 @@ function normalizeVoucher(data: AnyRecord): AnyRecord {
     eligibilityConditions: v.eligibilityConditions || {},
     stock: v.stock == null ? null : Number(v.stock),
     claimedCount: Array.isArray(v.claimedBy) ? v.claimedBy.length : Number(v.claimedCount ?? 0),
+    visibilityType,
+    targetedRecipientCount: targetUserIds.length,
+    notificationsEnabled: Boolean(v.notificationsEnabled),
+    ...(options.includeTargetUserIds ? { targetUserIds } : {}),
     status: computedStatus,
+    expiredVisibilityMode,
+    expiredVisibilityDays,
+    expiredHiddenFromYouth: normalizeBoolean(v.expiredHiddenFromYouth),
+    expiredAt: toIso(v.expiredAt) || null,
+    expiredVisibleUntil,
     createdBy: String(v.createdBy || ""),
     createdAt: String(v.createdAt || ""),
     expiresAt: v.expiresAt ? String(v.expiresAt) : null,
   };
 }
 
+async function assertValidTargetUsers(targetUserIds: string[]) {
+  if (!targetUserIds.length) {
+    throw new Error("Select at least one youth member for a targeted voucher");
+  }
+  if (targetUserIds.length > MAX_TARGET_RECIPIENTS) {
+    throw new Error(`Targeted vouchers support up to ${MAX_TARGET_RECIPIENTS} recipients`);
+  }
+
+  const userDocs = await Promise.all(
+    targetUserIds.map((uid) => db.collection("users").doc(uid).get())
+  );
+  const invalidRecipient = userDocs.find(
+    (doc) => !doc.exists || String(doc.data()?.role || "").toLowerCase() !== "youth"
+  );
+
+  if (invalidRecipient) {
+    throw new Error("Every targeted recipient must be an existing youth member");
+  }
+}
+
+async function notifyTargetRecipients(
+  targetUserIds: string[],
+  voucher: { id: string; title: string; description?: string }
+) {
+  await Promise.allSettled(
+    targetUserIds.map((recipientUid) =>
+      createNotification({
+        recipientUid,
+        audience: "youth",
+        type: "info",
+        title: "New Voucher Available",
+        body: voucher.description
+          ? `${voucher.title}: ${voucher.description}`
+          : `${voucher.title} is now available in your KK Vouchers account.`,
+        link: "/vouchers",
+        metadata: {
+          voucherId: voucher.id,
+          visibilityType: TARGETED_VOUCHER,
+        },
+      })
+    )
+  );
+}
+
+async function attachTargetRecipientSummaries(vouchers: AnyRecord[]) {
+  const targetUserIds = Array.from(
+    new Set(vouchers.flatMap((voucher) => normalizeTargetUserIds(voucher.targetUserIds)))
+  );
+  const userDocs = await Promise.all(
+    targetUserIds.map((uid) => db.collection("users").doc(uid).get())
+  );
+  const userMap = new Map(
+    userDocs
+      .filter((doc) => doc.exists)
+      .map((doc) => [
+        doc.id,
+        {
+          uid: doc.id,
+          fullName: String(doc.data()?.UserName || doc.data()?.displayName || ""),
+          email: String(doc.data()?.email || ""),
+        },
+      ])
+  );
+
+  return vouchers.map((voucher) => ({
+    ...voucher,
+    targetRecipients: normalizeTargetUserIds(voucher.targetUserIds).map(
+      (uid) => userMap.get(uid) || { uid, fullName: "", email: "" }
+    ),
+  }));
+}
+
 // ─── SUPERADMIN: create ────────────────────────────────────────────────────────
 
 export async function createVoucher(createdBy: string, payload: AnyRecord) {
   const ref = db.collection("vouchers").doc();
+  const visibilityType = resolveVisibilityType(payload.visibilityType);
+  const targetUserIds =
+    visibilityType === TARGETED_VOUCHER
+      ? normalizeTargetUserIds(payload.targetUserIds)
+      : [];
+  const notificationsEnabled =
+    visibilityType === TARGETED_VOUCHER && normalizeBoolean(payload.notificationsEnabled);
+
+  if (visibilityType === TARGETED_VOUCHER) {
+    await assertValidTargetUsers(targetUserIds);
+  }
+
+  const status = String(payload.status || "active");
   const data = {
     title: String(payload.title || ""),
     description: String(payload.description || ""),
@@ -66,14 +272,38 @@ export async function createVoucher(createdBy: string, payload: AnyRecord) {
     eligibilityConditions: payload.eligibilityConditions || {},
     stock: payload.stock == null ? null : Number(payload.stock),
     claimedBy: [],
-    status: String(payload.status || "active"),
+    visibilityType,
+    targetUserIds,
+    notificationsEnabled,
+    expiredVisibilityMode: normalizeExpiredVisibilityMode(payload.expiredVisibilityMode),
+    expiredVisibilityDays: normalizeExpiredVisibilityDays(payload.expiredVisibilityDays),
+    expiredHiddenFromYouth: normalizeBoolean(payload.expiredHiddenFromYouth),
+    status,
     createdBy,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     expiresAt: payload.expiresAt || null,
+    expiredAt: status === "expired" ? FieldValue.serverTimestamp() : null,
   };
   await ref.set(data);
-  return { id: ref.id, ...data };
+
+  if (
+    visibilityType === TARGETED_VOUCHER &&
+    notificationsEnabled &&
+    data.status === "active" &&
+    !isExpired(data.expiresAt)
+  ) {
+    await notifyTargetRecipients(targetUserIds, {
+      id: ref.id,
+      title: data.title,
+      description: data.description,
+    });
+  }
+
+  return normalizeVoucher(
+    { id: ref.id, ...data, createdAt: new Date().toISOString() },
+    { includeTargetUserIds: true }
+  );
 }
 
 // ─── LIST for youth (active + expired, with claimedByMe flag) ────────────────
@@ -81,8 +311,10 @@ export async function createVoucher(createdBy: string, payload: AnyRecord) {
 export async function listYouthVouchers(uid: string) {
   const snap = await db.collection("vouchers").get();
   const vouchers: YouthVoucherSummary[] = snap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as AnyRecord)
+    .filter((voucher) => canUserAccessVoucher(voucher, uid))
     .map((doc) => {
-      const data = { id: doc.id, ...doc.data() } as AnyRecord;
+      const data = doc;
       const claimedByMe = Array.isArray(data.claimedBy) && data.claimedBy.includes(uid);
       const normalized = normalizeVoucher(data);
       return {
@@ -94,7 +326,9 @@ export async function listYouthVouchers(uid: string) {
 
   return vouchers.filter(
     (voucher) =>
-      voucher.status === "active" || voucher.status === "expired" || voucher.claimedByMe
+      voucher.status === "active" ||
+      voucher.claimedByMe ||
+      (voucher.status === "expired" && isExpiredVoucherVisibleToYouth(voucher))
   );
 }
 
@@ -102,15 +336,40 @@ export async function listYouthVouchers(uid: string) {
 
 export async function listAllVouchers() {
   const snap = await db.collection("vouchers").get();
-  return snap.docs.map((doc) => normalizeVoucher({ id: doc.id, ...doc.data() }));
+  const vouchers = snap.docs.map((doc) =>
+    normalizeVoucher(
+      { id: doc.id, ...doc.data() },
+      { includeTargetUserIds: true }
+    )
+  );
+  return attachTargetRecipientSummaries(vouchers);
 }
 
 // ─── GET SINGLE ───────────────────────────────────────────────────────────────
 
-export async function getVoucher(voucherId: string) {
+export async function getVoucher(
+  voucherId: string,
+  viewer: { uid: string; role: string }
+) {
   const snap = await db.collection("vouchers").doc(voucherId).get();
   if (!snap.exists) return null;
-  return normalizeVoucher({ id: snap.id, ...snap.data() });
+  const rawVoucher = { id: snap.id, ...snap.data() } as AnyRecord;
+  const isPrivileged = ["admin", "superadmin"].includes(
+    String(viewer.role || "").toLowerCase()
+  );
+
+  if (!isPrivileged && !canUserAccessVoucher(rawVoucher, viewer.uid)) {
+    return null;
+  }
+
+  const voucher = normalizeVoucher(rawVoucher, {
+    includeTargetUserIds: isPrivileged,
+  });
+  if (!isPrivileged) {
+    return voucher;
+  }
+
+  return (await attachTargetRecipientSummaries([voucher]))[0];
 }
 
 // ─── PATCH (superadmin update / expire) ───────────────────────────────────────
@@ -120,14 +379,97 @@ export async function updateVoucher(voucherId: string, patch: AnyRecord) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error("Voucher not found");
 
+  const existing = snap.data() as AnyRecord;
+  const previousVisibilityType = resolveVisibilityType(existing.visibilityType);
+  const visibilityType =
+    patch.visibilityType === undefined
+      ? previousVisibilityType
+      : resolveVisibilityType(patch.visibilityType);
+  const previousTargetUserIds = normalizeTargetUserIds(existing.targetUserIds);
+  const targetUserIds =
+    visibilityType === TARGETED_VOUCHER
+      ? patch.targetUserIds === undefined
+        ? previousTargetUserIds
+        : normalizeTargetUserIds(patch.targetUserIds)
+      : [];
+  const notificationsEnabled =
+    visibilityType === TARGETED_VOUCHER &&
+    (patch.notificationsEnabled === undefined
+      ? Boolean(existing.notificationsEnabled)
+      : normalizeBoolean(patch.notificationsEnabled));
+
+  if (visibilityType === TARGETED_VOUCHER) {
+    await assertValidTargetUsers(targetUserIds);
+  }
+
   const allowed: AnyRecord = { updatedAt: FieldValue.serverTimestamp() };
-  const fields = ["title", "description", "type", "pointsCost", "eligibilityConditions", "stock", "status", "expiresAt"];
+  const fields = [
+    "title",
+    "description",
+    "type",
+    "pointsCost",
+    "eligibilityConditions",
+    "stock",
+    "status",
+    "expiresAt",
+    "expiredHiddenFromYouth",
+  ];
   for (const key of fields) {
     if (patch[key] !== undefined) allowed[key] = patch[key];
   }
+  if (patch.expiredVisibilityMode !== undefined) {
+    allowed.expiredVisibilityMode = normalizeExpiredVisibilityMode(patch.expiredVisibilityMode);
+  }
+  if (patch.expiredVisibilityDays !== undefined) {
+    allowed.expiredVisibilityDays = normalizeExpiredVisibilityDays(patch.expiredVisibilityDays);
+  }
+  if (
+    patch.status === "expired" &&
+    !isExpired(existing.expiresAt) &&
+    String(existing.status || "active") !== "expired"
+  ) {
+    allowed.expiredAt = FieldValue.serverTimestamp();
+  }
+  if (patch.status !== undefined && String(patch.status || "") !== "expired") {
+    allowed.expiredAt = null;
+  }
+  allowed.visibilityType = visibilityType;
+  allowed.targetUserIds = targetUserIds;
+  allowed.notificationsEnabled = notificationsEnabled;
+
   await ref.set(allowed, { merge: true });
   const updated = await ref.get();
-  return normalizeVoucher({ id: ref.id, ...updated.data() });
+  const updatedData = { id: ref.id, ...updated.data() } as AnyRecord;
+  const nextStatus = String(updatedData.status || "active");
+  const newlyTargetedUserIds = targetUserIds.filter(
+    (uid) => !previousTargetUserIds.includes(uid)
+  );
+  const becameActive =
+    String(existing.status || "active") !== "active" && nextStatus === "active";
+  const notificationsJustEnabled =
+    !Boolean(existing.notificationsEnabled) && notificationsEnabled;
+  const recipientsToNotify =
+    becameActive || notificationsJustEnabled || previousVisibilityType !== TARGETED_VOUCHER
+      ? targetUserIds
+      : newlyTargetedUserIds;
+
+  if (
+    visibilityType === TARGETED_VOUCHER &&
+    notificationsEnabled &&
+    nextStatus === "active" &&
+    !isExpired(updatedData.expiresAt) &&
+    recipientsToNotify.length > 0
+  ) {
+    await notifyTargetRecipients(recipientsToNotify, {
+      id: ref.id,
+      title: String(updatedData.title || ""),
+      description: String(updatedData.description || ""),
+    });
+  }
+
+  return (await attachTargetRecipientSummaries([
+    normalizeVoucher(updatedData, { includeTargetUserIds: true }),
+  ]))[0];
 }
 
 // ─── CLAIM ────────────────────────────────────────────────────────────────────
@@ -153,6 +495,9 @@ export async function claimVoucher(uid: string, voucherId: string) {
     const v = serializeRecord({ id: voucherSnap.id, ...voucherSnap.data() }) as AnyRecord;
     const computedStatus = isExpired(v.expiresAt) ? "expired" : String(v.status || "active");
     if (computedStatus !== "active") throw new Error("This voucher is not available");
+    if (!canUserAccessVoucher(v, uid)) {
+      throw new Error("This voucher is not available to your account");
+    }
 
     // Duplicate claim check
     const alreadyClaimed = Array.isArray(v.claimedBy) && v.claimedBy.includes(uid);
@@ -187,9 +532,9 @@ export async function claimVoucher(uid: string, voucherId: string) {
       throw new Error(`You must be ${cond.maxAge} years old or younger to claim this voucher`);
     }
     if (cond.ageGroup) {
-      const userGroup = String(profile.ageGroup || "").toLowerCase();
+      const userGroup = String(profile.youthAgeGroup || profile.ageGroup || "").toLowerCase();
       const reqGroup = String(cond.ageGroup).toLowerCase();
-      if (userGroup && userGroup !== reqGroup) {
+      if (userGroup !== reqGroup) {
         throw new Error(`This voucher is only for ${cond.ageGroup} members`);
       }
     }
@@ -271,6 +616,14 @@ export async function claimVoucher(uid: string, voucherId: string) {
 // ─── GET MY CLAIM (youth) ─────────────────────────────────────────────────────
 
 export async function getMyVoucherClaim(uid: string, voucherId: string) {
+  const voucherSnap = await db.collection("vouchers").doc(voucherId).get();
+  if (!voucherSnap.exists) return null;
+
+  const voucher = serializeRecord({ id: voucherSnap.id, ...voucherSnap.data() }) as AnyRecord;
+  if (!canUserAccessVoucher(voucher, uid)) {
+    return null;
+  }
+
   const snap = await db
     .collection("voucherClaims")
     .where("uid", "==", uid)
@@ -293,11 +646,8 @@ export async function getMyVoucherClaim(uid: string, voucherId: string) {
 
   // No claim doc found — check if the user is in the voucher's claimedBy array
   // (happens when the voucher was claimed before the token system was deployed)
-  const voucherSnap = await db.collection("vouchers").doc(voucherId).get();
-  if (!voucherSnap.exists) return null;
-
-  const v = serializeRecord({ id: voucherSnap.id, ...voucherSnap.data() }) as AnyRecord;
-  const alreadyClaimed = Array.isArray(v.claimedBy) && v.claimedBy.includes(uid);
+  const alreadyClaimed =
+    Array.isArray(voucher.claimedBy) && voucher.claimedBy.includes(uid);
   if (!alreadyClaimed) return null;
 
   // Backfill: generate a token and create the missing voucherClaims document
@@ -307,7 +657,7 @@ export async function getMyVoucherClaim(uid: string, voucherId: string) {
     claimId: claimRef.id,
     uid,
     voucherId,
-    voucherTitle: String(v.title || ""),
+    voucherTitle: String(voucher.title || ""),
     token,
     status: "claimed",
     claimedAt: FieldValue.serverTimestamp(),
@@ -320,7 +670,7 @@ export async function getMyVoucherClaim(uid: string, voucherId: string) {
     claimId: claimRef.id,
     token,
     voucherId,
-    voucherTitle: String(v.title || ""),
+    voucherTitle: String(voucher.title || ""),
     status: "claimed",
     claimedAt: null,
     redeemedAt: null,
@@ -328,12 +678,6 @@ export async function getMyVoucherClaim(uid: string, voucherId: string) {
 }
 
 // ─── REDEEM PREVIEW (admin/superadmin) ───────────────────────────────────────
-
-function makeError(message: string, status: number): Error {
-  const err = new Error(message) as any;
-  err.status = status;
-  return err;
-}
 
 export async function redeemVoucherPreview(token: string) {
   const normalized = token.trim().toUpperCase();
@@ -357,6 +701,9 @@ export async function redeemVoucherPreview(token: string) {
 
   const user = userSnap.data() || {};
   const voucher = voucherSnap.data() || {};
+  if (!voucherSnap.exists || !canUserAccessVoucher(voucher, String(claim.uid || ""))) {
+    throw makeError("This voucher is no longer available to this youth member.", 403);
+  }
 
   return {
     claimId: claim.claimId || claim.id,
@@ -386,6 +733,14 @@ export async function redeemVoucherConfirm(token: string, adminUid: string) {
 
   if (claim.status === "redeemed") throw makeError("This voucher was already redeemed.", 409);
   if (claim.status === "expired") throw makeError("This claim code has expired.", 410);
+
+  const voucherSnap = await db.collection("vouchers").doc(String(claim.voucherId || "")).get();
+  if (
+    !voucherSnap.exists ||
+    !canUserAccessVoucher(voucherSnap.data() || {}, String(claim.uid || ""))
+  ) {
+    throw makeError("This voucher is no longer available to this youth member.", 403);
+  }
 
   await db.collection("voucherClaims").doc(snap.docs[0].id).set(
     {

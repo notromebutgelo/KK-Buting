@@ -81,6 +81,22 @@ async function loadPhysicalIdRequestsService(db) {
   );
 }
 
+async function loadVouchersService(db, notifications = []) {
+  return loadDistModuleWithMocks("dist/src/modules/vouchers/vouchers.service", {
+    "dist/src/config/firebase": createFirebaseConfigMock(db),
+    "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+    "dist/src/modules/notifications/notifications.service": {
+      createNotification: async (notification) => {
+        notifications.push(notification);
+        return `notification-${notifications.length}`;
+      },
+    },
+    "dist/src/modules/vouchers/vouchers.tokens": {
+      generateUniqueToken: async () => "KKB-ABC123",
+    },
+  });
+}
+
 const tests = [
   {
     name: "notifications integration writes, lists, and marks records as read in fake Firestore",
@@ -111,6 +127,147 @@ const tests = [
       const after = await notificationsService.listNotificationsForUser("youth-1");
       assert.equal(after[0].read, true);
       assert.ok(after[0].readAt);
+    },
+  },
+  {
+    name: "targeted vouchers stay private to selected youth through listing, claim, and redemption",
+    async run() {
+      const notifications = [];
+      const db = new FakeFirestore({
+        users: {
+          "youth-1": {
+            role: "youth",
+            UserName: "Selected Member",
+            email: "selected@example.com",
+          },
+          "youth-2": {
+            role: "youth",
+            UserName: "Other Member",
+            email: "other@example.com",
+          },
+          "super-1": {
+            role: "superadmin",
+            UserName: "Super Admin",
+            email: "super@example.com",
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            age: 19,
+            youthAgeGroup: "Core Youth",
+            status: "verified",
+            verified: true,
+          },
+          "youth-2": {
+            age: 20,
+            youthAgeGroup: "Core Youth",
+            status: "verified",
+            verified: true,
+          },
+        },
+        points: {
+          "youth-1": { balance: 100, redeemedPoints: 0 },
+          "youth-2": { balance: 100, redeemedPoints: 0 },
+        },
+        vouchers: {
+          "legacy-public": {
+            title: "Community Voucher",
+            description: "Available to everyone",
+            type: "community",
+            pointsCost: 0,
+            stock: null,
+            claimedBy: [],
+            status: "active",
+          },
+        },
+      });
+      const vouchersService = await loadVouchersService(db, notifications);
+
+      const created = await vouchersService.createVoucher("super-1", {
+        title: "School Supplies",
+        description: "Selected students only",
+        type: "school_supplies",
+        pointsCost: 0,
+        stock: 2,
+        status: "active",
+        visibilityType: "targeted",
+        targetUserIds: ["youth-1"],
+        notificationsEnabled: true,
+        eligibilityConditions: {
+          isVerified: true,
+          ageGroup: "Core Youth",
+        },
+      });
+
+      assert.equal(created.visibilityType, "targeted");
+      assert.deepEqual(created.targetUserIds, ["youth-1"]);
+      assert.equal(created.targetedRecipientCount, 1);
+      assert.deepEqual(
+        notifications.map((notification) => notification.recipientUid),
+        ["youth-1"]
+      );
+
+      const selectedList = await vouchersService.listYouthVouchers("youth-1");
+      const otherList = await vouchersService.listYouthVouchers("youth-2");
+      assert.deepEqual(
+        selectedList.map((voucher) => voucher.title).sort(),
+        ["Community Voucher", "School Supplies"]
+      );
+      assert.deepEqual(
+        otherList.map((voucher) => voucher.title),
+        ["Community Voucher"]
+      );
+      assert.equal(
+        selectedList.find((voucher) => voucher.id === created.id).targetUserIds,
+        undefined
+      );
+
+      const hiddenDetail = await vouchersService.getVoucher(created.id, {
+        uid: "youth-2",
+        role: "youth",
+      });
+      const adminDetail = await vouchersService.getVoucher(created.id, {
+        uid: "super-1",
+        role: "superadmin",
+      });
+      assert.equal(hiddenDetail, null);
+      assert.deepEqual(adminDetail.targetUserIds, ["youth-1"]);
+      assert.equal(adminDetail.targetRecipients[0].fullName, "Selected Member");
+
+      await assert.rejects(
+        vouchersService.claimVoucher("youth-2", created.id),
+        /not available to your account/
+      );
+
+      const claim = await vouchersService.claimVoucher("youth-1", created.id);
+      assert.equal(claim.token, "KKB-ABC123");
+      assert.equal(
+        notifications.filter((notification) => notification.title === "Voucher Claimed").length,
+        1
+      );
+
+      const listedForAdmin = await vouchersService.listAllVouchers();
+      const targetedVoucher = listedForAdmin.find((voucher) => voucher.id === created.id);
+      assert.equal(targetedVoucher.claimedCount, 1);
+      assert.equal(targetedVoucher.targetedRecipientCount, 1);
+
+      await vouchersService.updateVoucher(created.id, {
+        targetUserIds: ["youth-2"],
+        notificationsEnabled: false,
+      });
+
+      assert.equal(
+        await vouchersService.getMyVoucherClaim("youth-1", created.id),
+        null
+      );
+      await assert.rejects(
+        vouchersService.redeemVoucherPreview("KKB-ABC123"),
+        /no longer available/
+      );
+      await assert.rejects(
+        vouchersService.redeemVoucherConfirm("KKB-ABC123", "super-1"),
+        /no longer available/
+      );
     },
   },
   {
@@ -463,6 +620,91 @@ const tests = [
         queue.profiles[0].requiredDocuments.map((document) => document.reviewStatus),
         ["pending", "pending", "pending"]
       );
+    },
+  },
+  {
+    name: "digital ID issuance moves the verification queue from pending superadmin to verified",
+    async run() {
+      const db = new FakeFirestore({
+        users: {
+          "youth-1": {
+            role: "youth",
+            UserName: "Angeline Flores",
+            email: "angeline@example.com",
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            firstName: "Angeline",
+            lastName: "Flores",
+            email: "angeline@example.com",
+            youthAgeGroup: "Core Youth",
+            documentsSubmitted: true,
+            submittedAt: "2026-05-06T04:01:37.000Z",
+            status: "verified",
+            verified: true,
+            verifiedAt: "2026-05-06T04:10:00.000Z",
+            verificationQueueStatus: "pending_superadmin_id_generation",
+            verificationDocumentsApprovedAt: "2026-05-06T04:10:00.000Z",
+            verificationDocumentsApprovedBy: "admin@kk.local",
+            verificationReferredToSuperadminAt: "2026-05-06T04:11:00.000Z",
+            verificationReferredToSuperadminBy: "admin@kk.local",
+            digitalIdApprovalRequestedAt: "2026-05-06T04:11:00.000Z",
+            digitalIdApprovalRequestedBy: "admin@kk.local",
+            digitalIdStatus: "pending_approval",
+            digitalIdEmergencyContactName: "Maria Flores",
+            digitalIdEmergencyContactRelationship: "Mother",
+            digitalIdEmergencyContactPhone: "09171234567",
+            digitalIdSignatureUrl: "https://cdn.example.com/signature.png",
+          },
+        },
+        documents: {
+          "doc-1": {
+            profileId: "youth-1",
+            documentType: "proof_of_voter_registration",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:00.000Z",
+          },
+          "doc-2": {
+            profileId: "youth-1",
+            documentType: "valid_government_id",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:01.000Z",
+          },
+          "doc-3": {
+            profileId: "youth-1",
+            documentType: "id_photo",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:02.000Z",
+          },
+        },
+      });
+
+      const adminService = await loadAdminService(db);
+      const before = await adminService.getVerificationProfiles({ pageSize: 10 });
+
+      assert.equal(before.profiles[0].queueStatus, "pending_superadmin_id_generation");
+
+      await adminService.approveDigitalId("youth-1", "superadmin@kk.local");
+
+      const storedProfile = db.getDocData("kkProfiling", "youth-1");
+      assert.equal(storedProfile.status, "verified");
+      assert.equal(storedProfile.verificationQueueStatus, "verified");
+      assert.equal(storedProfile.digitalIdStatus, "active");
+      assert.equal(storedProfile.verificationLastAction, "digital_id_issued");
+      assert.equal(
+        storedProfile.verificationReferredToSuperadminAt,
+        "2026-05-06T04:11:00.000Z"
+      );
+
+      const after = await adminService.getVerificationProfiles({ pageSize: 10 });
+      assert.equal(after.profiles[0].queueStatus, "verified");
+      assert.equal(after.profiles[0].digitalIdStatus, "active");
+      assert.equal(after.summary.pendingSuperadmin, 0);
+
+      const detail = await adminService.getVerificationProfile("youth-1");
+      assert.equal(detail.queueStatus, "verified");
+      assert.equal(detail.digitalIdStatus, "active");
     },
   },
   {

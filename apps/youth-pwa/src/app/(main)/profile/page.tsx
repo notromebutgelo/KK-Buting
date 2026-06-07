@@ -8,6 +8,7 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Spinner from '@/components/ui/Spinner'
+import { useUser } from '@/hooks/useUser'
 import { useAuthStore } from '@/store/authStore'
 import { useUserStore } from '@/store/userStore'
 import { clearYouthSession } from '@/lib/session'
@@ -131,7 +132,8 @@ const menuItems = [
 export default function ProfilePage() {
   const router = useRouter()
   const { user, logout, isLoading } = useAuthStore()
-  const { profile, setProfile } = useUserStore()
+  const { profile, isLoading: isProfileLoading } = useUser()
+  const setProfile = useUserStore((state) => state.setProfile)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
@@ -161,7 +163,13 @@ export default function ProfilePage() {
       return 'Not set'
     }
 
-    const parts = [profile.barangay, profile.city, profile.province].filter(Boolean)
+    const parts = [
+      profile.currentAddressHouseBlockUnitNumber,
+      profile.currentAddressStreetAddress,
+      profile.barangay,
+      profile.city,
+      profile.province,
+    ].filter(Boolean)
     return parts.length > 0 ? parts.join(', ') : 'Not set'
   }, [profile])
 
@@ -206,6 +214,16 @@ export default function ProfilePage() {
       icon: <HomePinIcon />,
     },
     {
+      label: 'House / Block / Unit No.',
+      value: profile?.currentAddressHouseBlockUnitNumber || 'Not set yet',
+      icon: <HomePinIcon />,
+    },
+    {
+      label: 'Street Address',
+      value: profile?.currentAddressStreetAddress || 'Not set yet',
+      icon: <LocationPinIcon />,
+    },
+    {
       label: 'City / Municipality',
       value: profile?.city || 'Not set yet',
       icon: <CityIcon />,
@@ -227,7 +245,7 @@ export default function ProfilePage() {
     }
   }
 
-  if (isLoading || !user) {
+  if (isLoading || isProfileLoading || !user) {
     return <Spinner fullPage />
   }
 
@@ -467,13 +485,13 @@ function ProfileStat({
   icon: React.ReactNode
 }) {
   return (
-    <div className="min-h-[116px] overflow-hidden rounded-[20px] border border-white/14 bg-white/10 px-3 py-3.5 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-      <div className="grid grid-cols-[36px_minmax(0,1fr)] items-start gap-2.5">
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[14px] bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+    <div className="min-h-[116px] overflow-hidden rounded-[20px] border border-white/14 bg-white/10 px-4 py-4 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+      <div className="grid grid-cols-[32px_minmax(0,1fr)] items-start gap-2">
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[12px] bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.11em] leading-[1.3] text-white/62">
+          <p className="text-[9px] font-semibold uppercase leading-[1.3] tracking-[0.1em] text-white/62">
             {label}
           </p>
           <p className="mt-1.5 text-[12px] font-bold leading-[1.38] text-white break-words">

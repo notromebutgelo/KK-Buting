@@ -309,7 +309,7 @@ export default function VerificationPage() {
     return () => {
       active = false
     }
-  }, [selectedUserId])
+  }, [refreshToken, selectedUserId])
 
   const queueMetrics = useMemo(
     () => ({

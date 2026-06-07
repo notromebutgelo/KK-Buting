@@ -3,10 +3,12 @@ import { useEffect } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
+import { useUserStore } from '@/store/userStore'
 import api from '@/lib/api'
 
 export function useAuth() {
   const { user, token, isLoading, setUser, setToken, setLoading } = useAuthStore()
+  const setProfile = useUserStore((state) => state.setProfile)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -34,15 +36,17 @@ export function useAuth() {
           )
         } catch {
           setUser(null)
+          setProfile(null)
         }
       } else {
         setUser(null)
         setToken(null)
+        setProfile(null)
       }
       setLoading(false)
     })
     return () => unsubscribe()
-  }, [setUser, setToken, setLoading])
+  }, [setUser, setToken, setLoading, setProfile])
 
   return { user, token, isLoading }
 }

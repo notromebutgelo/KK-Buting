@@ -39,7 +39,8 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 
 const emptyForm = {
   firstName: '', middleName: '', lastName: '', suffix: '', birthday: '', age: '', gender: '',
-  civilStatus: '', contactNumber: '', region: '', province: '', city: '', barangay: '', purok: '',
+  civilStatus: '', contactNumber: '', region: '', province: '', city: '', barangay: '',
+  currentAddressHouseBlockUnitNumber: '', currentAddressStreetAddress: '', purok: '',
   yearsInBarangay: '', youthAgeGroup: '', educationalBackground: '', youthClassification: '',
   workStatus: '', registeredSkVoter: '', votedLastSkElections: '', registeredNationalVoter: '',
   attendedKkAssembly: '', kkAssemblyTimesAttended: '',
@@ -86,6 +87,8 @@ export default function YouthDetailPage() {
         contactNumber: nextMember.profile?.contactNumber || '', region: nextMember.profile?.region || '',
         province: nextMember.profile?.province || '', city: nextMember.profile?.city || '',
         barangay: nextMember.profile?.barangay || '', purok: nextMember.profile?.purok || '',
+        currentAddressHouseBlockUnitNumber: nextMember.profile?.currentAddressHouseBlockUnitNumber || '',
+        currentAddressStreetAddress: nextMember.profile?.currentAddressStreetAddress || '',
         yearsInBarangay: nextMember.profile?.yearsInBarangay || '', youthAgeGroup: nextMember.profile?.youthAgeGroup || '',
         educationalBackground: nextMember.profile?.educationalBackground || '', youthClassification: nextMember.profile?.youthClassification || '',
         workStatus: nextMember.profile?.workStatus || '', registeredSkVoter: normalizeBool(nextMember.profile?.registeredSkVoter),
@@ -175,7 +178,7 @@ export default function YouthDetailPage() {
               </div>
               <div className="rounded-[var(--radius-md)] p-5" style={{ background: 'var(--surface-muted)' }}>
                 {activeTab === 'personal' && <FieldGrid fields={[['Full Name', member.fullName || member.UserName], ['Birthday', formatDate(profile.birthday)], ['Gender', profile.gender], ['Civil Status', profile.civilStatus], ['Contact Number', profile.contactNumber], ['Email', profile.email || member.email]]} />}
-                {activeTab === 'address' && <FieldGrid fields={[['Region', profile.region], ['Province', profile.province], ['City', profile.city], ['Barangay', profile.barangay], ['Purok / Zone', profile.purok], ['Years in Barangay', profile.yearsInBarangay]]} />}
+                {activeTab === 'address' && <FieldGrid fields={[['Region', profile.region], ['Province', profile.province], ['City', profile.city], ['Barangay', profile.barangay], ['House / Block / Unit No.', profile.currentAddressHouseBlockUnitNumber], ['Street Address', profile.currentAddressStreetAddress], ['Purok / Zone', profile.purok], ['Years in Barangay', profile.yearsInBarangay]]} />}
                 {activeTab === 'demographics' && <FieldGrid fields={[['Civil Status', profile.civilStatus], ['Age / Age Group', `${profile.age || '-'} / ${profile.youthAgeGroup || '-'}`], ['Education', profile.educationalBackground], ['Classification', profile.youthClassification], ['Work Status', profile.workStatus], ['Profiling Status', member.profilingStatus]]} />}
                 {activeTab === 'civic' && <FieldGrid fields={[['Registered SK Voter', formatBool(profile.registeredSkVoter)], ['Voted Last SK Elections', formatBool(profile.votedLastSkElections)], ['Registered National Voter', formatBool(profile.registeredNationalVoter)], ['Attended KK Assembly', formatBool(profile.attendedKkAssembly)], ['KK Assembly Attendance', profile.kkAssemblyTimesAttended], ['Verification Status', profile.status]]} />}
                 {activeTab === 'documents' && <ListCardList items={member.documents || []} renderItem={(doc) => (
@@ -215,6 +218,8 @@ export default function YouthDetailPage() {
                 <InputField label="Province" value={editForm.province} onChange={(v) => patchForm('province', v)} />
                 <InputField label="City" value={editForm.city} onChange={(v) => patchForm('city', v)} />
                 <InputField label="Barangay" value={editForm.barangay} onChange={(v) => patchForm('barangay', v)} />
+                <InputField label="House / Block / Unit No." value={editForm.currentAddressHouseBlockUnitNumber} onChange={(v) => patchForm('currentAddressHouseBlockUnitNumber', v)} />
+                <InputField label="Street Address" value={editForm.currentAddressStreetAddress} onChange={(v) => patchForm('currentAddressStreetAddress', v)} />
                 <InputField label="Purok / Zone" value={editForm.purok} onChange={(v) => patchForm('purok', v)} />
                 <InputField label="Years in Barangay" value={editForm.yearsInBarangay} onChange={(v) => patchForm('yearsInBarangay', v)} />
                 <InputField label="Age Group" value={editForm.youthAgeGroup} onChange={(v) => patchForm('youthAgeGroup', v)} />

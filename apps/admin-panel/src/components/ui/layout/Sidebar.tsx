@@ -181,19 +181,25 @@ export default function Sidebar({
         }}
       >
         {/* Logo */}
-        <div className="flex h-16 shrink-0 items-center gap-3 px-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white p-0.5 shadow-sm ring-1 ring-black/5">
+        <div className={`flex h-16 shrink-0 items-center ${collapsed ? 'gap-1 px-2' : 'gap-3 px-4'}`}>
+          <div
+            className={`flex shrink-0 items-center justify-center overflow-hidden bg-white p-0.5 shadow-sm ring-1 ring-black/5 transition-all duration-200 ${
+              collapsed ? 'h-7 w-7 rounded-xl' : 'h-10 w-10 rounded-2xl'
+            }`}
+          >
             <Image
               src="/images/SKButingLogo.png"
               alt="SK Buting logo"
               width={36}
               height={36}
-              className="h-9 w-9 rounded-xl object-cover"
+              className={`object-cover transition-all duration-200 ${
+                collapsed ? 'h-6 w-6 rounded-lg' : 'h-9 w-9 rounded-xl'
+              }`}
             />
           </div>
           <div
             className={`min-w-0 transition-all duration-200 ${
-              collapsed ? 'w-0 translate-x-1 overflow-hidden opacity-0' : 'opacity-100'
+              collapsed ? 'hidden' : 'opacity-100'
             }`}
           >
             <div className="truncate text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -205,6 +211,18 @@ export default function Sidebar({
           </div>
           <button
             type="button"
+            onClick={() => onCollapsedChange(!collapsed)}
+            className={`ml-auto hidden shrink-0 place-items-center border text-xs font-medium transition-colors hover:bg-[color:var(--accent-soft)] lg:grid ${
+              collapsed ? 'h-7 w-7 rounded-lg' : 'h-8 w-8 rounded-xl'
+            }`}
+            style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={16} />}
+          </button>
+          <button
+            type="button"
             onClick={onMobileClose}
             className="ml-auto grid h-9 w-9 place-items-center rounded-xl border lg:hidden"
             style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}
@@ -214,22 +232,8 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Collapse toggle */}
-        <div className="hidden px-4 pb-3 lg:block">
-          <button
-            type="button"
-            onClick={() => onCollapsedChange(!collapsed)}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border text-xs font-medium transition-colors hover:bg-[color:var(--accent-soft)]"
-            style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            {!collapsed && <span>Collapse</span>}
-          </button>
-        </div>
-
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 py-2">
+        <nav className="flex-1 overflow-y-auto px-3 pb-2 pt-3">
           <div className="flex flex-col gap-6">
             {Object.entries(grouped).map(([group, items]) => (
               <div key={group}>

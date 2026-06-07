@@ -15,6 +15,8 @@ interface YouthMember {
   fullName?: string
   idNumber?: string | null
   age?: number | null
+  currentAddressHouseBlockUnitNumber?: string | null
+  currentAddressStreetAddress?: string | null
   barangay?: string | null
   purok?: string | null
   contactNumber?: string | null
@@ -481,6 +483,7 @@ export default function YouthPage() {
                       </td>
                       <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
                         <div>{member.barangay || '-'}</div>
+                        <div className="text-xs" style={{ color: 'var(--muted)' }}>{buildAddressDetail(member) || 'No house / street'}</div>
                         <div className="text-xs" style={{ color: 'var(--muted)' }}>{member.purok || 'No purok'}</div>
                       </td>
                       <td className="px-5 py-4">
@@ -687,6 +690,12 @@ function StatTile({ label, value }: { label: string; value: number }) {
       <p className="mt-2 text-2xl font-black" style={{ color: 'var(--ink)' }}>{value.toLocaleString()}</p>
     </div>
   )
+}
+
+function buildAddressDetail(member: Pick<YouthMember, 'currentAddressHouseBlockUnitNumber' | 'currentAddressStreetAddress'>) {
+  return [member.currentAddressHouseBlockUnitNumber, member.currentAddressStreetAddress]
+    .filter(Boolean)
+    .join(', ')
 }
 
 function buildFilterSummary({

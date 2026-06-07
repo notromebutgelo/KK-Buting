@@ -53,6 +53,19 @@ function normalizeOptionalString(value: any) {
   return String(value || "").trim();
 }
 
+function buildHomeAddress(profile: Record<string, any>) {
+  return [
+    profile.currentAddressHouseBlockUnitNumber,
+    profile.currentAddressStreetAddress,
+    profile.barangay || profile.currentAddressBarangay,
+    profile.city,
+    profile.province,
+  ]
+    .map(normalizeOptionalString)
+    .filter(Boolean)
+    .join(", ");
+}
+
 function hasIssuedDigitalId(profile: Record<string, any>) {
   return Boolean(
     profile?.digitalIdGeneratedAt ||
@@ -266,11 +279,15 @@ export async function getDigitalId(uid: string) {
     birthday: data.birthday,
     gender: data.gender || "",
     contactNumber: normalizeOptionalString(data.contactNumber),
+    currentAddressHouseBlockUnitNumber: normalizeOptionalString(
+      data.currentAddressHouseBlockUnitNumber
+    ),
+    currentAddressStreetAddress: normalizeOptionalString(data.currentAddressStreetAddress),
     barangay: data.barangay || "",
     city: data.city || "",
     province: data.province || "",
     purok: normalizeOptionalString(data.purok),
-    address: `${data.barangay}, ${data.city}, ${data.province}`,
+    address: buildHomeAddress(data),
     photoUrl: photoDocument?.fileUrl || null,
     verifiedAt: data.verifiedAt,
     digitalIdGeneratedAt: toIso(data.digitalIdGeneratedAt),
@@ -367,6 +384,10 @@ export async function getMyVerificationStatus(uid: string) {
     province: profile.province || "",
     city: profile.city || "",
     barangay: profile.barangay || "",
+    currentAddressHouseBlockUnitNumber: normalizeOptionalString(
+      profile.currentAddressHouseBlockUnitNumber
+    ),
+    currentAddressStreetAddress: normalizeOptionalString(profile.currentAddressStreetAddress),
     purok: profile.purok || "",
     civilStatus: profile.civilStatus || "",
     youthAgeGroup: normalizeYouthAgeGroup(profile.youthAgeGroup) || "",

@@ -16,14 +16,12 @@ import Spinner from '@/components/ui/Spinner'
 const MEMBER_CONTACT_NUMBER_MAX_LENGTH = 11
 const EMERGENCY_CONTACT_PHONE_MAX_LENGTH = 11
 const PUROK_OPTIONS = [
-  'Aliw',
-  'Ausmulo',
-  'Bukid',
-  'Gitna',
-  'Ilaya',
-  'Looban',
-  'Manggahan 1',
-  'Manggahan 2',
+  'ILAYA',
+  'ALIW',
+  'GITNA',
+  'LOOBAN',
+  'MANGGAHAN',
+  'BUKID',
 ] as const
 
 type SaveFeedbackState = {
@@ -53,7 +51,6 @@ export default function EditProfilePage() {
   const contactNumberError = showContactNumberValidation
     ? getMemberContactNumberError(contactNumber)
     : ''
-  const purokOptions = getPurokOptions(purok)
 
   useEffect(() => {
     if (user) {
@@ -65,7 +62,7 @@ export default function EditProfilePage() {
   useEffect(() => {
     if (profile) {
       setContactNumber(normalizeMemberContactNumber(profile.contactNumber || ''))
-      setPurok(profile.purok || '')
+      setPurok(normalizePurok(profile.purok || ''))
       setEmergencyContactName(profile.digitalIdEmergencyContactName || '')
       setEmergencyContactRelationship(profile.digitalIdEmergencyContactRelationship || '')
       setEmergencyContactPhone(
@@ -91,7 +88,7 @@ export default function EditProfilePage() {
 
     const trimmedUsername = username.trim()
     const trimmedContactNumber = normalizeMemberContactNumber(contactNumber)
-    const trimmedPurok = purok.trim()
+    const trimmedPurok = normalizePurok(purok)
     const trimmedContactName = emergencyContactName.trim()
     const trimmedContactRelationship = emergencyContactRelationship.trim()
     const trimmedContactPhone = normalizeEmergencyContactPhone(
@@ -246,7 +243,7 @@ export default function EditProfilePage() {
                   label="Purok / Zone"
                   value={purok}
                   onChange={setPurok}
-                  options={purokOptions}
+                  options={PUROK_OPTIONS}
                   placeholder="Select your purok / zone"
                   hint="Optional. This fills the Purok field below your home address."
                 />
@@ -335,10 +332,14 @@ function getMemberContactNumberError(value: string) {
   return ''
 }
 
-function getPurokOptions(currentValue: string) {
-  if (!currentValue || PUROK_OPTIONS.includes(currentValue as (typeof PUROK_OPTIONS)[number])) {
-    return [...PUROK_OPTIONS]
+function normalizePurok(value: string) {
+  const normalizedValue = value.trim().toUpperCase()
+
+  if (normalizedValue === 'MANGGAHAN 1' || normalizedValue === 'MANGGAHAN 2') {
+    return 'MANGGAHAN'
   }
 
-  return [currentValue, ...PUROK_OPTIONS]
+  return PUROK_OPTIONS.includes(normalizedValue as (typeof PUROK_OPTIONS)[number])
+    ? normalizedValue
+    : ''
 }

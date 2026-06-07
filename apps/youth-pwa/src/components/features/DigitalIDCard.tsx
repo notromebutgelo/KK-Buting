@@ -13,7 +13,7 @@ interface DigitalIDCardProps {
 
 const DIGITAL_ID_TERMS_TEXT =
   'This card is non-transferable and must be used only by the cardholder whose signature appears herein. Cardholder privileges remain subject to implementing guidelines approved by the Sangguniang Kabataan Council.'
-const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
+const DIGITAL_ID_SIGNATORY_SIGNATURE_SRC = '/images/sk-chairperson-signature.png'
 const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
 const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
 const DIGITAL_ID_BARANGAY_LOGO_SRC = '/images/brgy logo.png'
@@ -30,10 +30,7 @@ export default function DigitalIDCard({
     .join(' ')
     .toUpperCase()
 
-  const address = [profile.barangay, profile.city, profile.province]
-    .filter(Boolean)
-    .join(', ')
-    .toUpperCase()
+  const address = buildAddress(profile)
   const purok = formatFrontCardValue(profile.purok)
   const contactNumber = formatPlainFrontCardValue(profile.contactNumber)
   const emergencyContactName = formatEmergencyContactValue(
@@ -128,7 +125,11 @@ export function DigitalIdFace({
             </p>
             <div className="mt-[2.3%] flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
               {photoUrl ? (
-                <img src={photoUrl} alt={fullName} className="h-full w-full object-cover" />
+                <img
+                  src={getExportSafeImageUrl(photoUrl)}
+                  alt={fullName}
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <span className="text-sm font-black text-[#014384]">{getInitials(fullName)}</span>
               )}
@@ -136,7 +137,7 @@ export function DigitalIdFace({
             <div className="mt-[4.6%] flex h-[13%] w-full items-end justify-center overflow-hidden px-[4%]">
               {signatureUrl ? (
                 <img
-                  src={signatureUrl}
+                  src={getExportSafeImageUrl(signatureUrl)}
                   alt="Member signature"
                   className="max-h-full w-full object-contain"
                 />
@@ -216,47 +217,53 @@ export function DigitalIdBack({
   validThru: string
 }) {
   return (
-    <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] border border-[#d6dee8] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_10px_24px_rgba(1,67,132,0.08)]">
+    <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d6dee8] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_10px_24px_rgba(1,67,132,0.08)]">
       <div className="absolute inset-[3.6%] rounded-[18px] border-[1.5px] border-[#4e5650]/65" />
       <div className="absolute inset-[6.2%] rounded-[14px] border border-[#838b85]/35" />
-      <div className="relative flex h-full flex-col px-[9%] pb-[20.8%] pt-[9.8%] text-[#2b312e] sm:px-[8.9%] sm:pb-[21.4%] sm:pt-[10.4%]">
+      <div className="relative flex h-full flex-col px-[9%] pb-[10.2%] pt-[9.8%] text-[#2b312e]">
         <div className="text-center">
-          <p className="text-[0.38rem] font-bold uppercase tracking-[0.09em] text-[#666d67] sm:text-[0.42rem]">
+          <p className="text-[1.24cqw] font-bold uppercase tracking-[0.09em] text-[#666d67]">
             In case of emergency, please contact:
           </p>
-          <p className="mt-[2.4%] text-[0.66rem] font-black leading-[1.08] tracking-[0.01em] text-[#1f2621] sm:mt-[2.6%] sm:text-[0.74rem] sm:leading-[1.05]">
+          <p className="mt-[2.4%] text-[2.15cqw] font-black leading-[1.08] tracking-[0.01em] text-[#1f2621]">
             {emergencyContactName} - {emergencyContactPhone}
           </p>
-          <p className="mt-[1.8%] text-[0.34rem] font-semibold tracking-[0.08em] text-[#6b726c] sm:mt-[2.2%] sm:text-[0.38rem]">
+          <p className="mt-[1.8%] text-[1.11cqw] font-semibold tracking-[0.08em] text-[#6b726c]">
             Relationship: {emergencyContactRelationship}
           </p>
         </div>
 
         <div className="mx-auto mt-[5.4%] max-w-[80%] text-center">
-          <p className="text-[0.38rem] font-bold uppercase tracking-[0.18em] text-[#767d78] sm:text-[0.42rem]">
+          <p className="text-[1.24cqw] font-bold uppercase tracking-[0.18em] text-[#767d78]">
             Terms and Conditions
           </p>
-          <p className="mt-[2.4%] text-[0.4rem] font-semibold leading-[1.32] text-[#424843] sm:mt-[3%] sm:text-[0.46rem] sm:leading-[1.38]">
+          <p className="mt-[2.4%] text-[1.3cqw] font-semibold leading-[1.32] text-[#424843]">
             {DIGITAL_ID_TERMS_TEXT}
           </p>
         </div>
 
-        <div className="mt-auto flex justify-center pt-[0.8%] sm:pt-[1.1%]">
-          <div className="flex w-full max-w-[62%] flex-col items-center text-center sm:max-w-[61%]">
-            <p className="text-[0.34rem] font-bold uppercase tracking-[0.16em] text-[#7a807b] sm:text-[0.36rem]">
+        <div className="mt-auto flex justify-center pt-[1%]">
+          <div className="flex w-full max-w-[68%] flex-col items-center text-center">
+            <p className="text-[1.11cqw] font-bold uppercase tracking-[0.16em] text-[#7a807b]">
               Valid Until
             </p>
-            <p className="mt-[1.4%] text-[0.64rem] font-black text-[#222823] sm:mt-[1.8%] sm:text-[0.72rem]">
+            <p className="mt-[1.4%] text-[2.08cqw] font-black leading-none text-[#222823]">
               {validThru}
             </p>
-            <p className="mt-[2.6%] text-[0.7rem] font-semibold italic tracking-[0.02em] text-[#444b45] sm:mt-[3.5%] sm:text-[0.82rem]">
-              {DIGITAL_ID_SIGNATURE_TEXT}
-            </p>
-            <div className="mt-[1%] h-px w-[60%] bg-[#4d544e] sm:mt-[1.2%] sm:w-[58%]" />
-            <p className="mt-[1.2%] text-[0.3rem] font-black uppercase leading-none tracking-[0.08em] text-[#303731] sm:mt-[1.5%] sm:text-[0.34rem]">
+            <div className="mt-[1.2%] flex h-[8.8cqw] w-full items-center justify-center overflow-hidden">
+              <img
+                src={DIGITAL_ID_SIGNATORY_SIGNATURE_SRC}
+                alt="Signature of Mark Jervin B. Ventura"
+                draggable={false}
+                className="block h-full w-auto max-w-[48%] object-contain"
+                style={{ transform: 'none' }}
+              />
+            </div>
+            <div className="-mt-[0.4%] h-px w-[58%] bg-[#4d544e]" />
+            <p className="mt-[1.4%] text-[1.42cqw] font-black uppercase leading-[1.1] tracking-[0.06em] text-[#303731]">
               {DIGITAL_ID_SIGNATORY_NAME}
             </p>
-            <p className="mt-[0.6%] text-[0.29rem] font-black uppercase leading-none tracking-[0.12em] text-[#303731] sm:mt-[0.8%] sm:text-[0.33rem]">
+            <p className="mt-[0.8%] text-[1.22cqw] font-black uppercase leading-[1.1] tracking-[0.1em] text-[#303731]">
               {DIGITAL_ID_SIGNATORY_TITLE}
             </p>
           </div>
@@ -292,6 +299,28 @@ function formatBirthday(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleDateString('en-PH')
+}
+
+function buildAddress(
+  profile: Pick<
+    UserProfile,
+    | 'currentAddressHouseBlockUnitNumber'
+    | 'currentAddressStreetAddress'
+    | 'barangay'
+    | 'city'
+    | 'province'
+  >,
+) {
+  return [
+    profile.currentAddressHouseBlockUnitNumber,
+    profile.currentAddressStreetAddress,
+    profile.barangay,
+    profile.city,
+    profile.province,
+  ]
+    .filter(Boolean)
+    .join(', ')
+    .toUpperCase() || '-'
 }
 
 function getInitials(value: string) {
@@ -365,4 +394,33 @@ function resolveDigitalIdIssuedAt(
   }
 
   return undefined
+}
+
+function getExportSafeImageUrl(value: string) {
+  const normalizedUrl = String(value || '').trim()
+
+  if (
+    !normalizedUrl ||
+    normalizedUrl.startsWith('data:') ||
+    normalizedUrl.startsWith('blob:') ||
+    normalizedUrl.startsWith('/')
+  ) {
+    return normalizedUrl
+  }
+
+  if (/^https?:\/\//i.test(normalizedUrl)) {
+    try {
+      const parsedUrl = new URL(normalizedUrl)
+
+      if (typeof window !== 'undefined' && parsedUrl.origin === window.location.origin) {
+        return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`
+      }
+    } catch {
+      return normalizedUrl
+    }
+
+    return `/api/image-proxy?url=${encodeURIComponent(normalizedUrl)}`
+  }
+
+  return normalizedUrl
 }

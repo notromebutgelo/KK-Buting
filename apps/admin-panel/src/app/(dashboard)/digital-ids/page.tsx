@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import type { Ref } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import jsPDF from 'jspdf'
 import JSZip from 'jszip'
 import {
+  AlertCircle,
   BadgeCheck,
+  CheckCircle2,
   Download,
   FileText,
   Hourglass,
@@ -12,9 +15,15 @@ import {
   Printer,
   RotateCw,
   Search,
+  X,
   XCircle,
 } from 'lucide-react'
 import api from '@/lib/api'
+import {
+  captureDigitalIdElement,
+  captureDigitalIdNode,
+  canvasToJpegBlob,
+} from '@/lib/digitalIdCapture'
 import { cn } from '@/utils/cn'
 
 interface DigitalIdMember {
@@ -26,6 +35,8 @@ interface DigitalIdMember {
   fullName?: string
   youthAgeGroup?: string
   contactNumber?: string
+  currentAddressHouseBlockUnitNumber?: string
+  currentAddressStreetAddress?: string
   city?: string
   province?: string
   barangay?: string
@@ -58,6 +69,8 @@ interface DigitalIdDetail extends DigitalIdMember {
     birthday?: string
     gender?: string
     contactNumber?: string
+    currentAddressHouseBlockUnitNumber?: string
+    currentAddressStreetAddress?: string
     purok?: string
     barangay?: string
     city?: string
@@ -98,10 +111,25 @@ interface DigitalIdResponse {
   }
 }
 
+interface ActionToast {
+  id: number
+  tone: 'success' | 'danger'
+  title: string
+  message: string
+}
+
+interface DigitalIdCanvases {
+  front: HTMLCanvasElement
+  back: HTMLCanvasElement
+}
+
+type DigitalIdCanvasSource = DigitalIdCanvases | Promise<DigitalIdCanvases>
+
 const PAGE_SIZE = 10
+const EXPORT_ACTION_TIMEOUT_MS = 25_000
 const DIGITAL_ID_TERMS_TEXT =
   'This card is non-transferable and must be used only by the cardholder whose signature appears herein. Cardholder privileges remain subject to implementing guidelines approved by the Sangguniang Kabataan Council.'
-const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
+const DIGITAL_ID_SIGNATORY_SIGNATURE_SRC = '/images/sk-chairperson-signature.png'
 const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
 const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
 const DIGITAL_ID_SIGNATORY_OFFICE = ''
@@ -116,14 +144,17 @@ export default function DigitalIdsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [isBatchDownloading, setIsBatchDownloading] = useState(false)
-  const [pdfAction, setPdfAction] = useState<'download' | 'print' | null>(null)
+  const [pdfAction, setPdfAction] = useState<'download' | 'jpeg' | 'print' | null>(null)
   const [adminRole, setAdminRole] = useState('admin')
   const [message, setMessage] = useState('')
+  const [toast, setToast] = useState<ActionToast | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [preferredMemberId, setPreferredMemberId] = useState<string | null>(null)
   const [selectedMember, setSelectedMember] = useState<DigitalIdDetail | null>(null)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [previewSide, setPreviewSide] = useState<'front' | 'back'>('front')
+  const frontPreviewRef = useRef<HTMLDivElement | null>(null)
+  const backPreviewRef = useRef<HTMLDivElement | null>(null)
   const [pagination, setPagination] = useState<DigitalIdResponse['pagination']>({
     page: 1,
     pageSize: PAGE_SIZE,
@@ -163,6 +194,16 @@ export default function DigitalIdsPage() {
   useEffect(() => {
     setCurrentPage(1)
   }, [status, search])
+
+  useEffect(() => {
+    if (!toast) return
+
+    const timeout = window.setTimeout(() => {
+      setToast((current) => current?.id === toast.id ? null : current)
+    }, 5_500)
+
+    return () => window.clearTimeout(timeout)
+  }, [toast])
 
   useEffect(() => {
     let mounted = true
@@ -305,25 +346,110 @@ export default function DigitalIdsPage() {
     }
   }
 
-  const resolveDigitalIdDetail = async (member: DigitalIdMember | DigitalIdDetail) =>
-      'profile' in member && member.profile
-        ? (member as DigitalIdDetail)
-        : (await api.get<{ member: DigitalIdDetail }>(`/admin/digital-ids/${member.uid}`)).data.member
+  const resolveDigitalIdDetail = async (member: DigitalIdMember | DigitalIdDetail) => {
+    if ('profile' in member && member.profile) {
+      return member as DigitalIdDetail
+    }
+
+    const response = await api.get<{ member: DigitalIdDetail }>(
+      `/admin/digital-ids/${member.uid}`,
+      { timeout: 10_000 }
+    )
+
+    return response.data.member
+  }
+
+  const getPreviewCaptureWidth = () => {
+    const width = frontPreviewRef.current?.getBoundingClientRect().width
+
+    return width && Number.isFinite(width) && width > 0 ? width : undefined
+  }
+
+  const captureSelectedPreviewCanvases = async (detail: DigitalIdDetail) => {
+    const frontPreview = frontPreviewRef.current
+    const backPreview = backPreviewRef.current
+
+    if (selectedMember?.uid === detail.uid && frontPreview && backPreview) {
+      const [front, back] = await Promise.all([
+        captureDigitalIdElement(frontPreview),
+        captureDigitalIdElement(backPreview),
+      ])
+
+      return { front, back }
+    }
+
+    return renderDigitalIdCanvases(detail, getPreviewCaptureWidth())
+  }
 
   const handleDownloadPdf = async (member: DigitalIdMember | DigitalIdDetail) => {
     setPdfAction('download')
     setMessage('')
+    setToast(null)
 
     try {
       const detail = await resolveDigitalIdDetail(member)
-      const pdf = await buildDigitalIdPdf(detail)
+      const pdf = await withExportTimeout(
+        buildDigitalIdPdf(detail, captureSelectedPreviewCanvases(detail)),
+        'PDF export timed out. Check the member photo or signature, then try again.'
+      )
       pdf.save(`${(detail.memberId || detail.profile?.idNumber || detail.uid).replace(/[^\w-]+/g, '_')}.pdf`)
-      setMessage('Digital ID PDF downloaded successfully.')
-    } catch (error: any) {
-      setMessage(error?.response?.data?.error || 'We could not prepare this Digital ID PDF.')
+      showActionToast(
+        'success',
+        'PDF Download Started',
+        'The Digital ID PDF was prepared successfully and sent to your downloads.'
+      )
+    } catch (error: unknown) {
+      showActionToast(
+        'danger',
+        'PDF Download Failed',
+        getExportErrorMessage(error, 'We could not prepare this Digital ID PDF.')
+      )
     } finally {
       setPdfAction(null)
     }
+  }
+
+  const handleDownloadJpeg = async (member: DigitalIdMember | DigitalIdDetail) => {
+    setPdfAction('jpeg')
+    setMessage('')
+    setToast(null)
+
+    try {
+      const detail = await resolveDigitalIdDetail(member)
+      const images = await withExportTimeout(
+        buildDigitalIdJpegs(detail, captureSelectedPreviewCanvases(detail)),
+        'JPEG export timed out. Check the member photo or signature, then try again.'
+      )
+      const fileName = (detail.memberId || detail.profile?.idNumber || detail.uid)
+        .replace(/[^\w-]+/g, '_')
+      await downloadDigitalIdJpegZip(images, fileName)
+      showActionToast(
+        'success',
+        'JPEG Download Started',
+        'The front and back JPEG files were prepared successfully and sent to your downloads.'
+      )
+    } catch (error: unknown) {
+      showActionToast(
+        'danger',
+        'JPEG Download Failed',
+        getExportErrorMessage(error, 'We could not prepare this Digital ID JPEG.')
+      )
+    } finally {
+      setPdfAction(null)
+    }
+  }
+
+  const showActionToast = (
+    tone: ActionToast['tone'],
+    title: string,
+    toastMessage: string
+  ) => {
+    setToast({
+      id: Date.now(),
+      tone,
+      title,
+      message: toastMessage,
+    })
   }
 
   const handlePrintPdf = async (member: DigitalIdMember | DigitalIdDetail) => {
@@ -341,7 +467,10 @@ export default function DigitalIdsPage() {
 
     try {
       const detail = await resolveDigitalIdDetail(member)
-      const pdf = await buildDigitalIdPdf(detail)
+      const pdf = await withExportTimeout(
+        buildDigitalIdPdf(detail, captureSelectedPreviewCanvases(detail)),
+        'Print export timed out. Check the member photo or signature, then try again.'
+      )
       pdf.autoPrint()
       const url = URL.createObjectURL(pdf.output('blob'))
       printWindow.location.replace(url)
@@ -372,10 +501,14 @@ export default function DigitalIdsPage() {
 
     try {
       const zip = new JSZip()
+      const fallbackCaptureWidth = getPreviewCaptureWidth()
 
       for (const member of activeIds) {
         const detailRes = await api.get<{ member: DigitalIdDetail }>(`/admin/digital-ids/${member.uid}`)
-        const pdf = await buildDigitalIdPdf(detailRes.data.member)
+        const pdf = await buildDigitalIdPdf(
+          detailRes.data.member,
+          renderDigitalIdCanvases(detailRes.data.member, fallbackCaptureWidth)
+        )
         const blob = pdf.output('blob')
         const fileName = `${(member.memberId || member.uid).replace(/[^\w-]+/g, '_')}.pdf`
         zip.file(fileName, blob)
@@ -415,6 +548,13 @@ export default function DigitalIdsPage() {
 
   return (
     <div className="space-y-6">
+      {toast ? (
+        <ActionToastNotice
+          toast={toast}
+          onClose={() => setToast(null)}
+        />
+      ) : null}
+
       {message ? (
         <div className="rounded-xl border px-4 py-3 text-sm bg-[color:var(--accent-soft)]" style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}>
           {message}
@@ -671,7 +811,7 @@ export default function DigitalIdsPage() {
                       previewSide === 'front' ? 'ring-2 ring-[color:var(--accent-soft)] ring-offset-2 ring-offset-transparent' : ''
                     )}
                   >
-                    <DigitalIdPreviewCard member={selectedMember} previewSide="front" />
+                    <DigitalIdPreviewCard member={selectedMember} previewSide="front" cardRef={frontPreviewRef} />
                   </div>
                   <div
                     className={cn(
@@ -679,7 +819,7 @@ export default function DigitalIdsPage() {
                       previewSide === 'back' ? 'ring-2 ring-[color:var(--accent-soft)] ring-offset-2 ring-offset-transparent' : ''
                     )}
                   >
-                    <DigitalIdPreviewCard member={selectedMember} previewSide="back" />
+                    <DigitalIdPreviewCard member={selectedMember} previewSide="back" cardRef={backPreviewRef} />
                   </div>
                 </div>
 
@@ -737,6 +877,7 @@ export default function DigitalIdsPage() {
                     {selectedMember.digitalIdStatus === 'draft' && isSuperadmin ? <SecondaryButton label="Generate and Issue ID" onClick={() => handleAction('approve', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} icon="issue" /> : null}
                     {selectedMember.digitalIdStatus === 'pending_approval' && isSuperadmin ? <SecondaryButton label="Generate and Issue ID" onClick={() => handleAction('approve', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} icon="issue" /> : null}
                     {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label={pdfAction === 'download' ? 'Preparing PDF...' : 'Download PDF'} onClick={() => handleDownloadPdf(selectedMember)} disabled={pdfAction !== null} icon="download" /> : null}
+                    {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label={pdfAction === 'jpeg' ? 'Preparing JPEGs...' : 'Download JPEGs'} onClick={() => handleDownloadJpeg(selectedMember)} disabled={pdfAction !== null} icon="download" /> : null}
                     {selectedMember.digitalIdStatus === 'active' ? <SecondaryButton label={pdfAction === 'print' ? 'Preparing print...' : 'Print ID'} onClick={() => handlePrintPdf(selectedMember)} disabled={pdfAction !== null} icon="print" /> : null}
                     {selectedMember.memberId && isSuperadmin ? <SecondaryButton label="Regenerate ID" onClick={() => handleAction('regenerate', selectedMember)} disabled={isActionLoading || !selectedMember.emergencyContactComplete || !selectedMember.signatureComplete} icon="refresh" /> : null}
                   </div>
@@ -746,6 +887,58 @@ export default function DigitalIdsPage() {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ActionToastNotice({
+  toast,
+  onClose,
+}: {
+  toast: ActionToast
+  onClose: () => void
+}) {
+  const isSuccess = toast.tone === 'success'
+
+  return (
+    <div
+      className="fixed right-4 top-5 z-[100] w-[min(390px,calc(100vw-2rem))]"
+      role={isSuccess ? 'status' : 'alert'}
+      aria-live={isSuccess ? 'polite' : 'assertive'}
+    >
+      <div
+        className="admin-tone-surface overflow-hidden rounded-2xl shadow-[var(--shadow-lg)]"
+        data-tone={toast.tone}
+      >
+        <div className="flex items-start gap-3 p-4">
+          <div
+            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            style={{ background: 'var(--tone-border)', color: 'var(--tone-status)' }}
+          >
+            {isSuccess ? (
+              <CheckCircle2 className="h-5 w-5" />
+            ) : (
+              <AlertCircle className="h-5 w-5" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="admin-tone-title text-sm font-black">{toast.title}</p>
+            <p className="admin-tone-body mt-1 text-sm leading-5">{toast.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="admin-tone-status rounded-lg p-1.5 transition hover:bg-black/5"
+            aria-label="Close notification"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div
+          className="h-1 w-full"
+          style={{ background: 'var(--tone-status)' }}
+        />
       </div>
     </div>
   )
@@ -866,16 +1059,18 @@ function getDigitalIdTone(status: string) {
 function DigitalIdPreviewCard({
   member,
   previewSide,
+  cardRef,
 }: {
   member: DigitalIdDetail
   previewSide: 'front' | 'back'
+  cardRef?: Ref<HTMLDivElement>
 }) {
   const fullName = [member.profile?.firstName, member.profile?.middleName, member.profile?.lastName]
     .filter(Boolean)
     .join(' ')
     .toUpperCase() || member.fullName?.toUpperCase() || 'KABATAAN MEMBER'
-  const photoUrl = member.photoUrl || member.profilePhotoUrl || null
-  const signatureUrl = getMemberSignatureUrl(member)
+  const photoUrl = getExportSafeImageUrl(member.photoUrl || member.profilePhotoUrl)
+  const signatureUrl = getExportSafeImageUrl(getMemberSignatureUrl(member))
   const address = buildAddress(member)
   const purok = buildPurok(member.profile?.purok || member.purok)
   const contactNumber = buildFrontCardValue(member.profile?.contactNumber || member.contactNumber)
@@ -886,7 +1081,7 @@ function DigitalIdPreviewCard({
 
   if (previewSide === 'front') {
     return (
-      <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
+      <div ref={cardRef} className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
         <img src="/images/KK ID - Front BG.png" alt="KK ID front background" className="absolute inset-0 h-full w-full object-cover" />
         <DigitalIdFrontHeader />
         <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
@@ -925,49 +1120,55 @@ function DigitalIdPreviewCard({
   }
 
   return (
-    <div className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
+    <div ref={cardRef} className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
       <div className="absolute inset-[3.6%] rounded-[18px] border-[1.5px] border-[#4e5650]/65" />
       <div className="absolute inset-[6.2%] rounded-[14px] border border-[#838b85]/35" />
-      <div className="relative flex h-full flex-col px-[9%] pb-[20.8%] pt-[9.8%] text-[#2b312e]">
+      <div className="relative flex h-full flex-col px-[9%] pb-[10.2%] pt-[9.8%] text-[#2b312e]">
         <div className="text-center">
-          <p className="text-[0.38rem] font-bold uppercase tracking-[0.09em] text-[#666d67]">
+          <p className="text-[1.24cqw] font-bold uppercase tracking-[0.09em] text-[#666d67]">
             In case of emergency, please contact:
           </p>
-          <p className="mt-[2.4%] text-[0.66rem] font-black leading-[1.08] tracking-[0.01em] text-[#1f2621]">
+          <p className="mt-[2.4%] text-[2.15cqw] font-black leading-[1.08] tracking-[0.01em] text-[#1f2621]">
             {emergencyContactName} - {emergencyContactPhone}
           </p>
-          <p className="mt-[1.8%] text-[0.34rem] font-semibold tracking-[0.08em] text-[#6b726c]">
+          <p className="mt-[1.8%] text-[1.11cqw] font-semibold tracking-[0.08em] text-[#6b726c]">
             Relationship: {emergencyContactRelationship}
           </p>
         </div>
 
         <div className="mx-auto mt-[5.4%] max-w-[80%] text-center">
-          <p className="text-[0.38rem] font-bold uppercase tracking-[0.18em] text-[#767d78]">
+          <p className="text-[1.24cqw] font-bold uppercase tracking-[0.18em] text-[#767d78]">
             Terms and Conditions
           </p>
-          <p className="mt-[2.4%] text-[0.4rem] font-semibold leading-[1.32] text-[#424843]">
+          <p className="mt-[2.4%] text-[1.3cqw] font-semibold leading-[1.32] text-[#424843]">
             {DIGITAL_ID_TERMS_TEXT}
           </p>
         </div>
 
-        <div className="mt-auto flex justify-center pt-[0.8%]">
-          <div className="flex w-full max-w-[62%] flex-col items-center text-center">
-            <p className="text-[0.34rem] font-bold uppercase tracking-[0.16em] text-[#7a807b]">
+        <div className="mt-auto flex justify-center pt-[1%]">
+          <div className="flex w-full max-w-[68%] flex-col items-center text-center">
+            <p className="text-[1.11cqw] font-bold uppercase tracking-[0.16em] text-[#7a807b]">
               Valid Until
             </p>
-            <p className="mt-[1.4%] text-[0.64rem] font-black text-[#222823]">{validThru}</p>
-            <p className="mt-[2.6%] text-[0.7rem] font-semibold italic tracking-[0.02em] text-[#444b45]">
-              {DIGITAL_ID_SIGNATURE_TEXT}
-            </p>
-            <div className="mt-[1%] h-px w-[60%] bg-[#4d544e]" />
-            <p className="mt-[1.2%] text-[0.3rem] font-black uppercase leading-none tracking-[0.08em] text-[#303731]">
+            <p className="mt-[1.4%] text-[2.08cqw] font-black leading-none text-[#222823]">{validThru}</p>
+            <div className="mt-[1.2%] flex h-[8.8cqw] w-full items-center justify-center overflow-hidden">
+              <img
+                src={DIGITAL_ID_SIGNATORY_SIGNATURE_SRC}
+                alt="Signature of Mark Jervin B. Ventura"
+                draggable={false}
+                className="block h-full w-auto max-w-[48%] object-contain"
+                style={{ transform: 'rotate(180deg)' }}
+              />
+            </div>
+            <div className="-mt-[0.4%] h-px w-[58%] bg-[#4d544e]" />
+            <p className="mt-[1.4%] text-[1.42cqw] font-black uppercase leading-[1.1] tracking-[0.06em] text-[#303731]">
               {DIGITAL_ID_SIGNATORY_NAME}
             </p>
-            <p className="mt-[0.6%] text-[0.29rem] font-black uppercase leading-none tracking-[0.12em] text-[#303731]">
+            <p className="mt-[0.8%] text-[1.22cqw] font-black uppercase leading-[1.1] tracking-[0.1em] text-[#303731]">
               {DIGITAL_ID_SIGNATORY_TITLE}
             </p>
             {DIGITAL_ID_SIGNATORY_OFFICE ? (
-              <p className="mt-[0.4%] text-[0.31rem] font-semibold uppercase leading-none tracking-[0.11em] text-[#656d67]">
+              <p className="mt-[0.5%] text-[1.15cqw] font-semibold uppercase leading-none tracking-[0.11em] text-[#656d67]">
                 {DIGITAL_ID_SIGNATORY_OFFICE}
               </p>
             ) : null}
@@ -1120,187 +1321,172 @@ function PreviewField({ label, value, className = '' }: { label: string; value: 
   )
 }
 
-async function buildDigitalIdPdf(member: DigitalIdDetail) {
+function withExportTimeout<T>(promise: Promise<T>, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error(message)),
+      EXPORT_ACTION_TIMEOUT_MS
+    )
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout)
+        resolve(value)
+      },
+      (error) => {
+        window.clearTimeout(timeout)
+        reject(error)
+      }
+    )
+  })
+}
+
+function getExportErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const responseError = error as {
+      response?: {
+        data?: {
+          error?: unknown
+        }
+      }
+    }
+    const apiMessage = responseError.response?.data?.error
+
+    if (typeof apiMessage === 'string' && apiMessage.trim()) {
+      return apiMessage
+    }
+  }
+
+  return fallback
+}
+
+async function buildDigitalIdPdf(
+  member: DigitalIdDetail,
+  canvasSource?: DigitalIdCanvasSource
+) {
+  const { front, back } = canvasSource ? await canvasSource : await renderDigitalIdCanvases(member)
+  const cardWidth = 420
+  const frontHeight = cardWidth * (front.height / front.width)
+  const backHeight = cardWidth * (back.height / back.width)
+  const pageMargin = 20
+  const pageWidth = cardWidth + pageMargin * 2
+  const pageHeight = Math.max(frontHeight, backHeight) + pageMargin * 2
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'pt',
-    format: [700, 460],
+    format: [pageWidth, pageHeight],
   })
 
-  const frontBg = await loadImageData('/images/KK ID - Front BG.png')
-  const barangayLogo = await loadImageData(DIGITAL_ID_BARANGAY_LOGO_SRC)
-  const skLogo = await loadImageData(DIGITAL_ID_SK_LOGO_SRC)
-  const photoData = member.photoUrl || member.profilePhotoUrl
-    ? await loadImageData(member.photoUrl || member.profilePhotoUrl || '', 'jpeg').catch(() => '')
-    : ''
-  const signatureUrl = getMemberSignatureUrl(member)
-  const signatureData = signatureUrl
-    ? await loadImageData(signatureUrl).catch(() => '')
-    : ''
-  const fullName = (member.fullName || buildFullName(member.profile || {})).toUpperCase()
-  const address = buildAddress(member)
-  const purok = buildPurok(member.profile?.purok || member.purok)
-  const contactNumber = buildFrontCardValue(member.profile?.contactNumber || member.contactNumber)
-  const validThru = getDigitalIdValidThru(member)
-  const emergencyContactName = getEmergencyContactName(member)
-  const emergencyContactPhone = getEmergencyContactPhone(member)
-  const emergencyContactRelationship = getEmergencyContactRelationship(member)
-
-  doc.setFillColor(245, 249, 255)
-  doc.rect(0, 0, 460, 700, 'F')
-
-  doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
-  doc.setFillColor(1, 67, 132)
-  doc.rect(20, 20, 420, 50, 'F')
-  doc.addImage(barangayLogo, 'PNG', 37, 28, 31, 31)
-  doc.addImage(skLogo, 'PNG', 392, 28, 31, 31)
-  doc.setTextColor(255, 255, 255)
-  doc.setFont('times', 'normal')
-  doc.setFontSize(26)
-  doc.text('KATIPUNAN NG KABATAAN', 230, 52, { align: 'center', maxWidth: 310 })
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.2)
-  doc.text('SANGGUNIANG KABATAAN NG BARANGAY BUTING', 230, 64, { align: 'center', maxWidth: 280 })
-  doc.setFillColor(244, 242, 236)
-  doc.roundedRect(20, 330, 420, 266, 24, 24, 'F')
-  doc.setDrawColor(80, 88, 82)
-  doc.setLineWidth(1.2)
-  doc.roundedRect(35, 345, 390, 236, 18, 18, 'S')
-  doc.setDrawColor(139, 147, 141)
-  doc.setLineWidth(0.6)
-  doc.roundedRect(45, 355, 370, 216, 14, 14, 'S')
-  const frontContentOffsetY = -12
-  const frontInfoOffsetY = -18
-
-  doc.setTextColor(11, 47, 91)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(6.8)
-  doc.text(member.memberId || member.profile?.idNumber || 'DRAFT', 89, 74 + frontContentOffsetY, { align: 'center', maxWidth: 78 })
-
-  if (photoData) {
-    doc.addImage(photoData, 'JPEG', 53, 86 + frontContentOffsetY, 72, 94)
-  } else {
-    doc.setTextColor(1, 67, 132)
-    doc.setFontSize(22)
-    doc.text(getInitials(fullName), 89, 142 + frontContentOffsetY, { align: 'center' })
-  }
-
-  if (signatureData) {
-    doc.addImage(signatureData, 'PNG', 48, 184 + frontContentOffsetY, 82, 22)
-  }
-
-  doc.setDrawColor(128, 128, 128)
-  doc.setLineWidth(0.8)
-  doc.line(50, 208 + frontContentOffsetY, 128, 208 + frontContentOffsetY)
-  doc.setTextColor(26, 26, 26)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(5.6)
-  doc.text('SIGNATURE', 89, 216 + frontContentOffsetY, { align: 'center' })
-
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(29, 90, 161)
-  doc.setFontSize(7)
-  doc.text('NAME:', 164, 84 + frontInfoOffsetY)
-  doc.text('HOME ADDRESS:', 164, 111 + frontInfoOffsetY)
-  doc.text('PUROK:', 164, 152 + frontInfoOffsetY)
-  doc.text('DATE OF BIRTH:', 164, 183 + frontInfoOffsetY)
-  doc.text('GENDER:', 299, 183 + frontInfoOffsetY)
-  doc.text('CONTACT NO:', 164, 218 + frontInfoOffsetY)
-
-  doc.setTextColor(11, 47, 91)
-  doc.setFontSize(12)
-  doc.text(fullName, 164, 97 + frontInfoOffsetY)
-  doc.setFontSize(10.5)
-  doc.text(address, 164, 123 + frontInfoOffsetY, { maxWidth: 160 })
-  doc.text(purok, 164, 164 + frontInfoOffsetY, { maxWidth: 160 })
-  doc.text(formatShortDate(member.profile?.birthday), 164, 196 + frontInfoOffsetY)
-  doc.text((member.profile?.gender || '-').toUpperCase(), 299, 196 + frontInfoOffsetY)
-  doc.text(contactNumber, 164, 231 + frontInfoOffsetY)
-
-  doc.setTextColor(96, 103, 98)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.text('IN CASE OF EMERGENCY, PLEASE CONTACT:', 230, 381, { align: 'center' })
-  doc.setTextColor(31, 38, 33)
-  doc.setFontSize(13)
-  doc.text(`${emergencyContactName} - ${emergencyContactPhone}`, 230, 398, { align: 'center', maxWidth: 300 })
-  doc.setTextColor(107, 114, 108)
-  doc.setFontSize(7)
-  doc.text(`RELATIONSHIP: ${emergencyContactRelationship}`, 230, 410, { align: 'center', maxWidth: 260 })
-
-  doc.setTextColor(118, 125, 120)
-  doc.setFontSize(8)
-  doc.text('TERMS AND CONDITIONS', 230, 431, { align: 'center' })
-  doc.setTextColor(66, 72, 67)
-  doc.setFontSize(7.9)
-  doc.text(DIGITAL_ID_TERMS_TEXT, 230, 446, { align: 'center', maxWidth: 235, lineHeightFactor: 1.26 })
-
-  doc.setTextColor(122, 128, 123)
-  doc.setFontSize(7)
-  doc.text('VALID UNTIL', 230, 490, { align: 'center' })
-  doc.setTextColor(34, 40, 35)
-  doc.setFontSize(12)
-  doc.text(validThru, 230, 504, { align: 'center' })
-  doc.setTextColor(68, 75, 69)
-  doc.setFont('times', 'italic')
-  doc.setFontSize(15)
-  doc.text(DIGITAL_ID_SIGNATURE_TEXT, 230, 521, { align: 'center' })
-  doc.setDrawColor(77, 84, 78)
-  doc.setLineWidth(0.8)
-  doc.line(186, 526, 274, 526)
-  doc.setTextColor(48, 55, 49)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(6.2)
-  doc.text(DIGITAL_ID_SIGNATORY_NAME, 230, 537, { align: 'center' })
-  doc.setFontSize(6.4)
-  doc.text(DIGITAL_ID_SIGNATORY_TITLE, 230, 546, { align: 'center' })
-  doc.setTextColor(101, 109, 103)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(5.8)
-  if (DIGITAL_ID_SIGNATORY_OFFICE) {
-    doc.text(DIGITAL_ID_SIGNATORY_OFFICE, 230, 554, { align: 'center' })
-  }
+  drawDigitalIdPdfPage(doc, front, cardWidth, frontHeight, pageWidth, pageHeight)
+  doc.addPage([pageWidth, pageHeight], 'landscape')
+  drawDigitalIdPdfPage(doc, back, cardWidth, backHeight, pageWidth, pageHeight)
 
   return doc
 }
 
-async function loadImageData(url: string, output: 'png' | 'jpeg' = 'png') {
-  const response = await fetch(url)
-  const blob = await response.blob()
-  const objectUrl = URL.createObjectURL(blob)
-
-  try {
-    return await rasterizeImage(objectUrl, output)
-  } finally {
-    URL.revokeObjectURL(objectUrl)
-  }
+function drawDigitalIdPdfPage(
+  doc: jsPDF,
+  canvas: HTMLCanvasElement,
+  cardWidth: number,
+  cardHeight: number,
+  pageWidth: number,
+  pageHeight: number
+) {
+  doc.setFillColor(245, 249, 255)
+  doc.rect(0, 0, pageWidth, pageHeight, 'F')
+  doc.addImage(
+    canvas.toDataURL('image/png'),
+    'PNG',
+    (pageWidth - cardWidth) / 2,
+    (pageHeight - cardHeight) / 2,
+    cardWidth,
+    cardHeight
+  )
 }
 
-function rasterizeImage(url: string, output: 'png' | 'jpeg') {
-  return new Promise<string>((resolve, reject) => {
-    const image = new Image()
-    image.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = image.naturalWidth || image.width
-      canvas.height = image.naturalHeight || image.height
+async function buildDigitalIdJpegs(
+  member: DigitalIdDetail,
+  canvasSource?: DigitalIdCanvasSource
+) {
+  return canvasSource ? await canvasSource : await renderDigitalIdCanvases(member)
+}
 
-      const context = canvas.getContext('2d')
-      if (!context) {
-        reject(new Error('Failed to prepare image canvas'))
-        return
+async function downloadDigitalIdJpegZip(
+  canvases: DigitalIdCanvases,
+  baseFileName: string
+) {
+  const zip = new JSZip()
+  const [frontBlob, backBlob] = await Promise.all([
+    canvasToJpegBlob(canvases.front),
+    canvasToJpegBlob(canvases.back),
+  ])
+
+  zip.file(`${baseFileName}-front.jpg`, frontBlob)
+  zip.file(`${baseFileName}-back.jpg`, backBlob)
+
+  const blob = await zip.generateAsync({ type: 'blob' })
+  downloadBlob(blob, `${baseFileName}-jpeg.zip`)
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
+}
+
+async function renderDigitalIdCanvases(member: DigitalIdDetail, width?: number) {
+  const captureOptions = width ? { width } : undefined
+  const [front, back] = await Promise.all([
+    captureDigitalIdNode(
+      <DigitalIdPreviewCard member={member} previewSide="front" />,
+      captureOptions
+    ),
+    captureDigitalIdNode(
+      <DigitalIdPreviewCard member={member} previewSide="back" />,
+      captureOptions
+    ),
+  ])
+
+  return { front, back }
+}
+
+function getExportSafeImageUrl(value?: string | null) {
+  const normalizedUrl = String(value || '').trim()
+
+  if (
+    !normalizedUrl ||
+    normalizedUrl.startsWith('data:') ||
+    normalizedUrl.startsWith('blob:') ||
+    normalizedUrl.startsWith('/')
+  ) {
+    return normalizedUrl || null
+  }
+
+  if (/^https?:\/\//i.test(normalizedUrl)) {
+    try {
+      const parsedUrl = new URL(normalizedUrl)
+
+      if (typeof window !== 'undefined' && parsedUrl.origin === window.location.origin) {
+        return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`
       }
-
-      if (output === 'jpeg') {
-        context.fillStyle = '#ffffff'
-        context.fillRect(0, 0, canvas.width, canvas.height)
-      }
-
-      context.drawImage(image, 0, 0)
-      resolve(canvas.toDataURL(output === 'jpeg' ? 'image/jpeg' : 'image/png', 0.96))
+    } catch {
+      return normalizedUrl
     }
-    image.onerror = () => reject(new Error('Failed to load image'))
-    image.src = url
-  })
+
+    return `/api/image-proxy?url=${encodeURIComponent(normalizedUrl)}`
+  }
+
+  return normalizedUrl
 }
 
 function prettifyStatus(value: string) {
@@ -1317,8 +1503,24 @@ function getInitials(fullName: string) {
     .join('')
 }
 
-function buildAddress(member: Pick<DigitalIdDetail, 'profile' | 'barangay' | 'city' | 'province'>) {
-  return [member.profile?.barangay || member.barangay, member.profile?.city || member.city, member.profile?.province || member.province]
+function buildAddress(
+  member: Pick<
+    DigitalIdDetail,
+    | 'profile'
+    | 'currentAddressHouseBlockUnitNumber'
+    | 'currentAddressStreetAddress'
+    | 'barangay'
+    | 'city'
+    | 'province'
+  >,
+) {
+  return [
+    member.profile?.currentAddressHouseBlockUnitNumber || member.currentAddressHouseBlockUnitNumber,
+    member.profile?.currentAddressStreetAddress || member.currentAddressStreetAddress,
+    member.profile?.barangay || member.barangay,
+    member.profile?.city || member.city,
+    member.profile?.province || member.province,
+  ]
     .filter(Boolean)
     .join(', ')
     .toUpperCase() || '-'
@@ -1353,10 +1555,6 @@ function extractYear(value?: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
   return String(date.getFullYear())
-}
-
-function buildFullName(profile: DigitalIdDetail['profile']) {
-  return [profile?.firstName, profile?.middleName, profile?.lastName].filter(Boolean).join(' ')
 }
 
 function getEmergencyContactName(member: DigitalIdDetail) {

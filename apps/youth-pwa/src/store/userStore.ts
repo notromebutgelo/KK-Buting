@@ -25,6 +25,8 @@ export interface UserProfile {
   province: string
   city: string
   barangay: string
+  currentAddressHouseBlockUnitNumber?: string
+  currentAddressStreetAddress?: string
   purok: string
   civilStatus: string
   youthAgeGroup: string

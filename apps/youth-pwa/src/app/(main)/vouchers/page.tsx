@@ -29,6 +29,7 @@ interface Voucher {
   stock?: number | null
   claimedCount?: number
   claimedByMe?: boolean
+  visibilityType?: 'public' | 'targeted'
   status?: string
   expiresAt?: string | null
 }
@@ -68,13 +69,18 @@ function formatDate(value?: string | null) {
   return d.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
-function buildEligibilityTag(cond?: EligibilityConditions): string | null {
-  if (!cond) return null
+function buildEligibilityTag(
+  cond?: EligibilityConditions,
+  visibilityType: 'public' | 'targeted' = 'public'
+): string | null {
+  if (!cond && visibilityType === 'public') return null
+  const conditions = cond || {}
   const parts: string[] = []
-  if (cond.minAge) parts.push(`${cond.minAge}+`)
-  if (cond.maxAge) parts.push(`≤ ${cond.maxAge}`)
-  if (cond.ageGroup) parts.push(cond.ageGroup)
-  if (cond.isVerified) parts.push('Verified only')
+  if (visibilityType === 'targeted') parts.push('Exclusive to you')
+  if (conditions.minAge) parts.push(`${conditions.minAge}+`)
+  if (conditions.maxAge) parts.push(`≤ ${conditions.maxAge}`)
+  if (conditions.ageGroup) parts.push(conditions.ageGroup)
+  if (conditions.isVerified) parts.push('Verified only')
   return parts.length ? parts.join(' · ') : null
 }
 
@@ -208,8 +214,6 @@ export default function VouchersPage() {
     setClaiming(voucher.id)
     try {
       const res = await api.post(`/vouchers/${voucher.id}/claim`)
-      console.log('[claim response]', res.data)
-
       const { voucherId, claimedAt } = res.data as { voucherId?: string; claimedAt?: string }
 
       if (!voucherId) {
@@ -331,7 +335,7 @@ export default function VouchersPage() {
               <VoucherCard
                 key={voucher.id}
                 voucher={voucher}
-                eligTag={buildEligibilityTag(voucher.eligibilityConditions)}
+                eligTag={buildEligibilityTag(voucher.eligibilityConditions, voucher.visibilityType)}
                 isClaiming={claiming === voucher.id}
                 onClaim={() => void handleClaim(voucher)}
                 onViewDetail={voucher.claimedByMe ? () => router.push(`/vouchers/${voucher.id}`) : undefined}

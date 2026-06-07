@@ -422,9 +422,50 @@ export function validateVoucherMutationRequest(options: { partial?: boolean } = 
     validateNumber(errors, body, "stock", "stock", { min: 0, integer: true, allowNull: true });
     validateString(errors, body, "status", "status", { minLength: 2, maxLength: 32 });
     validateString(errors, body, "expiresAt", "expiresAt", { date: true });
+    validateEnum(errors, body, "expiredVisibilityMode", "expiredVisibilityMode", ["duration", "manual"]);
+    validateNumber(errors, body, "expiredVisibilityDays", "expiredVisibilityDays", { min: 1, integer: true });
+    validateBoolean(errors, body, "expiredHiddenFromYouth", "expiredHiddenFromYouth");
+    validateEnum(errors, body, "visibilityType", "visibilityType", ["public", "targeted"]);
+    validateStringArray(errors, body, "targetUserIds", "targetUserIds");
+    validateBoolean(errors, body, "notificationsEnabled", "notificationsEnabled");
     validateEligibilityConditions(errors, body);
 
-    if (options.partial && !hasAnyKey(body, ["title", "description", "type", "pointsCost", "stock", "status", "expiresAt", "eligibilityConditions"])) {
+    if (
+      body.expiredVisibilityDays !== undefined &&
+      body.expiredVisibilityDays !== "" &&
+      Number(body.expiredVisibilityDays) > 365
+    ) {
+      errors.push("expiredVisibilityDays must be at most 365.");
+    }
+
+    if (
+      body.visibilityType === "targeted" &&
+      Array.isArray(body.targetUserIds) &&
+      body.targetUserIds.length === 0
+    ) {
+      errors.push("targetUserIds must contain at least one item for a targeted voucher.");
+    }
+
+    if (Array.isArray(body.targetUserIds) && body.targetUserIds.length > 500) {
+      errors.push("targetUserIds must contain at most 500 items.");
+    }
+
+    if (options.partial && !hasAnyKey(body, [
+      "title",
+      "description",
+      "type",
+      "pointsCost",
+      "stock",
+      "status",
+      "expiresAt",
+      "eligibilityConditions",
+      "visibilityType",
+      "targetUserIds",
+      "notificationsEnabled",
+      "expiredVisibilityMode",
+      "expiredVisibilityDays",
+      "expiredHiddenFromYouth",
+    ])) {
       errors.push("At least one voucher field must be provided.");
     }
 
@@ -727,6 +768,8 @@ export function validateYouthProfileUpdateRequest(req: Request) {
     "province",
     "city",
     "barangay",
+    "currentAddressHouseBlockUnitNumber",
+    "currentAddressStreetAddress",
     "purok",
     "youthAgeGroup",
     "educationalBackground",

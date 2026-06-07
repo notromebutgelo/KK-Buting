@@ -395,6 +395,8 @@ function sanitizeProfilePayload(data: Record<string, unknown>) {
     "province",
     "city",
     "barangay",
+    "currentAddressHouseBlockUnitNumber",
+    "currentAddressStreetAddress",
     "purok",
     "yearsInBarangay",
     "youthAgeGroup",
@@ -466,6 +468,10 @@ function hasAllRequiredDocumentsApproved(profile: AnyRecord, documents: AnyRecor
 function computeQueueStatus(profile: AnyRecord, documents: AnyRecord[]) {
   const finalStatus = String(profile?.status || "pending");
   if (finalStatus === "rejected") return "rejected";
+
+  if (finalStatus === "verified" && resolveDigitalIdStatus(profile) === "active") {
+    return "verified";
+  }
 
   if (
     (finalStatus === "verified" && profile?.verificationReferredToSuperadminAt) ||
@@ -1813,6 +1819,10 @@ export async function getYouthMembers(filters: YouthMemberFilters = {}) {
         .join(" "),
       idNumber: profileMap.get(user.uid)?.idNumber || null,
       age: Number(profileMap.get(user.uid)?.age || 0) || null,
+      currentAddressHouseBlockUnitNumber:
+        profileMap.get(user.uid)?.currentAddressHouseBlockUnitNumber || null,
+      currentAddressStreetAddress:
+        profileMap.get(user.uid)?.currentAddressStreetAddress || null,
       barangay: profileMap.get(user.uid)?.barangay || null,
       purok: profileMap.get(user.uid)?.purok || null,
       contactNumber: profileMap.get(user.uid)?.contactNumber || null,
@@ -2180,6 +2190,12 @@ export async function getDigitalIdMembers(filters: {
         fullName: [member.profile?.firstName, member.profile?.lastName].filter(Boolean).join(" "),
         youthAgeGroup: member.profile?.youthAgeGroup,
         contactNumber: normalizeOptionalString(member.profile?.contactNumber),
+        currentAddressHouseBlockUnitNumber: normalizeOptionalString(
+          member.profile?.currentAddressHouseBlockUnitNumber
+        ),
+        currentAddressStreetAddress: normalizeOptionalString(
+          member.profile?.currentAddressStreetAddress
+        ),
         city: member.profile?.city,
         province: member.profile?.province,
         barangay: member.profile?.barangay,

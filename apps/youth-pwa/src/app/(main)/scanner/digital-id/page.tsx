@@ -4,7 +4,10 @@ import Image from 'next/image'
 import Link from 'next/link'
 import jsPDF from 'jspdf'
 import { useEffect, useMemo, useState } from 'react'
-import DigitalIDCard, { DigitalIdBack } from '@/components/features/DigitalIDCard'
+import DigitalIDCard, {
+  DigitalIdBack,
+  DigitalIdFace,
+} from '@/components/features/DigitalIDCard'
 import PhysicalIdRequestStatusBadge, {
   getPhysicalIdRequestStatusLabel,
 } from '@/components/features/PhysicalIdRequestStatusBadge'
@@ -12,6 +15,11 @@ import AlertModal from '@/components/ui/AlertModal'
 import Modal from '@/components/ui/Modal'
 import Spinner from '@/components/ui/Spinner'
 import { usePhysicalIdRequests } from '@/hooks/usePhysicalIdRequests'
+import {
+  captureDigitalIdNode,
+  downloadCanvasAsJpeg,
+  stackDigitalIdCanvases,
+} from '@/lib/digitalIdCapture'
 import type { PhysicalIdRequest } from '@/services/physicalIdRequests.service'
 import { getDigitalID, getVerificationStatus } from '@/services/verification.service'
 import { useAuthStore } from '@/store/authStore'
@@ -31,6 +39,8 @@ interface DigitalIDData {
   birthday?: string
   gender?: string
   contactNumber?: string
+  currentAddressHouseBlockUnitNumber?: string
+  currentAddressStreetAddress?: string
   barangay?: string
   city?: string
   province?: string
@@ -39,11 +49,6 @@ interface DigitalIDData {
   digitalIdSignatureUrl?: string | null
 }
 
-const DIGITAL_ID_TERMS_TEXT =
-  'This card is non-transferable and must be used only by the cardholder whose signature appears herein. Cardholder privileges remain subject to implementing guidelines approved by the Sangguniang Kabataan Council.'
-const DIGITAL_ID_SIGNATURE_TEXT = 'Mark Jervin B. Ventura'
-const DIGITAL_ID_SIGNATORY_NAME = 'HON. MARK JERVIN B. VENTURA'
-const DIGITAL_ID_SIGNATORY_TITLE = 'SK CHAIRPERSON'
 const REQUEST_CONTACT_NUMBER_MAX_LENGTH = 11
 
 export default function DigitalIDPage() {
@@ -52,7 +57,7 @@ export default function DigitalIDPage() {
   const [idData, setIdData] = useState<DigitalIDData | null>(null)
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
+  const [savingFormat, setSavingFormat] = useState<'pdf' | 'jpeg' | null>(null)
   const [errorTitle, setErrorTitle] = useState('Digital ID Unavailable')
   const [error, setError] = useState('')
   const [isPhysicalRequestModalOpen, setIsPhysicalRequestModalOpen] = useState(false)
@@ -121,6 +126,11 @@ export default function DigitalIDPage() {
         birthday: idData?.birthday || profile.birthday,
         gender: idData?.gender || profile.gender,
         contactNumber: idData?.contactNumber || profile.contactNumber,
+        currentAddressHouseBlockUnitNumber:
+          idData?.currentAddressHouseBlockUnitNumber ||
+          profile.currentAddressHouseBlockUnitNumber,
+        currentAddressStreetAddress:
+          idData?.currentAddressStreetAddress || profile.currentAddressStreetAddress,
         barangay: idData?.barangay || profile.barangay,
         city: idData?.city || profile.city,
         province: idData?.province || profile.province,
@@ -243,27 +253,34 @@ export default function DigitalIDPage() {
     setRequestContactNumber(nextContactNumber)
   }, [idData?.contactNumber, profile?.contactNumber])
 
-  async function handleSaveId() {
-    if (!digitalIdProfile || !idData || isSaving) {
+  async function handleSaveId(format: 'pdf' | 'jpeg') {
+    if (!digitalIdProfile || !idData || savingFormat) {
       return
     }
 
-    setIsSaving(true)
+    setSavingFormat(format)
 
     try {
-      const pdf = await buildDigitalIdPdf({
+      const exportData = {
         profile: digitalIdProfile,
         memberId: idData.memberId || idData.idNumber || '',
         photoUrl: digitalIdPhotoUrl,
         signatureUrl: digitalIdSignatureUrl,
-      })
+      }
+      const fileName = sanitizeFileName(idData.memberId || displayName || 'kk_digital_id')
 
-      pdf.save(`${sanitizeFileName(idData.memberId || displayName || 'kk_digital_id')}.pdf`)
+      if (format === 'pdf') {
+        const pdf = await buildDigitalIdPdf(exportData)
+        pdf.save(`${fileName}.pdf`)
+      } else {
+        const image = await buildDigitalIdJpeg(exportData)
+        await downloadCanvasAsJpeg(image, `${fileName}.jpg`)
+      }
     } catch {
       setErrorTitle('Save Failed')
       setError('Could not save your Digital ID right now.')
     } finally {
-      setIsSaving(false)
+      setSavingFormat(null)
     }
   }
 
@@ -664,8 +681,9 @@ export default function DigitalIDPage() {
             />
 
             <CredentialActionsSection
-              isSaving={isSaving}
-              onSave={handleSaveId}
+              savingFormat={savingFormat}
+              onSavePdf={() => handleSaveId('pdf')}
+              onSaveJpeg={() => handleSaveId('jpeg')}
             />
 
             <EmergencyCredentialPanel
@@ -963,11 +981,13 @@ function CredentialMetaItem({
 }
 
 function CredentialActionsSection({
-  isSaving,
-  onSave,
+  savingFormat,
+  onSavePdf,
+  onSaveJpeg,
 }: {
-  isSaving: boolean
-  onSave: () => void
+  savingFormat: 'pdf' | 'jpeg' | null
+  onSavePdf: () => void
+  onSaveJpeg: () => void
 }) {
   return (
     <section className="rounded-[28px] border border-[#d9e5f3] bg-white/76 px-5 py-5 shadow-[0_12px_24px_rgba(1,67,132,0.05)] backdrop-blur-sm">
@@ -985,11 +1005,19 @@ function CredentialActionsSection({
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={onSave}
-          disabled={isSaving}
-          className="col-span-2 inline-flex items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[17px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.16)] disabled:opacity-60"
+          onClick={onSavePdf}
+          disabled={savingFormat !== null}
+          className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-4 py-4 text-[15px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.16)] disabled:opacity-60"
         >
-          {isSaving ? 'Saving ID...' : 'Save ID'}
+          {savingFormat === 'pdf' ? 'Saving PDF...' : 'Save PDF'}
+        </button>
+        <button
+          type="button"
+          onClick={onSaveJpeg}
+          disabled={savingFormat !== null}
+          className="inline-flex items-center justify-center rounded-full border border-[#9fc7ee] bg-[#eef6ff] px-4 py-4 text-[15px] font-bold text-[#014384] disabled:opacity-60"
+        >
+          {savingFormat === 'jpeg' ? 'Saving JPEG...' : 'Save JPEG'}
         </button>
         <Link
           href="/verification/status"
@@ -1049,16 +1077,6 @@ function extractYear(value?: string) {
   return date.getFullYear()
 }
 
-function getInitials(value: string) {
-  return value
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-}
-
 function hasCompleteEmergencyContact(
   profile:
     | {
@@ -1087,16 +1105,13 @@ function hasDigitalIdSignature(
   return Boolean(String(profile?.digitalIdSignatureUrl || '').trim())
 }
 
-async function buildDigitalIdPdf({
-  profile,
-  memberId,
-  photoUrl,
-  signatureUrl,
-}: {
+interface DigitalIdExportData {
   profile: {
     firstName?: string
     middleName?: string
     lastName?: string
+    currentAddressHouseBlockUnitNumber?: string
+    currentAddressStreetAddress?: string
     purok?: string
     barangay?: string
     city?: string
@@ -1114,23 +1129,37 @@ async function buildDigitalIdPdf({
   memberId: string
   photoUrl?: string | null
   signatureUrl?: string | null
-}) {
+}
+
+async function buildDigitalIdPdf(exportData: DigitalIdExportData) {
+  const { front, back } = await renderDigitalIdCanvases(exportData)
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'pt',
     format: [700, 460],
   })
 
-  const [frontBg, photoData, signatureData] = await Promise.all([
-    loadImageData('/images/KK ID - Front BG.png'),
-    photoUrl ? loadImageData(photoUrl, 'jpeg').catch(() => '') : Promise.resolve(''),
-    signatureUrl ? loadImageData(signatureUrl).catch(() => '') : Promise.resolve(''),
-  ])
+  doc.setFillColor(245, 249, 255)
+  doc.rect(0, 0, 460, 700, 'F')
+  doc.addImage(front.toDataURL('image/png'), 'PNG', 20, 20, 420, 420 / 1.58)
+  doc.addImage(back.toDataURL('image/png'), 'PNG', 20, 330, 420, 420 / 1.58)
 
+  return doc
+}
+
+async function buildDigitalIdJpeg(exportData: DigitalIdExportData) {
+  const { front, back } = await renderDigitalIdCanvases(exportData)
+  return stackDigitalIdCanvases(front, back)
+}
+
+async function renderDigitalIdCanvases({
+  profile,
+  memberId,
+  photoUrl,
+  signatureUrl,
+}: DigitalIdExportData) {
   const fullName = buildFullName(profile).toUpperCase() || 'KABATAAN MEMBER'
   const address = buildAddress(profile)
-  const purok = buildPurok(profile.purok)
-  const contactNumber = buildFrontCardValue(profile.contactNumber)
   const validThru = getDigitalIdValidThru(
     resolveDigitalIdIssuedAt(
       profile.digitalIdApprovedAt,
@@ -1150,116 +1179,33 @@ async function buildDigitalIdPdf({
     profile.digitalIdEmergencyContactRelationship,
     'Not Provided Yet'
   )
+  const [front, back] = await Promise.all([
+    captureDigitalIdNode(
+      <DigitalIdFace
+        backgroundSrc="/images/KK ID - Front BG.png"
+        fullName={fullName}
+        address={address}
+        purok={buildPurok(profile.purok)}
+        birthday={formatShortDate(profile.birthday)}
+        gender={profile.gender || '-'}
+        contactNumber={buildFrontCardValue(profile.contactNumber)}
+        photoUrl={photoUrl}
+        signatureUrl={signatureUrl}
+        memberId={memberId}
+        showQr={false}
+      />
+    ),
+    captureDigitalIdNode(
+      <DigitalIdBack
+        emergencyContactName={emergencyContactName}
+        emergencyContactPhone={emergencyContactPhone}
+        emergencyContactRelationship={emergencyContactRelationship}
+        validThru={validThru}
+      />
+    ),
+  ])
 
-  doc.setFillColor(245, 249, 255)
-  doc.rect(0, 0, 460, 700, 'F')
-
-  doc.addImage(frontBg, 'PNG', 20, 20, 420, 266)
-  doc.setFillColor(244, 242, 236)
-  doc.roundedRect(20, 330, 420, 266, 24, 24, 'F')
-  doc.setDrawColor(80, 88, 82)
-  doc.setLineWidth(1.2)
-  doc.roundedRect(35, 345, 390, 236, 18, 18, 'S')
-  doc.setDrawColor(139, 147, 141)
-  doc.setLineWidth(0.6)
-  doc.roundedRect(45, 355, 370, 216, 14, 14, 'S')
-  const frontContentOffsetY = -12
-  const frontInfoOffsetY = -18
-
-  doc.setTextColor(11, 47, 91)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(6.8)
-  doc.text(memberId || 'DRAFT', 89, 74 + frontContentOffsetY, { align: 'center', maxWidth: 78 })
-
-  if (photoData) {
-    doc.addImage(photoData, 'JPEG', 53, 86 + frontContentOffsetY, 72, 94)
-  } else {
-    doc.setTextColor(1, 67, 132)
-    doc.setFontSize(22)
-    doc.text(getInitials(fullName), 89, 142 + frontContentOffsetY, { align: 'center' })
-  }
-
-  if (signatureData) {
-    doc.addImage(signatureData, 'PNG', 48, 184 + frontContentOffsetY, 82, 22)
-  }
-
-  doc.setDrawColor(128, 128, 128)
-  doc.setLineWidth(0.8)
-  doc.line(50, 208 + frontContentOffsetY, 128, 208 + frontContentOffsetY)
-  doc.setTextColor(26, 26, 26)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(5.6)
-  doc.text('SIGNATURE', 89, 216 + frontContentOffsetY, { align: 'center' })
-
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(29, 90, 161)
-  doc.setFontSize(7)
-  doc.text('NAME:', 164, 84 + frontInfoOffsetY)
-  doc.text('HOME ADDRESS:', 164, 111 + frontInfoOffsetY)
-  doc.text('PUROK:', 164, 152 + frontInfoOffsetY)
-  doc.text('DATE OF BIRTH:', 164, 183 + frontInfoOffsetY)
-  doc.text('GENDER:', 299, 183 + frontInfoOffsetY)
-  doc.text('CONTACT NO:', 164, 218 + frontInfoOffsetY)
-
-  doc.setTextColor(11, 47, 91)
-  doc.setFontSize(12)
-  doc.text(fullName, 164, 97 + frontInfoOffsetY)
-  doc.setFontSize(10.5)
-  doc.text(address, 164, 123 + frontInfoOffsetY, { maxWidth: 160 })
-  doc.text(purok, 164, 164 + frontInfoOffsetY, { maxWidth: 160 })
-  doc.text(formatShortDate(profile.birthday), 164, 196 + frontInfoOffsetY)
-  doc.text((profile.gender || '-').toUpperCase(), 299, 196 + frontInfoOffsetY)
-  doc.text(contactNumber, 164, 231 + frontInfoOffsetY)
-
-  doc.setTextColor(96, 103, 98)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.text('IN CASE OF EMERGENCY, PLEASE CONTACT:', 230, 381, { align: 'center' })
-  doc.setTextColor(31, 38, 33)
-  doc.setFontSize(13)
-  doc.text(`${emergencyContactName} - ${emergencyContactPhone}`, 230, 398, {
-    align: 'center',
-    maxWidth: 300,
-  })
-  doc.setTextColor(107, 114, 108)
-  doc.setFontSize(7)
-  doc.text(`RELATIONSHIP: ${emergencyContactRelationship}`, 230, 410, {
-    align: 'center',
-    maxWidth: 260,
-  })
-
-  doc.setTextColor(118, 125, 120)
-  doc.setFontSize(8)
-  doc.text('TERMS AND CONDITIONS', 230, 431, { align: 'center' })
-  doc.setTextColor(66, 72, 67)
-  doc.setFontSize(7.9)
-  doc.text(DIGITAL_ID_TERMS_TEXT, 230, 446, {
-    align: 'center',
-    maxWidth: 235,
-    lineHeightFactor: 1.26,
-  })
-
-  doc.setTextColor(122, 128, 123)
-  doc.setFontSize(7)
-  doc.text('VALID UNTIL', 230, 490, { align: 'center' })
-  doc.setTextColor(34, 40, 35)
-  doc.setFontSize(12)
-  doc.text(validThru, 230, 504, { align: 'center' })
-  doc.setTextColor(68, 75, 69)
-  doc.setFont('times', 'italic')
-  doc.setFontSize(15)
-  doc.text(DIGITAL_ID_SIGNATURE_TEXT, 230, 521, { align: 'center' })
-  doc.setDrawColor(77, 84, 78)
-  doc.setLineWidth(0.8)
-  doc.line(186, 526, 274, 526)
-  doc.setTextColor(48, 55, 49)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(6.2)
-  doc.text(DIGITAL_ID_SIGNATORY_NAME, 230, 537, { align: 'center' })
-  doc.setFontSize(6.4)
-  doc.text(DIGITAL_ID_SIGNATORY_TITLE, 230, 546, { align: 'center' })
-
-  return doc
+  return { front, back }
 }
 
 function buildFullName(profile: {
@@ -1273,11 +1219,19 @@ function buildFullName(profile: {
 }
 
 function buildAddress(profile: {
+  currentAddressHouseBlockUnitNumber?: string
+  currentAddressStreetAddress?: string
   barangay?: string
   city?: string
   province?: string
 }) {
-  const parts = [profile.barangay, profile.city, profile.province]
+  const parts = [
+    profile.currentAddressHouseBlockUnitNumber,
+    profile.currentAddressStreetAddress,
+    profile.barangay,
+    profile.city,
+    profile.province,
+  ]
     .filter(Boolean)
     .join(', ')
     .toUpperCase()
@@ -1353,81 +1307,6 @@ function resolveDigitalIdIssuedAt(
   }
 
   return undefined
-}
-
-async function loadImageData(url: string, output: 'png' | 'jpeg' = 'png') {
-  const response = await fetch(getPdfAssetUrl(url), { cache: 'no-store' })
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image asset: ${response.status}`)
-  }
-
-  const blob = await response.blob()
-  const objectUrl = URL.createObjectURL(blob)
-
-  try {
-    return await rasterizeImage(objectUrl, output)
-  } finally {
-    URL.revokeObjectURL(objectUrl)
-  }
-}
-
-function rasterizeImage(url: string, output: 'png' | 'jpeg') {
-  return new Promise<string>((resolve, reject) => {
-    const image = new window.Image()
-    image.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = image.naturalWidth || image.width
-      canvas.height = image.naturalHeight || image.height
-
-      const context = canvas.getContext('2d')
-      if (!context) {
-        reject(new Error('Failed to prepare image canvas'))
-        return
-      }
-
-      if (output === 'jpeg') {
-        context.fillStyle = '#ffffff'
-        context.fillRect(0, 0, canvas.width, canvas.height)
-      }
-
-      context.drawImage(image, 0, 0)
-      resolve(canvas.toDataURL(output === 'jpeg' ? 'image/jpeg' : 'image/png', 0.96))
-    }
-    image.onerror = () => reject(new Error('Failed to load image'))
-    image.src = url
-  })
-}
-
-function getPdfAssetUrl(url: string) {
-  const normalizedUrl = String(url || '').trim()
-
-  if (!normalizedUrl) {
-    return normalizedUrl
-  }
-
-  if (
-    normalizedUrl.startsWith('data:') ||
-    normalizedUrl.startsWith('blob:') ||
-    normalizedUrl.startsWith('/')
-  ) {
-    return normalizedUrl
-  }
-
-  if (/^https?:\/\//i.test(normalizedUrl)) {
-    try {
-      const parsedUrl = new URL(normalizedUrl)
-
-      if (typeof window !== 'undefined' && parsedUrl.origin === window.location.origin) {
-        return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`
-      }
-    } catch {
-      return normalizedUrl
-    }
-
-    return `/api/image-proxy?url=${encodeURIComponent(normalizedUrl)}`
-  }
-
-  return normalizedUrl
 }
 
 function sanitizeFileName(value: string) {

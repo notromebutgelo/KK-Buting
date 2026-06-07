@@ -6,6 +6,8 @@ import api from '@/lib/api'
 import { cn } from '@/utils/cn'
 
 type VoucherTab = 'list' | 'create' | 'redeem'
+type VoucherVisibility = 'public' | 'targeted'
+type ExpiredVisibilityMode = 'duration' | 'manual'
 
 interface EligibilityConditions {
   minAge?: number | string
@@ -23,9 +25,51 @@ interface Voucher {
   eligibilityConditions?: EligibilityConditions
   stock?: number | null
   claimedCount?: number
+  visibilityType?: VoucherVisibility
+  targetUserIds?: string[]
+  targetedRecipientCount?: number
+  notificationsEnabled?: boolean
+  targetRecipients?: TargetRecipient[]
   status?: string
+  expiredVisibilityMode?: ExpiredVisibilityMode
+  expiredVisibilityDays?: number
+  expiredHiddenFromYouth?: boolean
+  expiredAt?: string | null
+  expiredVisibleUntil?: string | null
   createdAt?: string
   expiresAt?: string | null
+}
+
+interface TargetRecipient {
+  uid: string
+  fullName?: string
+  email?: string
+}
+
+interface YouthMember {
+  uid: string
+  UserName?: string
+  email?: string
+  fullName?: string
+  age?: number | null
+  purok?: string | null
+  gender?: string | null
+  ageGroup?: string | null
+  profilingStatus?: 'completed' | 'incomplete'
+  verificationStatus?: 'pending' | 'verified' | 'rejected' | 'not_submitted'
+}
+
+interface YouthListResponse {
+  users: YouthMember[]
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+    totalPages: number
+  }
+  filters?: {
+    purokOptions?: string[]
+  }
 }
 
 interface RedeemPreview {
@@ -53,22 +97,52 @@ interface ClaimRecord {
   redeemedBy: string | null
 }
 
-const emptyForm = {
-  title: '',
-  description: '',
-  type: 'school_supplies',
-  pointsCost: '0',
-  stock: '100',
-  unlimitedStock: false,
-  expiresAt: '',
-  status: 'active',
-  minAge: '',
-  maxAge: '',
-  ageGroup: '',
-  isVerified: false,
+interface VoucherForm {
+  title: string
+  description: string
+  type: string
+  pointsCost: string
+  stock: string
+  unlimitedStock: boolean
+  expiresAt: string
+  status: string
+  minAge: string
+  maxAge: string
+  ageGroup: string
+  isVerified: boolean
+  visibilityType: VoucherVisibility
+  targetUserIds: string[]
+  notificationsEnabled: boolean
+  expiredVisibilityMode: ExpiredVisibilityMode
+  expiredVisibilityDays: string
+  expiredHiddenFromYouth: boolean
+}
+
+function createEmptyForm(): VoucherForm {
+  return {
+    title: '',
+    description: '',
+    type: 'school_supplies',
+    pointsCost: '0',
+    stock: '100',
+    unlimitedStock: false,
+    expiresAt: '',
+    status: 'active',
+    minAge: '',
+    maxAge: '',
+    ageGroup: '',
+    isVerified: false,
+    visibilityType: 'public',
+    targetUserIds: [],
+    notificationsEnabled: false,
+    expiredVisibilityMode: 'duration',
+    expiredVisibilityDays: '30',
+    expiredHiddenFromYouth: false,
+  }
 }
 
 const inputClass = 'surface-input w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30'
+const EMPTY_TARGET_RECIPIENTS: TargetRecipient[] = []
 
 // ─── QR Scanner component ─────────────────────────────────────────────────────
 
@@ -330,6 +404,27 @@ function ClaimsPanel({ voucher, onClose }: { voucher: Voucher; onClose: () => vo
         </button>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border px-4 py-3" style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}>
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>
+            {voucher.visibilityType === 'targeted' ? 'Targeted Recipients' : 'Visibility'}
+          </p>
+          <p className="mt-1 text-xl font-black" style={{ color: 'var(--ink)' }}>
+            {voucher.visibilityType === 'targeted'
+              ? Number(voucher.targetedRecipientCount || 0).toLocaleString()
+              : 'Public'}
+          </p>
+        </div>
+        <div className="rounded-xl border px-4 py-3" style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}>
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>
+            Claimed
+          </p>
+          <p className="mt-1 text-xl font-black" style={{ color: 'var(--ink)' }}>
+            {Number(voucher.claimedCount || 0).toLocaleString()}
+          </p>
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="flex justify-center py-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
@@ -386,6 +481,319 @@ function ClaimStatusPill({ status }: { status: string }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+function TargetRecipientSelector({
+  selectedIds,
+  initialRecipients,
+  onChange,
+}: {
+  selectedIds: string[]
+  initialRecipients: TargetRecipient[]
+  onChange: (ids: string[]) => void
+}) {
+  const [members, setMembers] = useState<YouthMember[]>([])
+  const [knownRecipients, setKnownRecipients] = useState<Record<string, TargetRecipient>>({})
+  const [search, setSearch] = useState('')
+  const [purok, setPurok] = useState('all')
+  const [ageGroup, setAgeGroup] = useState('all')
+  const [gender, setGender] = useState('all')
+  const [verificationStatus, setVerificationStatus] = useState('all')
+  const [profilingStatus, setProfilingStatus] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [purokOptions, setPurokOptions] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    setKnownRecipients((current) => {
+      const next = { ...current }
+      for (const recipient of initialRecipients) {
+        next[recipient.uid] = recipient
+      }
+      return next
+    })
+  }, [initialRecipients])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, purok, ageGroup, gender, verificationStatus, profilingStatus])
+
+  const queryParams = useMemo(
+    () => ({
+      search,
+      purok,
+      ageGroup,
+      gender,
+      verificationStatus,
+      profilingStatus,
+      archiveScope: 'active',
+      sortKey: 'fullName',
+      sortDir: 'asc',
+      page: currentPage,
+      pageSize: 8,
+    }),
+    [
+      ageGroup,
+      currentPage,
+      gender,
+      profilingStatus,
+      purok,
+      search,
+      verificationStatus,
+    ]
+  )
+
+  useEffect(() => {
+    let active = true
+    setIsLoading(true)
+
+    api
+      .get<YouthListResponse>('/admin/youth', { params: queryParams })
+      .then((res) => {
+        if (!active) return
+        const nextMembers = res.data.users || []
+        setMembers(nextMembers)
+        setTotalPages(res.data.pagination?.totalPages || 1)
+        setTotal(res.data.pagination?.total || 0)
+        setPurokOptions(res.data.filters?.purokOptions || [])
+        setKnownRecipients((current) => {
+          const next = { ...current }
+          for (const member of nextMembers) {
+            next[member.uid] = {
+              uid: member.uid,
+              fullName: member.fullName || member.UserName || '',
+              email: member.email || '',
+            }
+          }
+          return next
+        })
+      })
+      .catch(() => {
+        if (active) {
+          setMembers([])
+          setTotal(0)
+          setTotalPages(1)
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [queryParams])
+
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const allVisibleSelected =
+    members.length > 0 && members.every((member) => selectedSet.has(member.uid))
+  const selectedRecipients = selectedIds.map(
+    (uid) => knownRecipients[uid] || { uid, fullName: '', email: '' }
+  )
+
+  function toggleMember(uid: string) {
+    onChange(
+      selectedSet.has(uid)
+        ? selectedIds.filter((id) => id !== uid)
+        : [...selectedIds, uid]
+    )
+  }
+
+  function toggleVisible() {
+    if (allVisibleSelected) {
+      const visibleIds = new Set(members.map((member) => member.uid))
+      onChange(selectedIds.filter((uid) => !visibleIds.has(uid)))
+      return
+    }
+
+    onChange(Array.from(new Set([...selectedIds, ...members.map((member) => member.uid)])))
+  }
+
+  return (
+    <section className="admin-panel flex flex-col gap-4 lg:col-span-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-base font-bold" style={{ color: 'var(--ink)' }}>
+            Target Recipients
+          </h3>
+          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
+            Only selected youth members can see, claim, and redeem this voucher.
+          </p>
+        </div>
+        <span
+          className="self-start rounded-full px-3 py-1 text-xs font-bold"
+          style={{ background: 'var(--accent-soft)', color: 'var(--accent-strong)' }}
+        >
+          {selectedIds.length} selected
+        </span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search name, email, ID"
+          className={cn(inputClass, 'xl:col-span-2')}
+        />
+        <select value={purok} onChange={(event) => setPurok(event.target.value)} className={inputClass}>
+          <option value="all">All Puroks</option>
+          {purokOptions.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+        <select value={ageGroup} onChange={(event) => setAgeGroup(event.target.value)} className={inputClass}>
+          <option value="all">All Age Groups</option>
+          <option value="Child Youth">Child Youth</option>
+          <option value="Core Youth">Core Youth</option>
+          <option value="Adult Youth">Adult Youth</option>
+        </select>
+        <select value={gender} onChange={(event) => setGender(event.target.value)} className={inputClass}>
+          <option value="all">All Genders</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Non-binary">Non-binary</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
+        <select
+          value={verificationStatus}
+          onChange={(event) => setVerificationStatus(event.target.value)}
+          className={inputClass}
+        >
+          <option value="all">All Membership Statuses</option>
+          <option value="verified">Verified</option>
+          <option value="pending">Pending</option>
+          <option value="rejected">Rejected</option>
+          <option value="not_submitted">Not Submitted</option>
+        </select>
+        <select
+          value={profilingStatus}
+          onChange={(event) => setProfilingStatus(event.target.value)}
+          className={inputClass}
+        >
+          <option value="all">All Profile Statuses</option>
+          <option value="completed">Profile Complete</option>
+          <option value="incomplete">Profile Incomplete</option>
+        </select>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--stroke)' }}>
+        <div
+          className="flex items-center justify-between gap-3 border-b px-4 py-3"
+          style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}
+        >
+          <label className="inline-flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleVisible}
+              disabled={members.length === 0}
+            />
+            Select this page
+          </label>
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>
+            {total.toLocaleString()} matching members
+          </span>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
+          </div>
+        ) : members.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm" style={{ color: 'var(--muted)' }}>
+            No youth members matched these filters.
+          </p>
+        ) : (
+          <div className="divide-y" style={{ borderColor: 'var(--stroke)' }}>
+            {members.map((member) => {
+              const checked = selectedSet.has(member.uid)
+              return (
+                <label
+                  key={member.uid}
+                  className={cn(
+                    'grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors',
+                    checked ? 'bg-[color:var(--accent-soft)]/70' : 'hover:bg-[color:var(--surface-muted)]'
+                  )}
+                >
+                  <input type="checkbox" checked={checked} onChange={() => toggleMember(member.uid)} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                      {member.fullName || member.UserName || 'Youth Member'}
+                    </span>
+                    <span className="block truncate text-xs" style={{ color: 'var(--muted)' }}>
+                      {[member.email, member.purok, member.ageGroup].filter(Boolean).join(' | ')}
+                    </span>
+                  </span>
+                  <span className="text-right text-xs capitalize" style={{ color: 'var(--muted)' }}>
+                    {member.verificationStatus?.replace('_', ' ') || 'not submitted'}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        )}
+
+        <div
+          className="flex items-center justify-between gap-3 border-t px-4 py-3"
+          style={{ borderColor: 'var(--stroke)' }}
+        >
+          <button
+            type="button"
+            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            disabled={currentPage === 1}
+            className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
+          >
+            Previous
+          </button>
+          <span className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            disabled={currentPage === totalPages}
+            className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      {selectedRecipients.length > 0 ? (
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>
+            Selected Recipients
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {selectedRecipients.slice(0, 16).map((recipient) => (
+              <button
+                key={recipient.uid}
+                type="button"
+                onClick={() => toggleMember(recipient.uid)}
+                className="inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs"
+                style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}
+                title="Remove recipient"
+              >
+                <span className="truncate">
+                  {recipient.fullName || recipient.email || recipient.uid}
+                </span>
+                <X size={12} />
+              </button>
+            ))}
+            {selectedRecipients.length > 16 ? (
+              <span className="rounded-full px-3 py-1.5 text-xs" style={{ background: 'var(--surface-muted)', color: 'var(--muted)' }}>
+                +{selectedRecipients.length - 16} more
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 export default function VouchersPage() {
   const [activeTab, setActiveTab] = useState<VoucherTab>('list')
   const [vouchers, setVouchers] = useState<Voucher[]>([])
@@ -394,7 +802,7 @@ export default function VouchersPage() {
   const [message, setMessage] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState<VoucherForm>(() => createEmptyForm())
   const [editId, setEditId] = useState<string | null>(null)
   const [claimsVoucher, setClaimsVoucher] = useState<Voucher | null>(null)
 
@@ -417,9 +825,12 @@ export default function VouchersPage() {
     const matchStatus = statusFilter === 'all' || v.status === statusFilter
     return matchSearch && matchStatus
   }), [vouchers, search, statusFilter])
+  const editingVoucher = editId
+    ? vouchers.find((voucher) => voucher.id === editId) || null
+    : null
 
   function openCreate() {
-    setEditId(null); setForm(emptyForm); setMessage(''); setClaimsVoucher(null); setActiveTab('create')
+    setEditId(null); setForm(createEmptyForm()); setMessage(''); setClaimsVoucher(null); setActiveTab('create')
   }
 
   function openEdit(v: Voucher) {
@@ -437,6 +848,12 @@ export default function VouchersPage() {
       maxAge: String(v.eligibilityConditions?.maxAge || ''),
       ageGroup: v.eligibilityConditions?.ageGroup || '',
       isVerified: Boolean(v.eligibilityConditions?.isVerified),
+      visibilityType: v.visibilityType === 'targeted' ? 'targeted' : 'public',
+      targetUserIds: v.targetUserIds || [],
+      notificationsEnabled: Boolean(v.notificationsEnabled),
+      expiredVisibilityMode: v.expiredVisibilityMode === 'manual' ? 'manual' : 'duration',
+      expiredVisibilityDays: String(v.expiredVisibilityDays || 30),
+      expiredHiddenFromYouth: Boolean(v.expiredHiddenFromYouth),
     })
     setMessage(''); setClaimsVoucher(null); setActiveTab('create')
   }
@@ -452,7 +869,31 @@ export default function VouchersPage() {
     } finally { setIsSaving(false) }
   }
 
+  async function handleExpiredVisibilityToggle(v: Voucher) {
+    setIsSaving(true); setMessage('')
+    const shouldShow = Boolean(v.expiredHiddenFromYouth) || !isExpiredVisibleInYouthTab(v)
+
+    try {
+      await api.patch(`/vouchers/${v.id}`, shouldShow
+        ? { expiredHiddenFromYouth: false, expiredVisibilityMode: 'manual' }
+        : { expiredHiddenFromYouth: true }
+      )
+      setMessage(shouldShow
+        ? 'Expired voucher is visible in the youth Expired tab until manually hidden.'
+        : 'Expired voucher hidden from the youth Expired tab.'
+      )
+      await loadVouchers()
+    } catch (err: any) {
+      setMessage(err?.response?.data?.error || 'Failed to update expired voucher visibility.')
+    } finally { setIsSaving(false) }
+  }
+
   async function handleSubmit() {
+    if (form.visibilityType === 'targeted' && form.targetUserIds.length === 0) {
+      setMessage('Select at least one youth member for a targeted voucher.')
+      return
+    }
+
     setIsSaving(true); setMessage('')
     try {
       const eligibilityConditions: EligibilityConditions = {}
@@ -470,6 +911,13 @@ export default function VouchersPage() {
         expiresAt: form.expiresAt || null,
         status: form.status,
         eligibilityConditions,
+        visibilityType: form.visibilityType,
+        targetUserIds: form.visibilityType === 'targeted' ? form.targetUserIds : [],
+        notificationsEnabled:
+          form.visibilityType === 'targeted' && form.notificationsEnabled,
+        expiredVisibilityMode: form.expiredVisibilityMode,
+        expiredVisibilityDays: Number(form.expiredVisibilityDays || 30),
+        expiredHiddenFromYouth: form.expiredHiddenFromYouth,
       }
 
       if (editId) {
@@ -479,7 +927,7 @@ export default function VouchersPage() {
         await api.post('/vouchers', payload)
         setMessage('Voucher created successfully.')
       }
-      setForm(emptyForm); setEditId(null)
+      setForm(createEmptyForm()); setEditId(null)
       await loadVouchers(); setActiveTab('list')
     } catch (err: any) {
       setMessage(err?.response?.data?.error || 'Failed to save voucher.')
@@ -521,7 +969,7 @@ export default function VouchersPage() {
               key={tab.id}
               type="button"
               onClick={() => {
-                if (tab.id === 'list') { setEditId(null); setForm(emptyForm) }
+                if (tab.id === 'list') { setEditId(null); setForm(createEmptyForm()) }
                 setClaimsVoucher(null); setActiveTab(tab.id)
               }}
               className="rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
@@ -575,10 +1023,10 @@ export default function VouchersPage() {
             ) : (
               <div className="overflow-hidden rounded-[var(--radius-md)] border" style={{ borderColor: 'var(--stroke)' }}>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[920px]">
+                  <table className="w-full min-w-[1040px]">
                     <thead style={{ background: 'var(--accent-soft)' }}>
                       <tr>
-                        {['Title', 'Type', 'Points Cost', 'Stock', 'Claimed', 'Status', 'Expires', 'Actions'].map((h) => (
+                        {['Title', 'Type', 'Visibility', 'Points Cost', 'Stock', 'Claims / Recipients', 'Status', 'Expires', 'Youth Expired Tab', 'Actions'].map((h) => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{h}</th>
                         ))}
                       </tr>
@@ -597,16 +1045,26 @@ export default function VouchersPage() {
                             <p className="mt-0.5 line-clamp-1 text-xs" style={{ color: 'var(--muted)' }}>{v.description || '—'}</p>
                           </td>
                           <td className="px-4 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>{v.type || '—'}</td>
+                          <td className="px-4 py-4">
+                            <VisibilityPill visibility={v.visibilityType || 'public'} />
+                          </td>
                           <td className="px-4 py-4 text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
                             {Number(v.pointsCost) > 0 ? `${Number(v.pointsCost).toLocaleString()} pts` : 'Free'}
                           </td>
                           <td className="px-4 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
                             {v.stock == null ? 'Unlimited' : Number(v.stock).toLocaleString()}
                           </td>
-                          <td className="px-4 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>{Number(v.claimedCount ?? 0)}</td>
+                          <td className="px-4 py-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
+                            {v.visibilityType === 'targeted'
+                              ? `${Number(v.claimedCount ?? 0).toLocaleString()} / ${Number(v.targetedRecipientCount ?? 0).toLocaleString()}`
+                              : Number(v.claimedCount ?? 0).toLocaleString()}
+                          </td>
                           <td className="px-4 py-4"><StatusPill status={v.status || 'active'} /></td>
                           <td className="px-4 py-4 text-sm" style={{ color: 'var(--muted)' }}>
                             {v.expiresAt ? new Date(v.expiresAt).toLocaleDateString('en-PH') : '—'}
+                          </td>
+                          <td className="px-4 py-4 text-xs" style={{ color: 'var(--muted)' }}>
+                            <ExpiredVisibilitySummary voucher={v} />
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex flex-wrap gap-2">
@@ -626,6 +1084,21 @@ export default function VouchersPage() {
                               {v.status === 'active' && (
                                 <button type="button" onClick={() => void handleExpire(v)} disabled={isSaving} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50">
                                   Expire
+                                </button>
+                              )}
+                              {v.status === 'expired' && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleExpiredVisibilityToggle(v)}
+                                  disabled={isSaving}
+                                  className={cn(
+                                    'rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50',
+                                    isExpiredVisibleInYouthTab(v)
+                                      ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  )}
+                                >
+                                  {isExpiredVisibleInYouthTab(v) ? 'Hide from Youth' : 'Show in Youth'}
                                 </button>
                               )}
                             </div>
@@ -665,6 +1138,70 @@ export default function VouchersPage() {
                 <FieldLabel label="Description" />
                 <textarea value={form.description} onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))} rows={3} className={inputClass} placeholder="What this voucher provides" />
               </div>
+              <div>
+                <FieldLabel label="Voucher Visibility" />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {([
+                    {
+                      value: 'public' as const,
+                      title: 'Public Voucher',
+                      description: 'Visible to all youth members who meet the eligibility rules.',
+                    },
+                    {
+                      value: 'targeted' as const,
+                      title: 'Targeted Voucher',
+                      description: 'Visible and claimable only by youth members you select.',
+                    },
+                  ]).map((option) => {
+                    const active = form.visibilityType === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setForm((current) => ({
+                          ...current,
+                          visibilityType: option.value,
+                          notificationsEnabled:
+                            option.value === 'targeted' ? current.notificationsEnabled : false,
+                        }))}
+                        className="rounded-xl border px-4 py-3 text-left transition-colors"
+                        style={{
+                          borderColor: active ? 'var(--accent)' : 'var(--stroke)',
+                          background: active ? 'var(--accent-soft)' : 'var(--card-solid)',
+                        }}
+                      >
+                        <span className="block text-sm font-bold" style={{ color: 'var(--ink)' }}>
+                          {option.title}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                          {option.description}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              {form.visibilityType === 'targeted' ? (
+                <label className="flex items-start gap-2 rounded-xl border px-3 py-3 text-sm" style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}>
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={form.notificationsEnabled}
+                    onChange={(event) => setForm((current) => ({
+                      ...current,
+                      notificationsEnabled: event.target.checked,
+                    }))}
+                  />
+                  <span>
+                    <span className="block font-semibold" style={{ color: 'var(--ink)' }}>
+                      Notify selected recipients
+                    </span>
+                    <span className="mt-0.5 block text-xs" style={{ color: 'var(--muted)' }}>
+                      Notifications are sent when the voucher becomes active and when new recipients are added.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <FieldLabel label="Type" />
@@ -706,12 +1243,91 @@ export default function VouchersPage() {
                   <input type="date" value={form.expiresAt} onChange={(e) => setForm((s) => ({ ...s, expiresAt: e.target.value }))} className={inputClass} />
                 </div>
               </div>
+              <div className="rounded-xl border px-4 py-3" style={{ borderColor: 'var(--stroke)' }}>
+                <div>
+                  <FieldLabel label="Expired Tab Visibility" />
+                  <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                    Controls how long unclaimed expired vouchers appear in the youth app Expired tab. Claimed vouchers remain in the member&apos;s Claimed tab.
+                  </p>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {([
+                    {
+                      value: 'duration' as const,
+                      title: 'Automatic',
+                      description: 'Hide after a set number of days from expiry.',
+                    },
+                    {
+                      value: 'manual' as const,
+                      title: 'Manual',
+                      description: 'Keep visible until superadmin hides it.',
+                    },
+                  ]).map((option) => {
+                    const active = form.expiredVisibilityMode === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setForm((current) => ({
+                          ...current,
+                          expiredVisibilityMode: option.value,
+                        }))}
+                        className="rounded-xl border px-4 py-3 text-left transition-colors"
+                        style={{
+                          borderColor: active ? 'var(--accent)' : 'var(--stroke)',
+                          background: active ? 'var(--accent-soft)' : 'var(--card-solid)',
+                        }}
+                      >
+                        <span className="block text-sm font-bold" style={{ color: 'var(--ink)' }}>
+                          {option.title}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                          {option.description}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {form.expiredVisibilityMode === 'duration' ? (
+                  <div className="mt-3">
+                    <FieldLabel label="Days Visible After Expiry" />
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={form.expiredVisibilityDays}
+                      onChange={(e) => setForm((s) => ({ ...s, expiredVisibilityDays: e.target.value }))}
+                      className={inputClass}
+                    />
+                  </div>
+                ) : null}
+                <label className="mt-3 flex items-start gap-2 rounded-xl border px-3 py-3 text-sm" style={{ borderColor: 'var(--stroke)', color: 'var(--ink-soft)' }}>
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={form.expiredHiddenFromYouth}
+                    onChange={(e) => setForm((s) => ({ ...s, expiredHiddenFromYouth: e.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold" style={{ color: 'var(--ink)' }}>
+                      Hide from youth Expired tab now
+                    </span>
+                    <span className="mt-0.5 block text-xs" style={{ color: 'var(--muted)' }}>
+                      Useful when a campaign is old, cancelled, or should no longer appear after it expires.
+                    </span>
+                  </span>
+                </label>
+              </div>
             </div>
 
             <button
               type="button"
               onClick={() => void handleSubmit()}
-              disabled={isSaving || !form.title}
+              disabled={
+                isSaving ||
+                !form.title ||
+                (form.visibilityType === 'targeted' && form.targetUserIds.length === 0)
+              }
               className="w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               style={{ background: 'var(--accent)' }}
             >
@@ -763,10 +1379,98 @@ export default function VouchersPage() {
               </ul>
             </div>
           </aside>
+          {form.visibilityType === 'targeted' ? (
+            <TargetRecipientSelector
+              selectedIds={form.targetUserIds}
+              initialRecipients={editingVoucher?.targetRecipients || EMPTY_TARGET_RECIPIENTS}
+              onChange={(targetUserIds) => setForm((current) => ({
+                ...current,
+                targetUserIds,
+              }))}
+            />
+          ) : null}
         </div>
       )}
     </div>
   )
+}
+
+function ExpiredVisibilitySummary({ voucher }: { voucher: Voucher }) {
+  if (voucher.status !== 'expired') {
+    return <span>Applies after expiry</span>
+  }
+
+  if (voucher.expiredHiddenFromYouth) {
+    return <span className="font-semibold text-red-600">Hidden manually</span>
+  }
+
+  if (voucher.expiredVisibilityMode === 'manual') {
+    return <span className="font-semibold text-emerald-700">Visible until hidden</span>
+  }
+
+  const visibleUntil = getExpiredVisibleUntil(voucher)
+  if (!visibleUntil) {
+    return <span>Visible for {Number(voucher.expiredVisibilityDays || 30)} days</span>
+  }
+
+  if (new Date(visibleUntil).getTime() < Date.now()) {
+    return <span className="font-semibold text-red-600">Hidden automatically</span>
+  }
+
+  return (
+    <span>
+      Visible until {formatVoucherDate(visibleUntil)}
+    </span>
+  )
+}
+
+function isExpiredVisibleInYouthTab(voucher: Voucher) {
+  if (voucher.status !== 'expired' || voucher.expiredHiddenFromYouth) {
+    return false
+  }
+
+  if (voucher.expiredVisibilityMode === 'manual') {
+    return true
+  }
+
+  const visibleUntil = getExpiredVisibleUntil(voucher)
+  if (!visibleUntil) {
+    return true
+  }
+
+  return new Date(visibleUntil).getTime() >= Date.now()
+}
+
+function getExpiredVisibleUntil(voucher: Voucher) {
+  if (voucher.expiredVisibleUntil) {
+    return voucher.expiredVisibleUntil
+  }
+
+  const referenceDate = voucher.expiresAt || voucher.expiredAt
+  if (!referenceDate) {
+    return null
+  }
+
+  const referenceTime = new Date(referenceDate).getTime()
+  if (Number.isNaN(referenceTime)) {
+    return null
+  }
+
+  const days = Math.min(Math.max(Math.trunc(Number(voucher.expiredVisibilityDays || 30)), 1), 365)
+  return new Date(referenceTime + days * 24 * 60 * 60 * 1000).toISOString()
+}
+
+function formatVoucherDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'the configured date'
+  }
+
+  return date.toLocaleDateString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function MetricCard({ label, value }: { label: string; value: number }) {
@@ -780,6 +1484,21 @@ function MetricCard({ label, value }: { label: string; value: number }) {
 
 function FieldLabel({ label }: { label: string }) {
   return <label className="mb-1 block text-sm font-semibold" style={{ color: 'var(--ink)' }}>{label}</label>
+}
+
+function VisibilityPill({ visibility }: { visibility: VoucherVisibility }) {
+  return (
+    <span
+      className={cn(
+        'rounded-full px-2.5 py-1 text-xs font-semibold capitalize',
+        visibility === 'targeted'
+          ? 'bg-violet-50 text-violet-700'
+          : 'bg-sky-50 text-sky-700'
+      )}
+    >
+      {visibility}
+    </span>
+  )
 }
 
 function StatusPill({ status }: { status: string }) {

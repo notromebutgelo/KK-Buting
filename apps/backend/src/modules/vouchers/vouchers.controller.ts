@@ -18,7 +18,9 @@ export async function handleListVouchers(req: AuthRequest, res: Response) {
   try {
     const role = String(req.user?.role || "");
     const uid = req.user!.uid;
-    const vouchers = role === "superadmin" ? await listAllVouchers() : await listYouthVouchers(uid);
+    const vouchers = ["admin", "superadmin"].includes(role)
+      ? await listAllVouchers()
+      : await listYouthVouchers(uid);
     return res.json({ vouchers });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -27,11 +29,14 @@ export async function handleListVouchers(req: AuthRequest, res: Response) {
 
 export async function handleGetVoucher(req: AuthRequest, res: Response) {
   try {
-    const voucher = await getVoucher(req.params.id);
+    const voucher = await getVoucher(req.params.id, {
+      uid: req.user!.uid,
+      role: String(req.user?.role || ""),
+    });
     if (!voucher) return res.status(404).json({ error: "Voucher not found" });
     return res.json({ voucher });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 }
 

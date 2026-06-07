@@ -260,6 +260,15 @@ const PASIG_BARANGAY_OPTIONS = [
   "Ugong",
 ] as const;
 
+const PUROK_OPTIONS = [
+  "ILAYA",
+  "ALIW",
+  "GITNA",
+  "LOOBAN",
+  "MANGGAHAN",
+  "BUKID",
+] as const;
+
 const PLACE_OF_BIRTH_OPTIONS = [
   "Pasig City",
   "National Capital Region, but not Pasig City",
@@ -901,8 +910,9 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
           {
             key: "purok",
             label: "Purok / Zone",
-            type: "text",
-            placeholder: "Example: Purok 1 or Zone 4",
+            type: "select",
+            options: PUROK_OPTIONS,
+            placeholder: "Piliin ang iyong purok.",
             helperText:
               "Optional ito, pero ito ang ipapakita sa front ng iyong Digital ID kapag nilagyan mo.",
           },

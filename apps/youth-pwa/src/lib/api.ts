@@ -2,6 +2,10 @@ import axios from 'axios'
 import { auth } from './firebase'
 import { signOut as firebaseSignOut } from 'firebase/auth'
 import { resolveApiBaseUrl } from './api-base-url'
+import { useAuthStore } from '@/store/authStore'
+import { useUserStore } from '@/store/userStore'
+
+const YOUTH_INACTIVITY_DEADLINE_KEY = 'kk-youth-inactivity-deadline'
 
 function normalizeApiBaseUrl(url?: string) {
   return resolveApiBaseUrl(url)
@@ -50,6 +54,9 @@ api.interceptors.response.use(
       isHandlingUnauthorized = true
       void (async () => {
         await firebaseSignOut(auth).catch(() => undefined)
+        useAuthStore.getState().logout()
+        useUserStore.getState().setProfile(null)
+        window.localStorage.removeItem(YOUTH_INACTIVITY_DEADLINE_KEY)
         await fetch('/api/session', {
           method: 'DELETE',
           credentials: 'same-origin',

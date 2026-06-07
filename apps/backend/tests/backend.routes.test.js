@@ -403,6 +403,75 @@ const tests = [
     },
   },
   {
+    name: "voucher routes require recipients for targeted voucher creation",
+    async run() {
+      let createCalls = 0;
+      const router = loadDistModuleWithMocks("dist/src/modules/vouchers/vouchers.routes", {
+        "dist/src/middleware/verifyToken": {
+          verifyToken: createVerifyTokenMock(),
+        },
+        "dist/src/modules/vouchers/vouchers.controller": {
+          handleListVouchers: async (_req, res) => res.json({ vouchers: [] }),
+          handleGetVoucher: async (_req, res) => res.json({ voucher: {} }),
+          handleCreateVoucher: async (_req, res) => {
+            createCalls += 1;
+            res.status(201).json({ voucher: { id: "voucher-1" } });
+          },
+          handleUpdateVoucher: async (_req, res) => res.json({ voucher: {} }),
+          handleClaimVoucher: async (_req, res) => res.json({ voucherId: "voucher-1" }),
+          handleGetMyVoucherClaim: async (_req, res) => res.json({ claim: {} }),
+          handleRedeemVoucherPreview: async (_req, res) => res.json({}),
+          handleRedeemVoucherConfirm: async (_req, res) => res.json({ success: true }),
+          handleGetVoucherClaims: async (_req, res) => res.json({ claims: [] }),
+        },
+      }).default;
+
+      await withExpressServer(router, async (baseUrl) => {
+        const invalid = await requestJson(baseUrl, "/", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "superadmin",
+          },
+          body: {
+            title: "School Supplies",
+            description: "Selected students only",
+            type: "school_supplies",
+            visibilityType: "targeted",
+            targetUserIds: [],
+          },
+        });
+
+        assert.equal(invalid.status, 400);
+        assert.ok(
+          invalid.body.details.includes(
+            "targetUserIds must contain at least one item for a targeted voucher."
+          )
+        );
+
+        const valid = await requestJson(baseUrl, "/", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer token",
+            "x-test-role": "superadmin",
+          },
+          body: {
+            title: "School Supplies",
+            description: "Selected students only",
+            type: "school_supplies",
+            visibilityType: "targeted",
+            targetUserIds: ["youth-1", "youth-2"],
+            notificationsEnabled: true,
+          },
+        });
+
+        assert.equal(valid.status, 201);
+      });
+
+      assert.equal(createCalls, 1);
+    },
+  },
+  {
     name: "admin merchant creation rejects invalid email payloads before controller execution",
     async run() {
       let controllerCalled = false;
