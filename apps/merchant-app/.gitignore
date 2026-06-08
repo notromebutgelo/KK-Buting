@@ -1,1 +1,10 @@
+node_modules/
 .expo/
+.expo-export-*/
+%USERPROFILE%/
+.npm-global/
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo

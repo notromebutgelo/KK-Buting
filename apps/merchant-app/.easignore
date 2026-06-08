@@ -1,6 +1,6 @@
 node_modules/
 .expo/
-.expo-export-diagnose/
+.expo-export-*/
 %USERPROFILE%/
 .npm-global/
 .env

@@ -14,6 +14,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.kksystem.merchant',
+    blockedPermissions: ['android.permission.RECORD_AUDIO'],
     adaptiveIcon: {
       foregroundImage: './assets/icon.png',
       backgroundColor: '#001b5f',
@@ -24,6 +25,7 @@ const config: ExpoConfig = {
       'expo-camera',
       {
         cameraPermission: 'Allow KK Merchant to scan member QR codes.',
+        recordAudioAndroid: false,
       },
     ],
     [

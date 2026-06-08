@@ -144,6 +144,10 @@ export async function refreshVerifiedUser() {
 
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider()
+  provider.setCustomParameters({
+    prompt: 'select_account',
+  })
+
   const credential = await signInWithPopup(auth, provider)
   const firebaseUser = credential.user
   const token = await firebaseUser.getIdToken()
