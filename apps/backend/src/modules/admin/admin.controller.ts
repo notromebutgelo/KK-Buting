@@ -45,6 +45,16 @@ import {
   listPhysicalIdRequestsForAdmin,
   updatePhysicalIdRequestByAdmin,
 } from "../physical-id-requests/physicalIdRequests.service";
+import {
+  createMerchantProductByAdmin,
+  createMerchantPromotionByAdmin,
+  deleteMerchantProductByAdmin,
+  deleteMerchantPromotionByAdmin,
+  removeMerchantAssetByAdmin,
+  updateMerchantProductByAdmin,
+  updateMerchantPromotionByAdmin,
+  uploadMerchantAssetByAdmin,
+} from "../merchants/merhcants.service";
 
 export async function getDashboard(req: AuthRequest, res: Response) {
   try {
@@ -146,13 +156,20 @@ export async function requestVerificationResubmissionHandler(req: AuthRequest, r
   }
 
   try {
-    await requestVerificationResubmission(
+    const result = await requestVerificationResubmission(
       req.params.userId,
       documentIds,
       message,
-      req.user!.email || "admin"
+      req.user!.email || "admin",
+      req.user!.role || "admin"
     );
-    return res.json({ message: "Resubmission requested" });
+    return res.json({
+      message:
+        result.destination === "admin"
+          ? "Re-verification request sent to admin"
+          : "Resubmission requested",
+      destination: result.destination,
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -273,6 +290,102 @@ export async function updateMerchantHandler(req: AuthRequest, res: Response) {
   }
 }
 
+export async function uploadMerchantAssetHandler(req: AuthRequest, res: Response) {
+  try {
+    const asset = await uploadMerchantAssetByAdmin(
+      req.params.merchantId,
+      req.body.assetType,
+      req.body.fileData
+    );
+    return res.status(201).json(asset);
+  } catch (err: any) {
+    return res.status(err.message === "Merchant not found" ? 404 : 500).json({ error: err.message });
+  }
+}
+
+export async function removeMerchantAssetHandler(req: AuthRequest, res: Response) {
+  try {
+    await removeMerchantAssetByAdmin(
+      req.params.merchantId,
+      req.body.assetType,
+      req.body.fileUrl
+    );
+    return res.json({ message: "Merchant image removed" });
+  } catch (err: any) {
+    return res.status(err.message === "Merchant not found" ? 404 : 500).json({ error: err.message });
+  }
+}
+
+export async function createMerchantPromotionHandler(req: AuthRequest, res: Response) {
+  try {
+    const promotion = await createMerchantPromotionByAdmin(req.params.merchantId, req.body || {});
+    return res.status(201).json({ promotion });
+  } catch (err: any) {
+    return res.status(err.message === "Merchant not found" ? 404 : 500).json({ error: err.message });
+  }
+}
+
+export async function updateMerchantPromotionHandler(req: AuthRequest, res: Response) {
+  try {
+    const promotion = await updateMerchantPromotionByAdmin(
+      req.params.merchantId,
+      req.params.promotionId,
+      req.body || {}
+    );
+    return res.json({ promotion, message: "Promotion updated" });
+  } catch (err: any) {
+    return res
+      .status(["Merchant not found", "Promotion not found"].includes(err.message) ? 404 : 500)
+      .json({ error: err.message });
+  }
+}
+
+export async function deleteMerchantPromotionHandler(req: AuthRequest, res: Response) {
+  try {
+    await deleteMerchantPromotionByAdmin(req.params.merchantId, req.params.promotionId);
+    return res.json({ message: "Promotion deleted" });
+  } catch (err: any) {
+    return res
+      .status(["Merchant not found", "Promotion not found"].includes(err.message) ? 404 : 500)
+      .json({ error: err.message });
+  }
+}
+
+export async function createMerchantProductHandler(req: AuthRequest, res: Response) {
+  try {
+    const product = await createMerchantProductByAdmin(req.params.merchantId, req.body || {});
+    return res.status(201).json({ product });
+  } catch (err: any) {
+    return res.status(err.message === "Merchant not found" ? 404 : 500).json({ error: err.message });
+  }
+}
+
+export async function updateMerchantProductHandler(req: AuthRequest, res: Response) {
+  try {
+    const product = await updateMerchantProductByAdmin(
+      req.params.merchantId,
+      req.params.productId,
+      req.body || {}
+    );
+    return res.json({ product, message: "Product or service updated" });
+  } catch (err: any) {
+    return res
+      .status(["Merchant not found", "Product not found"].includes(err.message) ? 404 : 500)
+      .json({ error: err.message });
+  }
+}
+
+export async function deleteMerchantProductHandler(req: AuthRequest, res: Response) {
+  try {
+    await deleteMerchantProductByAdmin(req.params.merchantId, req.params.productId);
+    return res.json({ message: "Product or service deleted" });
+  } catch (err: any) {
+    return res
+      .status(["Merchant not found", "Product not found"].includes(err.message) ? 404 : 500)
+      .json({ error: err.message });
+  }
+}
+
 export async function updateMerchantStatusHandler(req: AuthRequest, res: Response) {
   const status = String(req.body?.status || "");
   if (!["approved", "rejected", "suspended"].includes(status)) {
@@ -381,6 +494,22 @@ export async function updateYouthStatusHandler(req: AuthRequest, res: Response) 
   }
 
   try {
+    if (status === "rejected") {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({
+          error: "Only an admin can reject a youth verification and provide the member feedback.",
+        });
+      }
+
+      await rejectVerification(
+        req.params.userId,
+        req.user?.email || "admin",
+        reason,
+        note
+      );
+      return res.json({ message: "Youth status updated" });
+    }
+
     await updateYouthVerificationStatus(
       req.params.userId,
       status,

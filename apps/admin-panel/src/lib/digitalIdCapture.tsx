@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 const DEFAULT_CAPTURE_WIDTH = 492
-const DEFAULT_CAPTURE_SCALE = 2
+const DEFAULT_CAPTURE_SCALE = 4
 const IMAGE_LOAD_TIMEOUT_MS = 10_000
 const FONT_LOAD_TIMEOUT_MS = 8_000
 const CANVAS_RENDER_TIMEOUT_MS = 20_000
@@ -65,13 +65,17 @@ export async function captureDigitalIdElement(
   const scale = options.scale || DEFAULT_CAPTURE_SCALE
 
   await waitForPaint()
-  return await capturePreparedDigitalIdElement(target, scale)
+  return await captureClonedDigitalIdElement(target, scale)
 }
 
 async function capturePreparedDigitalIdElement(
   target: HTMLElement,
   scale: number
 ) {
+  const rect = target.getBoundingClientRect()
+  const width = Math.max(1, Math.ceil(rect.width))
+  const height = Math.max(1, Math.ceil(rect.height))
+
   if (document.fonts?.ready) {
     await withTimeout(
       document.fonts.ready,
@@ -93,10 +97,58 @@ async function capturePreparedDigitalIdElement(
       onclone: sanitizeExportDocument,
       scale,
       useCORS: true,
+      width,
+      height,
     }),
     CANVAS_RENDER_TIMEOUT_MS,
     'Digital ID rendering took too long. Please retry.'
   )
+}
+
+async function captureClonedDigitalIdElement(
+  target: HTMLElement,
+  scale: number
+) {
+  const rect = target.getBoundingClientRect()
+  const width = Math.max(1, Math.ceil(rect.width))
+  const height = Math.max(1, Math.ceil(rect.height))
+  const host = document.createElement('div')
+  const clone = target.cloneNode(true) as HTMLElement
+
+  Object.assign(host.style, {
+    backgroundColor: 'transparent',
+    color: '#0b2f5b',
+    position: 'fixed',
+    left: '-10000px',
+    top: '0',
+    width: `${width}px`,
+    height: `${height}px`,
+    overflow: 'hidden',
+    pointerEvents: 'none',
+    zIndex: '-2147483648',
+    colorScheme: 'light',
+  })
+
+  Object.assign(clone.style, {
+    width: `${width}px`,
+    height: `${height}px`,
+    minWidth: `${width}px`,
+    maxWidth: `${width}px`,
+    minHeight: `${height}px`,
+    maxHeight: `${height}px`,
+    margin: '0',
+    transform: 'none',
+  })
+
+  host.appendChild(clone)
+  document.body.appendChild(host)
+
+  try {
+    await waitForPaint()
+    return await capturePreparedDigitalIdElement(clone, scale)
+  } finally {
+    host.remove()
+  }
 }
 
 function sanitizeExportDocument(
@@ -278,7 +330,7 @@ export async function canvasToJpegBlob(canvas: HTMLCanvasElement) {
         }
       },
       'image/jpeg',
-      0.98
+      1
     )
   })
 }

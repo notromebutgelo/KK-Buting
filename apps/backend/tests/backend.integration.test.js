@@ -47,7 +47,7 @@ async function loadPointsService(db) {
   });
 }
 
-async function loadAdminService(db) {
+async function loadAdminService(db, notificationEvents = null) {
   return loadDistModuleWithMocks("dist/src/modules/admin/admin.service", {
     "dist/src/config/firebase": createFirebaseConfigMock(db),
     "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
@@ -61,8 +61,14 @@ async function loadAdminService(db) {
       getMerchantById: async () => null,
     },
     "dist/src/modules/notifications/notifications.service": {
-      createNotification: async () => undefined,
-      createNotificationsForRoles: async () => undefined,
+      createNotification: async (notification) => {
+        notificationEvents?.push({ kind: "direct", notification });
+        return undefined;
+      },
+      createNotificationsForRoles: async (roles, notification) => {
+        notificationEvents?.push({ kind: "roles", roles, notification });
+        return undefined;
+      },
     },
   });
 }
@@ -620,6 +626,126 @@ const tests = [
         queue.profiles[0].requiredDocuments.map((document) => document.reviewStatus),
         ["pending", "pending", "pending"]
       );
+    },
+  },
+  {
+    name: "superadmin re-verification feedback is routed to admin before admin rejection reaches youth",
+    async run() {
+      const notifications = [];
+      const db = new FakeFirestore({
+        users: {
+          "youth-1": {
+            role: "youth",
+            UserName: "Jerome Alison",
+            email: "jerome@example.com",
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            firstName: "Jerome",
+            lastName: "Alison",
+            email: "jerome@example.com",
+            youthAgeGroup: "Core Youth",
+            documentsSubmitted: true,
+            status: "verified",
+            verified: true,
+            verificationQueueStatus: "pending_superadmin_id_generation",
+            verificationDocumentsApprovedAt: "2026-05-06T04:10:00.000Z",
+            verificationDocumentsApprovedBy: "admin@kk.local",
+            verificationReferredToSuperadminAt: "2026-05-06T04:11:00.000Z",
+            verificationReferredToSuperadminBy: "admin@kk.local",
+            digitalIdApprovalRequestedAt: "2026-05-06T04:11:00.000Z",
+            digitalIdApprovalRequestedBy: "admin@kk.local",
+            digitalIdStatus: "pending_approval",
+          },
+        },
+        documents: {
+          "doc-1": {
+            profileId: "youth-1",
+            documentType: "proof_of_voter_registration",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:00.000Z",
+          },
+          "doc-2": {
+            profileId: "youth-1",
+            documentType: "valid_government_id",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:01.000Z",
+          },
+          "doc-3": {
+            profileId: "youth-1",
+            documentType: "id_photo",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-06T04:00:02.000Z",
+          },
+        },
+      });
+
+      const adminService = await loadAdminService(db, notifications);
+      const result = await adminService.requestVerificationResubmission(
+        "youth-1",
+        ["doc-1"],
+        "Please verify the voter registration document again.",
+        "superadmin@kk.local",
+        "superadmin"
+      );
+
+      assert.equal(result.destination, "admin");
+      const pendingProfile = db.getDocData("kkProfiling", "youth-1");
+      assert.equal(pendingProfile.status, "pending");
+      assert.equal(
+        pendingProfile.verificationQueueStatus,
+        "admin_reverification_requested"
+      );
+      assert.equal(pendingProfile.verificationResubmissionMessage, null);
+      assert.equal(db.getDocData("documents", "doc-1").reviewStatus, "approved");
+
+      const handoff = db.getDocData("verificationAdminHandoffs", "youth-1");
+      assert.equal(
+        handoff.message,
+        "Please verify the voter registration document again."
+      );
+      assert.deepEqual(handoff.documentIds, ["doc-1"]);
+      assert.equal(handoff.status, "pending");
+
+      assert.equal(notifications.length, 1);
+      assert.equal(notifications[0].kind, "roles");
+      assert.deepEqual(notifications[0].roles, ["admin"]);
+
+      const detail = await adminService.getVerificationProfile("youth-1");
+      assert.equal(detail.queueStatus, "admin_reverification_requested");
+      assert.equal(
+        detail.verificationAdminReviewMessage,
+        "Please verify the voter registration document again."
+      );
+
+      await adminService.rejectVerification(
+        "youth-1",
+        "admin@kk.local",
+        "The voter registration proof could not be validated.",
+        "Upload a clearer and current copy."
+      );
+
+      const rejectedProfile = db.getDocData("kkProfiling", "youth-1");
+      assert.equal(rejectedProfile.status, "rejected");
+      assert.equal(
+        rejectedProfile.verificationRejectReason,
+        "The voter registration proof could not be validated."
+      );
+      assert.equal(db.getDocData("documents", "doc-1").reviewStatus, "rejected");
+      assert.equal(
+        db.getDocData("documents", "doc-1").reviewNote,
+        "Upload a clearer and current copy."
+      );
+      assert.equal(db.getDocData("documents", "doc-2").reviewStatus, "approved");
+      assert.equal(
+        db.getDocData("verificationAdminHandoffs", "youth-1").resolution,
+        "rejected"
+      );
+
+      assert.equal(notifications.length, 2);
+      assert.equal(notifications[1].kind, "direct");
+      assert.equal(notifications[1].notification.recipientUid, "youth-1");
     },
   },
   {

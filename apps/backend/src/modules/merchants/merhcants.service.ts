@@ -7,6 +7,7 @@ import { createNotification } from "../notifications/notifications.service";
 import {
   buildMerchantPayload,
   getInlineAssetLimit,
+  MerchantAssetType,
   normalizeMerchant,
   normalizeMerchantAssetType,
   normalizeStringList,
@@ -65,6 +66,7 @@ function normalizeProduct(record: AnyRecord): AnyRecord {
     category: String(product.category || ""),
     description: String(product.description || ""),
     imageUrl: String(product.imageUrl || ""),
+    itemType: product.itemType === "service" ? "service" : "product",
     isActive: product.isActive !== false,
     createdAt: String(product.createdAt || product.updatedAt || ""),
     updatedAt: String(product.updatedAt || product.createdAt || ""),
@@ -143,7 +145,7 @@ function buildPromotionPayload(data: Record<string, unknown>) {
 
 function buildProductPayload(data: Record<string, unknown>) {
   const payload: AnyRecord = {};
-  const allowedKeys = ["name", "price", "category", "description", "imageUrl", "isActive"];
+  const allowedKeys = ["name", "price", "category", "description", "imageUrl", "itemType", "isActive"];
 
   for (const [key, value] of Object.entries(data)) {
     if (allowedKeys.includes(key) && value !== undefined) {
@@ -157,6 +159,10 @@ function buildProductPayload(data: Record<string, unknown>) {
 
   if (payload.isActive !== undefined) {
     payload.isActive = Boolean(payload.isActive);
+  }
+
+  if (payload.itemType !== undefined) {
+    payload.itemType = payload.itemType === "service" ? "service" : "product";
   }
 
   return payload;
@@ -176,8 +182,8 @@ function getMerchantAssetBucketCandidates() {
 }
 
 async function uploadMerchantAssetFromBase64(
-  ownerId: string,
-  assetType: "logo" | "banner",
+  merchantId: string,
+  assetType: MerchantAssetType,
   fileData: string
 ) {
   const match = fileData.match(/^data:(.+);base64,(.+)$/);
@@ -188,9 +194,8 @@ async function uploadMerchantAssetFromBase64(
   const mimeType = match[1];
   const base64Payload = match[2];
   const extension = mimeType.split("/")[1] || "jpg";
-  const filePath = `merchant-assets/${ownerId}/${assetType}-${Date.now()}.${extension}`;
+  const filePath = `merchant-assets/${merchantId}/${assetType}-${Date.now()}.${extension}`;
   const downloadToken = randomUUID();
-  let lastError: Error | null = null;
 
   for (const bucketName of getMerchantAssetBucketCandidates()) {
     try {
@@ -211,25 +216,31 @@ async function uploadMerchantAssetFromBase64(
         filePath
       )}?alt=media&token=${downloadToken}`;
     } catch (error: any) {
-      lastError = error instanceof Error ? error : new Error(String(error || "Upload failed"));
       if (!String(error?.message || "").includes("bucket does not exist")) {
         throw error;
       }
     }
   }
 
-  if (fileData.length <= getInlineAssetLimit(assetType)) {
+  if (
+    ["logo", "banner"].includes(assetType) &&
+    fileData.length <= getInlineAssetLimit(assetType)
+  ) {
     return fileData;
   }
 
   throw new Error(
-    "Firebase Storage bucket is not available, and this image is too large for the inline fallback. Enable Firebase Storage for this project or choose a smaller image."
+    ["logo", "banner"].includes(assetType)
+      ? "Firebase Storage is not available, and this image is too large for the inline fallback. Enable Firebase Storage or choose a smaller image."
+      : "Firebase Storage is required for gallery, product, service, and promotion images. Enable the project storage bucket and try again."
   );
 }
 
 export async function getAllMerchants() {
   const snap = await db.collection("merchants").where("status", "==", "approved").get();
-  return snap.docs.map((doc) => normalizeMerchant(serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord));
+  return snap.docs
+    .map((doc) => normalizeMerchant(serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord))
+    .sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
 }
 
 export async function getMerchantById(id: string, options?: { includePrivate?: boolean }): Promise<AnyRecord | null> {
@@ -315,24 +326,152 @@ export async function uploadMerchantAssetByOwner(ownerId: string, assetType: str
   }
 
   const normalizedAssetType = normalizeMerchantAssetType(String(assetType || ""));
-  const fileUrl = await uploadMerchantAssetFromBase64(ownerId, normalizedAssetType, fileData);
+  const fileUrl = await uploadMerchantAssetFromBase64(merchantDoc.id, normalizedAssetType, fileData);
   const current = merchantDoc.data() || {};
-  const fieldName = normalizedAssetType === "banner" ? "bannerUrl" : "logoUrl";
-  const updatePayload: AnyRecord = {
-    [fieldName]: fileUrl,
-    updatedAt: FieldValue.serverTimestamp(),
-  };
+  const updatePayload: AnyRecord = { updatedAt: FieldValue.serverTimestamp() };
 
-  if (normalizedAssetType === "banner" || !current.imageUrl) {
-    updatePayload.imageUrl = fileUrl;
+  if (normalizedAssetType === "gallery") {
+    updatePayload.galleryUrls = Array.from(
+      new Set([...normalizeStringList(current.galleryUrls), fileUrl])
+    );
+  } else if (normalizedAssetType === "logo" || normalizedAssetType === "banner") {
+    const fieldName = normalizedAssetType === "banner" ? "bannerUrl" : "logoUrl";
+    updatePayload[fieldName] = fileUrl;
+    if (normalizedAssetType === "banner" || !current.imageUrl) {
+      updatePayload.imageUrl = fileUrl;
+    }
   }
 
-  await merchantDoc.ref.set(updatePayload, { merge: true });
+  if (Object.keys(updatePayload).length > 1) {
+    await merchantDoc.ref.set(updatePayload, { merge: true });
+  }
 
   return {
     assetType: normalizedAssetType,
     fileUrl,
   };
+}
+
+async function requireMerchant(merchantId: string) {
+  const merchantRef = db.collection("merchants").doc(merchantId);
+  const merchantSnap = await merchantRef.get();
+  if (!merchantSnap.exists) {
+    throw new Error("Merchant not found");
+  }
+  return merchantSnap;
+}
+
+export async function uploadMerchantAssetByAdmin(
+  merchantId: string,
+  assetType: string,
+  fileData: string
+) {
+  const merchantSnap = await requireMerchant(merchantId);
+  const normalizedAssetType = normalizeMerchantAssetType(String(assetType || ""));
+  const fileUrl = await uploadMerchantAssetFromBase64(
+    merchantId,
+    normalizedAssetType,
+    fileData
+  );
+  const current = merchantSnap.data() || {};
+  const updatePayload: AnyRecord = { updatedAt: FieldValue.serverTimestamp() };
+
+  if (normalizedAssetType === "gallery") {
+    updatePayload.galleryUrls = Array.from(
+      new Set([...normalizeStringList(current.galleryUrls), fileUrl])
+    );
+  } else if (normalizedAssetType === "logo" || normalizedAssetType === "banner") {
+    const fieldName = normalizedAssetType === "banner" ? "bannerUrl" : "logoUrl";
+    updatePayload[fieldName] = fileUrl;
+    if (normalizedAssetType === "banner" || !current.imageUrl) {
+      updatePayload.imageUrl = fileUrl;
+    }
+  }
+
+  if (Object.keys(updatePayload).length > 1) {
+    await merchantSnap.ref.set(updatePayload, { merge: true });
+  }
+
+  return { assetType: normalizedAssetType, fileUrl };
+}
+
+export async function removeMerchantAssetByAdmin(
+  merchantId: string,
+  assetType: string,
+  fileUrl?: string
+) {
+  const merchantSnap = await requireMerchant(merchantId);
+  const current = merchantSnap.data() || {};
+  const normalizedAssetType = normalizeMerchantAssetType(String(assetType || ""));
+  const payload: AnyRecord = { updatedAt: FieldValue.serverTimestamp() };
+
+  if (normalizedAssetType === "gallery") {
+    payload.galleryUrls = normalizeStringList(current.galleryUrls).filter(
+      (url) => url !== String(fileUrl || "")
+    );
+  } else if (normalizedAssetType === "logo") {
+    payload.logoUrl = "";
+    if (current.imageUrl === current.logoUrl) {
+      payload.imageUrl = String(current.bannerUrl || "");
+    }
+  } else if (normalizedAssetType === "banner") {
+    payload.bannerUrl = "";
+    if (current.imageUrl === current.bannerUrl) {
+      payload.imageUrl = String(current.logoUrl || "");
+    }
+  }
+
+  await merchantSnap.ref.set(payload, { merge: true });
+}
+
+export async function createMerchantPromotionByAdmin(
+  merchantId: string,
+  data: Record<string, unknown>
+) {
+  await requireMerchant(merchantId);
+  return createMerchantPromotionForMerchant(merchantId, data);
+}
+
+export async function updateMerchantPromotionByAdmin(
+  merchantId: string,
+  promotionId: string,
+  data: Record<string, unknown>
+) {
+  await requireMerchant(merchantId);
+  return updateMerchantPromotionForMerchant(merchantId, promotionId, data);
+}
+
+export async function deleteMerchantPromotionByAdmin(
+  merchantId: string,
+  promotionId: string
+) {
+  await requireMerchant(merchantId);
+  return deleteMerchantPromotionForMerchant(merchantId, promotionId);
+}
+
+export async function createMerchantProductByAdmin(
+  merchantId: string,
+  data: Record<string, unknown>
+) {
+  await requireMerchant(merchantId);
+  return createMerchantProductForMerchant(merchantId, data);
+}
+
+export async function updateMerchantProductByAdmin(
+  merchantId: string,
+  productId: string,
+  data: Record<string, unknown>
+) {
+  await requireMerchant(merchantId);
+  return updateMerchantProductForMerchant(merchantId, productId, data);
+}
+
+export async function deleteMerchantProductByAdmin(
+  merchantId: string,
+  productId: string
+) {
+  await requireMerchant(merchantId);
+  return deleteMerchantProductForMerchant(merchantId, productId);
 }
 
 export async function getMerchantPromotionsByOwner(ownerId: string) {
@@ -350,8 +489,12 @@ export async function createMerchantPromotionByOwner(ownerId: string, data: Reco
     throw new Error("Merchant profile not found");
   }
 
+  return createMerchantPromotionForMerchant(merchantDoc.id, data);
+}
+
+async function createMerchantPromotionForMerchant(merchantId: string, data: Record<string, unknown>) {
   const payload = buildPromotionPayload(data);
-  const ref = await db.collection("merchants").doc(merchantDoc.id).collection("promotions").add({
+  const ref = await db.collection("merchants").doc(merchantId).collection("promotions").add({
     title: String(payload.title || "Untitled Promo"),
     shortTagline: String(payload.shortTagline || ""),
     bannerUrl: String(payload.bannerUrl || ""),
@@ -382,7 +525,15 @@ export async function updateMerchantPromotionByOwner(
     throw new Error("Merchant profile not found");
   }
 
-  const promotionRef = db.collection("merchants").doc(merchantDoc.id).collection("promotions").doc(promotionId);
+  return updateMerchantPromotionForMerchant(merchantDoc.id, promotionId, data);
+}
+
+async function updateMerchantPromotionForMerchant(
+  merchantId: string,
+  promotionId: string,
+  data: Record<string, unknown>
+) {
+  const promotionRef = db.collection("merchants").doc(merchantId).collection("promotions").doc(promotionId);
   const promotionSnap = await promotionRef.get();
   if (!promotionSnap.exists) {
     throw new Error("Promotion not found");
@@ -402,7 +553,11 @@ export async function deleteMerchantPromotionByOwner(ownerId: string, promotionI
     throw new Error("Merchant profile not found");
   }
 
-  const promotionRef = db.collection("merchants").doc(merchantDoc.id).collection("promotions").doc(promotionId);
+  return deleteMerchantPromotionForMerchant(merchantDoc.id, promotionId);
+}
+
+async function deleteMerchantPromotionForMerchant(merchantId: string, promotionId: string) {
+  const promotionRef = db.collection("merchants").doc(merchantId).collection("promotions").doc(promotionId);
   const promotionSnap = await promotionRef.get();
   if (!promotionSnap.exists) {
     throw new Error("Promotion not found");
@@ -426,13 +581,18 @@ export async function createMerchantProductByOwner(ownerId: string, data: Record
     throw new Error("Merchant profile not found");
   }
 
+  return createMerchantProductForMerchant(merchantDoc.id, data);
+}
+
+async function createMerchantProductForMerchant(merchantId: string, data: Record<string, unknown>) {
   const payload = buildProductPayload(data);
-  const ref = await db.collection("merchants").doc(merchantDoc.id).collection("products").add({
+  const ref = await db.collection("merchants").doc(merchantId).collection("products").add({
     name: String(payload.name || "Untitled Product"),
     price: Number(payload.price || 0),
     category: String(payload.category || ""),
     description: String(payload.description || ""),
     imageUrl: String(payload.imageUrl || ""),
+    itemType: payload.itemType === "service" ? "service" : "product",
     isActive: payload.isActive !== false,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
@@ -448,7 +608,15 @@ export async function updateMerchantProductByOwner(ownerId: string, productId: s
     throw new Error("Merchant profile not found");
   }
 
-  const productRef = db.collection("merchants").doc(merchantDoc.id).collection("products").doc(productId);
+  return updateMerchantProductForMerchant(merchantDoc.id, productId, data);
+}
+
+async function updateMerchantProductForMerchant(
+  merchantId: string,
+  productId: string,
+  data: Record<string, unknown>
+) {
+  const productRef = db.collection("merchants").doc(merchantId).collection("products").doc(productId);
   const productSnap = await productRef.get();
   if (!productSnap.exists) {
     throw new Error("Product not found");
@@ -468,7 +636,11 @@ export async function deleteMerchantProductByOwner(ownerId: string, productId: s
     throw new Error("Merchant profile not found");
   }
 
-  const productRef = db.collection("merchants").doc(merchantDoc.id).collection("products").doc(productId);
+  return deleteMerchantProductForMerchant(merchantDoc.id, productId);
+}
+
+async function deleteMerchantProductForMerchant(merchantId: string, productId: string) {
+  const productRef = db.collection("merchants").doc(merchantId).collection("products").doc(productId);
   const productSnap = await productRef.get();
   if (!productSnap.exists) {
     throw new Error("Product not found");

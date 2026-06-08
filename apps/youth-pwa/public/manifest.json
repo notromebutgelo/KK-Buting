@@ -1,11 +1,11 @@
 {
-  "name": "KK Youth Portal",
-  "short_name": "KK Youth",
-  "description": "Kabataang Katipunan Youth Profiling and Points System",
+  "name": "KKB App Buting",
+  "short_name": "KKB Buting",
+  "description": "Official youth portal for Barangay Buting KK profiling, verification, digital ID, points, vouchers, and rewards.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#16a34a",
+  "theme_color": "#1B4FD8",
   "orientation": "portrait",
   "icons": [
     {

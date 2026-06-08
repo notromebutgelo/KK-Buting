@@ -269,6 +269,81 @@ export default function MerchantDetailPage() {
           </div>
         </section>
 
+        {(merchant.contactNumber ||
+          merchant.email ||
+          merchant.websiteUrl ||
+          merchant.facebookUrl ||
+          merchant.operatingHours ||
+          merchant.locationDetails ||
+          merchant.mapUrl) ? (
+          <section className="mt-4 rounded-[28px] bg-white px-4 py-5 shadow-[0_14px_30px_rgba(4,60,121,0.12)]">
+            <h3 className="text-sm font-black text-[#0d4f92]">Visit & Contact</h3>
+            <div className="mt-3 space-y-3">
+              {merchant.operatingHours ? (
+                <StorefrontDetail label="Operating hours" value={merchant.operatingHours} />
+              ) : null}
+              {merchant.locationDetails ? (
+                <StorefrontDetail label="Location details" value={merchant.locationDetails} />
+              ) : null}
+              <div className="grid gap-2 sm:grid-cols-2">
+                {merchant.contactNumber ? (
+                  <a href={`tel:${merchant.contactNumber}`} className="rounded-[18px] border border-[#dce7f3] bg-[#f8fbff] px-4 py-3 text-xs font-bold text-[#0d4f92]">
+                    Call {merchant.contactNumber}
+                  </a>
+                ) : null}
+                {merchant.email ? (
+                  <a href={`mailto:${merchant.email}`} className="rounded-[18px] border border-[#dce7f3] bg-[#f8fbff] px-4 py-3 text-xs font-bold text-[#0d4f92]">
+                    Email merchant
+                  </a>
+                ) : null}
+                {merchant.websiteUrl ? (
+                  <a href={merchant.websiteUrl} target="_blank" rel="noreferrer" className="rounded-[18px] border border-[#dce7f3] bg-[#f8fbff] px-4 py-3 text-xs font-bold text-[#0d4f92]">
+                    Visit website
+                  </a>
+                ) : null}
+                {merchant.facebookUrl ? (
+                  <a href={merchant.facebookUrl} target="_blank" rel="noreferrer" className="rounded-[18px] border border-[#dce7f3] bg-[#f8fbff] px-4 py-3 text-xs font-bold text-[#0d4f92]">
+                    Open Facebook
+                  </a>
+                ) : null}
+                {merchant.mapUrl ? (
+                  <a href={merchant.mapUrl} target="_blank" rel="noreferrer" className="rounded-[18px] border border-[#dce7f3] bg-[#f8fbff] px-4 py-3 text-xs font-bold text-[#0d4f92]">
+                    Open map
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {merchant.galleryUrls && merchant.galleryUrls.length > 0 ? (
+          <section className="mt-4 rounded-[28px] bg-white px-4 py-5 shadow-[0_14px_30px_rgba(4,60,121,0.12)]">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-black text-[#0d4f92]">Storefront Gallery</h3>
+              <span className="text-xs font-semibold text-[#839cb8]">{merchant.galleryUrls.length} photos</span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {merchant.galleryUrls.map((photoUrl, index) => (
+                <div
+                  key={photoUrl}
+                  className={`relative overflow-hidden rounded-[20px] bg-[#eaf2fb] ${
+                    index === 0 && merchant.galleryUrls!.length % 2 === 1
+                      ? 'col-span-2 aspect-[16/8]'
+                      : 'aspect-square'
+                  }`}
+                >
+                  <Image
+                    src={photoUrl}
+                    alt={`${merchant.businessName || merchant.name} gallery photo ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {merchant.promotions && merchant.promotions.length > 0 ? (
           <section className="mt-4 rounded-[28px] bg-white px-4 py-5 shadow-[0_14px_30px_rgba(4,60,121,0.12)]">
             <div className="flex items-center justify-between gap-3">
@@ -346,14 +421,22 @@ export default function MerchantDetailPage() {
         {merchant.products && merchant.products.length > 0 ? (
           <section className="mt-4 rounded-[28px] bg-white px-4 py-5 shadow-[0_14px_30px_rgba(4,60,121,0.12)]">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-black text-[#0d4f92]">Products & Menu</h3>
+              <h3 className="text-sm font-black text-[#0d4f92]">Products & Services</h3>
               <span className="text-xs font-semibold text-[#839cb8]">{merchant.products.length} items</span>
             </div>
             <div className="mt-3 space-y-3">
               {merchant.products.map((product) => (
-                <div key={product.id} className="rounded-[20px] border border-[#dce7f3] bg-[#fbfdff] px-4 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                <div key={product.id} className="overflow-hidden rounded-[20px] border border-[#dce7f3] bg-[#fbfdff]">
+                  {product.imageUrl ? (
+                    <div className="relative h-32 bg-[#eaf2fb]">
+                      <Image src={product.imageUrl} alt={product.name} fill className="object-cover" />
+                    </div>
+                  ) : null}
+                  <div className="flex items-start justify-between gap-3 px-4 py-4">
+                    <div className="min-w-0">
+                      <p className="mb-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#f09000]">
+                        {product.itemType === 'service' ? 'Service' : 'Product'}
+                      </p>
                       <p className="text-sm font-black text-[#0d4f92]">{product.name}</p>
                       {product.description ? (
                         <p className="mt-1 text-xs leading-5 text-[#6480a0]">{product.description}</p>
@@ -431,6 +514,15 @@ export default function MerchantDetailPage() {
           {merchantRewards.length > 0 ? 'Redeem' : 'Show Youth QR to Earn Points'}
         </button>
       </div>
+    </div>
+  )
+}
+
+function StorefrontDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[18px] border border-[#dce7f3] bg-[#f8fbff] px-4 py-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#819bb7]">{label}</p>
+      <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[#496684]">{value}</p>
     </div>
   )
 }

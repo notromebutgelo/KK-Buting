@@ -19,13 +19,14 @@ const poppinsBody = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "KK Buting",
-  description: "Sangguniang Kabataan Barangay Buting - Youth Digital ID & Rewards",
+  title: "KKB App Buting",
+  description:
+    "KKB App Buting is the official youth portal for Barangay Buting KK profiling, verification, digital ID, points, vouchers, and rewards.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "KK Buting",
+    title: "KKB App Buting",
   },
 };
 

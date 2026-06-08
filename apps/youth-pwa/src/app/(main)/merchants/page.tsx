@@ -194,6 +194,11 @@ export default function MerchantsPage() {
                           />
                         ) : null}
                         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.18)_100%)]" />
+                        {merchant.isFeatured ? (
+                          <span className="absolute left-3 top-3 rounded-full bg-[#ffb51b] px-3 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-white shadow">
+                            Featured
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="px-4 pb-4 pt-3">

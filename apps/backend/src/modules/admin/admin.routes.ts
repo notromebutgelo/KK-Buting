@@ -18,6 +18,14 @@ import {
   listPendingMerchants,
   approveMerchantHandler,
   updateMerchantHandler,
+  uploadMerchantAssetHandler,
+  removeMerchantAssetHandler,
+  createMerchantPromotionHandler,
+  updateMerchantPromotionHandler,
+  deleteMerchantPromotionHandler,
+  createMerchantProductHandler,
+  updateMerchantProductHandler,
+  deleteMerchantProductHandler,
   updateMerchantStatusHandler,
   listMerchantTransactionsHandler,
   getPointsTransactionsOverviewHandler,
@@ -50,6 +58,10 @@ import {
   validateDigitalIdDeactivationRequest,
   validateMerchantAccountRequest,
   validateMerchantProfileUpdateRequest,
+  validateMerchantAssetDeleteRequest,
+  validateMerchantAssetUploadRequest,
+  validateMerchantProductRequest,
+  validateMerchantSubPromotionRequest,
   validateMerchantStatusRequest,
   validatePointsConversionRequest,
   validateRequest,
@@ -65,6 +77,7 @@ import {
 const router = Router();
 
 const adminOrSuperadmin = [verifyToken, requireRole("admin", "superadmin")];
+const adminOnly = [verifyToken, requireRole("admin")];
 const superadminOnly = [verifyToken, requireRole("superadmin")];
 
 router.get("/dashboard", ...adminOrSuperadmin, getDashboard);
@@ -72,10 +85,10 @@ router.get("/verification", ...adminOrSuperadmin, listVerificationProfiles);
 router.post("/verification/bulk-approve", ...adminOrSuperadmin, validateRequest(validateBulkUserIdsRequest), bulkApproveVerificationHandler);
 router.get("/verification/:userId", ...adminOrSuperadmin, getVerificationProfileHandler);
 router.patch("/verification/:userId/approve", ...adminOrSuperadmin, approveVerificationHandler);
-router.patch("/verification/:userId/reject", ...superadminOnly, validateRequest(validateVerificationRejectRequest), rejectVerificationHandler);
+router.patch("/verification/:userId/reject", ...adminOnly, validateRequest(validateVerificationRejectRequest), rejectVerificationHandler);
 router.patch(
   "/verification/:userId/documents/:documentId/review",
-  ...adminOrSuperadmin,
+  ...adminOnly,
   validateRequest(validateVerificationDocumentReviewRequest),
   reviewVerificationDocumentHandler
 );
@@ -96,6 +109,52 @@ router.get("/merchants/pending", ...adminOrSuperadmin, listPendingMerchants);
 router.get("/merchants/:merchantId", ...adminOrSuperadmin, getMerchantHandler);
 router.patch("/merchants/:merchantId/approve", ...superadminOnly, approveMerchantHandler);
 router.patch("/merchants/:merchantId", ...adminOrSuperadmin, validateRequest(validateMerchantProfileUpdateRequest), updateMerchantHandler);
+router.post(
+  "/merchants/:merchantId/assets",
+  ...superadminOnly,
+  validateRequest(validateMerchantAssetUploadRequest),
+  uploadMerchantAssetHandler
+);
+router.delete(
+  "/merchants/:merchantId/assets",
+  ...superadminOnly,
+  validateRequest(validateMerchantAssetDeleteRequest),
+  removeMerchantAssetHandler
+);
+router.post(
+  "/merchants/:merchantId/promotions",
+  ...superadminOnly,
+  validateRequest(validateMerchantSubPromotionRequest()),
+  createMerchantPromotionHandler
+);
+router.patch(
+  "/merchants/:merchantId/promotions/:promotionId",
+  ...superadminOnly,
+  validateRequest(validateMerchantSubPromotionRequest({ partial: true })),
+  updateMerchantPromotionHandler
+);
+router.delete(
+  "/merchants/:merchantId/promotions/:promotionId",
+  ...superadminOnly,
+  deleteMerchantPromotionHandler
+);
+router.post(
+  "/merchants/:merchantId/products",
+  ...superadminOnly,
+  validateRequest(validateMerchantProductRequest()),
+  createMerchantProductHandler
+);
+router.patch(
+  "/merchants/:merchantId/products/:productId",
+  ...superadminOnly,
+  validateRequest(validateMerchantProductRequest({ partial: true })),
+  updateMerchantProductHandler
+);
+router.delete(
+  "/merchants/:merchantId/products/:productId",
+  ...superadminOnly,
+  deleteMerchantProductHandler
+);
 router.patch("/merchants/:merchantId/status", ...superadminOnly, validateRequest(validateMerchantStatusRequest), updateMerchantStatusHandler);
 router.get("/merchants/:merchantId/transactions", ...adminOrSuperadmin, listMerchantTransactionsHandler);
 router.get("/points-transactions", ...adminOrSuperadmin, getPointsTransactionsOverviewHandler);
@@ -103,7 +162,7 @@ router.patch("/points-transactions/conversion-rate", ...superadminOnly, validate
 router.get("/youth", ...adminOrSuperadmin, listYouth);
 router.get("/youth/:userId", ...adminOrSuperadmin, getYouthHandler);
 router.patch("/youth/:userId/status", ...adminOrSuperadmin, validateRequest(validateYouthStatusRequest), updateYouthStatusHandler);
-router.patch("/youth/:userId/profile", ...adminOrSuperadmin, validateRequest(validateYouthProfileUpdateRequest), updateYouthProfileHandler);
+router.patch("/youth/:userId/profile", ...superadminOnly, validateRequest(validateYouthProfileUpdateRequest), updateYouthProfileHandler);
 router.patch("/youth/:userId/archive", ...superadminOnly, validateRequest(validateArchiveYouthRequest), archiveYouthHandler);
 router.post("/youth/:userId/points-adjustments", ...superadminOnly, validateRequest(validateAdjustYouthPointsRequest), adjustYouthPointsHandler);
 router.get("/digital-ids", ...adminOrSuperadmin, listDigitalIds);

@@ -296,7 +296,7 @@ function validateEligibilityConditions(errors: string[], record: AnyRecord, key 
 }
 
 const PROMOTION_TYPES = ["discount", "points_multiplier", "freebie"];
-const MERCHANT_ASSET_TYPES = ["logo", "banner"];
+const MERCHANT_ASSET_TYPES = ["logo", "banner", "gallery", "product", "promotion"];
 const MERCHANT_STATUSES = ["approved", "rejected", "suspended"];
 const REVIEW_ACTIONS = ["approved", "rejected"];
 const YOUTH_STATUSES = ["pending", "verified", "rejected"];
@@ -514,6 +514,11 @@ export function validateMerchantProfileUpdateRequest(req: Request) {
     "bannerUrl",
     "logoUrl",
     "contactNumber",
+    "websiteUrl",
+    "facebookUrl",
+    "mapUrl",
+    "operatingHours",
+    "locationDetails",
     "discountInfo",
     "pointsPolicy",
     "ownerName",
@@ -524,10 +529,13 @@ export function validateMerchantProfileUpdateRequest(req: Request) {
     validateString(errors, body, field, field, { maxLength: 2000 });
   }
 
+  validateString(errors, body, "email", "email", { email: true, maxLength: 160 });
   validateNumber(errors, body, "pointsRate", "pointsRate", { min: 0 });
   validateStringOrStringArray(errors, body, "termsAndConditions", "termsAndConditions", { maxLength: 2000 });
+  validateStringArray(errors, body, "galleryUrls", "galleryUrls");
+  validateBoolean(errors, body, "isFeatured", "isFeatured");
 
-  if (!hasAnyKey(body, [...stringFields, "pointsRate", "termsAndConditions"])) {
+  if (!hasAnyKey(body, [...stringFields, "email", "pointsRate", "termsAndConditions", "galleryUrls", "isFeatured"])) {
     errors.push("At least one merchant profile field must be provided.");
   }
 
@@ -584,9 +592,10 @@ export function validateMerchantProductRequest(options: { partial?: boolean } = 
     validateString(errors, body, "category", "category", { maxLength: 120 });
     validateString(errors, body, "description", "description", { maxLength: 1500 });
     validateString(errors, body, "imageUrl", "imageUrl", { maxLength: 2048 });
+    validateEnum(errors, body, "itemType", "itemType", ["product", "service"]);
     validateBoolean(errors, body, "isActive", "isActive");
 
-    if (options.partial && !hasAnyKey(body, ["name", "price", "category", "description", "imageUrl", "isActive"])) {
+    if (options.partial && !hasAnyKey(body, ["name", "price", "category", "description", "imageUrl", "itemType", "isActive"])) {
       errors.push("At least one product field must be provided.");
     }
 
@@ -733,6 +742,16 @@ export function validateDigitalIdDeactivationRequest(req: Request) {
   if (!body) return errors;
 
   validateString(errors, body, "reason", "reason", { maxLength: 500 });
+  return errors;
+}
+
+export function validateMerchantAssetDeleteRequest(req: Request) {
+  const errors: string[] = [];
+  const body = ensureBodyRecord(req, errors);
+  if (!body) return errors;
+
+  validateEnum(errors, body, "assetType", "assetType", ["logo", "banner", "gallery"], { required: true });
+  validateString(errors, body, "fileUrl", "fileUrl", { maxLength: 1_000_000 });
   return errors;
 }
 

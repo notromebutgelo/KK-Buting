@@ -18,6 +18,7 @@ import { useUser } from '@/hooks/useUser'
 import { getMyNotifications } from '@/services/notifications.service'
 import { getActivePromotions, type YouthPromotion } from '@/services/promotions.service'
 import { useAuthStore } from '@/store/authStore'
+import type { UserProfile } from '@/store/userStore'
 
 interface PointsData {
   totalPoints: number
@@ -176,6 +177,7 @@ export default function HomePage() {
 
   const greeting = getGreeting()
   const memberSinceYear = getMemberSinceYear()
+  const profilePhotoUrl = getProfilePhotoUrl(profile)
   const pointsValue = points?.totalPoints || 0
   const progressWidth = Math.min(
     100,
@@ -188,8 +190,16 @@ export default function HomePage() {
         <section className="overflow-hidden rounded-[28px] border border-white/80 bg-[radial-gradient(circle_at_top_left,rgba(201,224,248,0.72),rgba(255,255,255,0.95)_44%,rgba(255,255,255,1)_100%)] px-5 pb-5 pt-5 shadow-[0_18px_40px_rgba(15,76,151,0.12)]">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 flex-1 gap-4">
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-[#0f4c97] bg-[radial-gradient(circle_at_top_left,#f2f8ff_0%,#dfeeff_100%)] text-[24px] font-black tracking-[-0.03em] text-[#0f4c97] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                {getInitials(displayName)}
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#0f4c97] bg-[radial-gradient(circle_at_top_left,#f2f8ff_0%,#dfeeff_100%)] text-[24px] font-black tracking-[-0.03em] text-[#0f4c97] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                {profilePhotoUrl ? (
+                  <img
+                    src={profilePhotoUrl}
+                    alt={`${displayName} profile photo`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  getInitials(displayName)
+                )}
                 <span className="absolute -bottom-[1px] -right-[2px] h-3 w-3 rounded-full border-2 border-white bg-[#34c759] shadow-[0_6px_14px_rgba(52,199,89,0.18)]" />
               </div>
 
@@ -510,6 +520,22 @@ function getInitials(value: string) {
     .map((part) => part[0])
     .join('')
     .toUpperCase()
+}
+
+function getProfilePhotoUrl(profile: UserProfile | null) {
+  if (!profile) return ''
+
+  const flexibleProfile = profile as UserProfile & {
+    photoUrl?: string | null
+    profilePhotoUrl?: string | null
+  }
+
+  return String(
+    flexibleProfile.photoUrl ||
+      flexibleProfile.profilePhotoUrl ||
+      flexibleProfile.idPhotoUrl ||
+      ''
+  ).trim()
 }
 
 function getGreeting() {

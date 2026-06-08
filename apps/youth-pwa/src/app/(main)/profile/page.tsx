@@ -11,6 +11,7 @@ import Spinner from '@/components/ui/Spinner'
 import { useUser } from '@/hooks/useUser'
 import { useAuthStore } from '@/store/authStore'
 import { useUserStore } from '@/store/userStore'
+import type { UserProfile } from '@/store/userStore'
 import { clearYouthSession } from '@/lib/session'
 
 const menuItems = [
@@ -157,6 +158,7 @@ export default function ProfilePage() {
 
     return user?.UserName || 'Youth Member'
   }, [profile, user?.UserName])
+  const profilePhotoUrl = getProfilePhotoUrl(profile)
 
   const memberLocation = useMemo(() => {
     if (!profile) {
@@ -309,11 +311,21 @@ export default function ProfilePage() {
               </div>
 
               <div className="mt-5 flex items-center gap-4">
-                <div className="relative flex h-[74px] w-[74px] flex-shrink-0 items-center justify-center rounded-full bg-white/14 ring-[10px] ring-white/10">
-                  <span className="text-[30px] font-black text-white">
-                    {getInitials(displayName) || 'Y'}
-                  </span>
-                  <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#0a5fc1] bg-[#1578ea] shadow-[0_8px_18px_rgba(1,67,132,0.24)]">
+                <div className="relative h-[74px] w-[74px] flex-shrink-0">
+                  <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-white/14 ring-[10px] ring-white/10">
+                    {profilePhotoUrl ? (
+                      <img
+                        src={profilePhotoUrl}
+                        alt={`${displayName} profile photo`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-[30px] font-black text-white">
+                        {getInitials(displayName) || 'Y'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#1578ea] shadow-[0_8px_18px_rgba(1,67,132,0.28)]">
                     <ShieldTickIcon />
                   </div>
                 </div>
@@ -632,6 +644,22 @@ function getInitials(value: string) {
     .map((part) => part[0] || '')
     .join('')
     .toUpperCase()
+}
+
+function getProfilePhotoUrl(profile: UserProfile | null) {
+  if (!profile) return ''
+
+  const flexibleProfile = profile as UserProfile & {
+    photoUrl?: string | null
+    profilePhotoUrl?: string | null
+  }
+
+  return String(
+    flexibleProfile.photoUrl ||
+      flexibleProfile.profilePhotoUrl ||
+      flexibleProfile.idPhotoUrl ||
+      ''
+  ).trim()
 }
 
 function hasCompleteEmergencyContact(

@@ -1,4 +1,5 @@
 type AnyRecord = Record<string, any>;
+export type MerchantAssetType = "logo" | "banner" | "gallery" | "product" | "promotion";
 
 export function normalizeStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -23,6 +24,14 @@ export function normalizeMerchant(record: AnyRecord): AnyRecord {
     shortDescription: merchant.shortDescription || merchant.description || "",
     imageUrl: merchant.imageUrl || merchant.bannerUrl || merchant.logoUrl || "",
     bannerUrl: merchant.bannerUrl || merchant.imageUrl || "",
+    galleryUrls: normalizeStringList(merchant.galleryUrls),
+    operatingHours: normalizeTextBlock(merchant.operatingHours),
+    locationDetails: normalizeTextBlock(merchant.locationDetails),
+    email: String(merchant.email || merchant.contactEmail || ""),
+    websiteUrl: String(merchant.websiteUrl || ""),
+    facebookUrl: String(merchant.facebookUrl || ""),
+    mapUrl: String(merchant.mapUrl || ""),
+    isFeatured: merchant.isFeatured === true,
     pointsRate: Number(merchant.pointsRate || merchant.pointsRatePeso || 10),
     termsAndConditions: normalizeTextBlock(merchant.termsAndConditions),
     pointsPolicy:
@@ -45,11 +54,18 @@ export function buildMerchantPayload(data: Record<string, unknown>): AnyRecord {
     "logoUrl",
     "businessInfo",
     "contactNumber",
+    "email",
+    "websiteUrl",
+    "facebookUrl",
+    "mapUrl",
+    "operatingHours",
+    "locationDetails",
     "discountInfo",
     "termsAndConditions",
     "pointsPolicy",
     "ownerName",
     "ownerEmail",
+    "isFeatured",
   ];
 
   for (const [key, value] of Object.entries(data)) {
@@ -62,6 +78,14 @@ export function buildMerchantPayload(data: Record<string, unknown>): AnyRecord {
     }
   }
 
+  if (data.galleryUrls !== undefined) {
+    payload.galleryUrls = normalizeStringList(data.galleryUrls);
+  }
+
+  if (payload.isFeatured !== undefined) {
+    payload.isFeatured = Boolean(payload.isFeatured);
+  }
+
   if (!payload.name && payload.businessName) payload.name = payload.businessName;
   if (!payload.businessName && payload.name) payload.businessName = payload.name;
   if (!payload.description && payload.shortDescription) payload.description = payload.shortDescription;
@@ -70,10 +94,15 @@ export function buildMerchantPayload(data: Record<string, unknown>): AnyRecord {
   return payload;
 }
 
-export function normalizeMerchantAssetType(assetType: string): "logo" | "banner" {
-  return assetType === "banner" ? "banner" : "logo";
+export function normalizeMerchantAssetType(assetType: string): MerchantAssetType {
+  if (["banner", "gallery", "product", "promotion"].includes(assetType)) {
+    return assetType as MerchantAssetType;
+  }
+  return "logo";
 }
 
-export function getInlineAssetLimit(assetType: "logo" | "banner"): number {
-  return assetType === "logo" ? 400_000 : 550_000;
+export function getInlineAssetLimit(assetType: MerchantAssetType): number {
+  if (assetType === "logo") return 400_000;
+  if (assetType === "banner") return 550_000;
+  return 700_000;
 }

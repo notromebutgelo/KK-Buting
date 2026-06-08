@@ -10,14 +10,23 @@ export interface Merchant {
   shortDescription?: string
   category: string
   address: string
+  locationDetails?: string
+  contactNumber?: string
+  email?: string
+  websiteUrl?: string
+  facebookUrl?: string
+  mapUrl?: string
+  operatingHours?: string
   imageUrl: string
   bannerUrl?: string
   logoUrl?: string
+  galleryUrls?: string[]
   businessInfo?: string
   discountInfo?: string
   termsAndConditions?: string
   pointsPolicy?: string
   pointsRate?: number
+  isFeatured?: boolean
   status: 'pending' | 'approved' | 'rejected' | 'suspended'
   ownerId: string
   createdAt: string
@@ -36,6 +45,7 @@ export interface Merchant {
     category?: string
     imageUrl?: string
     price?: number
+    itemType?: 'product' | 'service'
   }>
 }
 

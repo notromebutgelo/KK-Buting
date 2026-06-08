@@ -89,12 +89,15 @@ export default function SplashOnboardingPage() {
     touchStartX.current = null;
   };
 
-  if (phase === "splash") {
-    return (
+  const slide = SLIDES[currentSlide];
+
+  return (
+    <>
+      {phase === "splash" ? (
       <div
         className="splash-screen"
         data-exit={splashExit}
-        aria-label="KK Buting splash screen"
+        aria-label="KKB App Buting splash screen"
       >
         <div className="splash-content">
           <Image
@@ -107,16 +110,33 @@ export default function SplashOnboardingPage() {
           />
         </div>
       </div>
-    );
-  }
-  const slide = SLIDES[currentSlide];
+      ) : null}
 
-  return (
     <div
       className="onboarding-screen"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
+      <header className="app-purpose-header">
+        <Image
+          src={BRAND_SEAL}
+          alt="Sangguniang Kabataan Barangay Buting seal"
+          className="app-purpose-seal"
+          width={58}
+          height={58}
+          priority
+        />
+        <div className="app-purpose-copy">
+          <p className="app-purpose-kicker">Official youth portal</p>
+          <h1 className="app-purpose-title">KKB App Buting</h1>
+          <p className="app-purpose-text">
+            KKB App Buting helps Barangay Buting youth register for KK profiling,
+            complete verification, access their digital ID, earn points, and redeem
+            rewards from participating merchants.
+          </p>
+        </div>
+      </header>
+
       <div
         className="slide-area"
         data-animating={animating}
@@ -191,5 +211,6 @@ export default function SplashOnboardingPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

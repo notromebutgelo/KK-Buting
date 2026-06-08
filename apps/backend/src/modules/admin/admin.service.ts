@@ -62,6 +62,8 @@ const REQUIRED_DOCUMENTS_BY_GROUP: Record<string, string[]> = {
 };
 
 const PENDING_SUPERADMIN_ID_GENERATION = "pending_superadmin_id_generation";
+const ADMIN_REVERIFICATION_REQUESTED = "admin_reverification_requested";
+const VERIFICATION_ADMIN_HANDOFFS = "verificationAdminHandoffs";
 const NOTIFICATION_DATE_FORMATTER = new Intl.DateTimeFormat("en-PH", {
   month: "short",
   day: "numeric",
@@ -468,6 +470,11 @@ function hasAllRequiredDocumentsApproved(profile: AnyRecord, documents: AnyRecor
 function computeQueueStatus(profile: AnyRecord, documents: AnyRecord[]) {
   const finalStatus = String(profile?.status || "pending");
   if (finalStatus === "rejected") return "rejected";
+  const latestDocuments = [...getLatestDocumentsByType(documents).values()];
+
+  if (String(profile?.verificationQueueStatus || "") === ADMIN_REVERIFICATION_REQUESTED) {
+    return ADMIN_REVERIFICATION_REQUESTED;
+  }
 
   if (finalStatus === "verified" && resolveDigitalIdStatus(profile) === "active") {
     return "verified";
@@ -485,12 +492,12 @@ function computeQueueStatus(profile: AnyRecord, documents: AnyRecord[]) {
 
   if (finalStatus === "verified") return "verified";
 
-  if (documents.some((document) => normalizeDocumentStatus(document) === "resubmission_requested")) {
+  if (latestDocuments.some((document) => normalizeDocumentStatus(document) === "resubmission_requested")) {
     return "resubmission_requested";
   }
 
   if (
-    documents.some((document) =>
+    latestDocuments.some((document) =>
       ["approved", "rejected"].includes(normalizeDocumentStatus(document))
     )
   ) {
@@ -758,9 +765,10 @@ export async function getDashboardStats() {
 }
 
 export async function getVerificationProfiles(filters: VerificationQueueFilters = {}) {
-  const [{ users, profileMap }, documentsSnap] = await Promise.all([
+  const [{ users, profileMap }, documentsSnap, handoffsSnap] = await Promise.all([
     getUsersAndProfiles(),
     db.collection("documents").get(),
+    db.collection(VERIFICATION_ADMIN_HANDOFFS).get(),
   ]);
 
   const documentMap = new Map<string, AnyRecord[]>();
@@ -772,6 +780,12 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
     }
     documentMap.get(profileId)!.push(document);
   }
+  const handoffMap = new Map<string, AnyRecord>(
+    handoffsSnap.docs.map((doc) => [
+      doc.id,
+      serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord,
+    ])
+  );
 
   const search = normalizeString(filters.search);
   const ageGroup = String(filters.ageGroup || "").trim();
@@ -786,6 +800,7 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
     .map((user) => {
       const profile = profileMap.get(user.uid) || {};
       const documents = documentMap.get(String(user.uid)) || [];
+      const adminHandoff = handoffMap.get(String(user.uid)) || {};
       const documentSummary = buildVerificationDocuments(profile, documents);
       const computedQueueStatus = computeQueueStatus(profile, documents);
       const submittedAt = String(profile.submittedAt || "");
@@ -809,6 +824,12 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
         verificationDocumentsApprovedBy: profile.verificationDocumentsApprovedBy || null,
         verificationReferredToSuperadminAt: profile.verificationReferredToSuperadminAt || null,
         verificationReferredToSuperadminBy: profile.verificationReferredToSuperadminBy || null,
+        verificationAdminReviewMessage: adminHandoff.message || null,
+        verificationAdminReviewDocumentIds: Array.isArray(adminHandoff.documentIds)
+          ? adminHandoff.documentIds
+          : [],
+        verificationAdminReviewRequestedAt: adminHandoff.requestedAt || null,
+        verificationAdminReviewRequestedBy: adminHandoff.requestedBy || null,
         idPhotoUrl: documentSummary.idPhotoPreviewUrl,
         requiredDocuments: documentSummary.requiredDocuments,
         missingDocuments: documentSummary.missingDocuments,
@@ -898,13 +919,19 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
       inReview: profiles.filter((profile) => profile.queueStatus === "in_review").length,
       pendingSuperadmin: profiles.filter((profile) => profile.queueStatus === PENDING_SUPERADMIN_ID_GENERATION).length,
       resubmissionRequested: profiles.filter((profile) => profile.queueStatus === "resubmission_requested").length,
+      adminReverificationRequested: profiles.filter(
+        (profile) => profile.queueStatus === ADMIN_REVERIFICATION_REQUESTED
+      ).length,
       pendingReview: profiles.filter((profile) =>
-        ["pending", "in_review"].includes(String(profile.queueStatus || ""))
+        ["pending", "in_review", ADMIN_REVERIFICATION_REQUESTED].includes(
+          String(profile.queueStatus || "")
+        )
       ).length,
       flaggedBySystem: profiles.filter((profile) => Number(profile.documentCounts.rejected || 0) > 0).length,
       requiringAttention: profiles.filter(
         (profile) =>
           profile.queueStatus === "resubmission_requested" ||
+          profile.queueStatus === ADMIN_REVERIFICATION_REQUESTED ||
           Number(profile.documentCounts.rejected || 0) > 0 ||
           Number(profile.missingDocuments.length || 0) > 0
       ).length,
@@ -920,10 +947,11 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
 }
 
 export async function getVerificationProfile(userId: string) {
-  const [profileSnap, userSnap, documentsSnap] = await Promise.all([
+  const [profileSnap, userSnap, documentsSnap, handoffSnap] = await Promise.all([
     db.collection("kkProfiling").doc(userId).get(),
     db.collection("users").doc(userId).get(),
     db.collection("documents").where("profileId", "==", userId).get(),
+    db.collection(VERIFICATION_ADMIN_HANDOFFS).doc(userId).get(),
   ]);
 
   if (!profileSnap.exists) return null;
@@ -936,6 +964,9 @@ export async function getVerificationProfile(userId: string) {
   const documentSummary = buildVerificationDocuments(profile, documents);
   const queueStatus = computeQueueStatus(profile, documents);
   const digitalIdStatus = resolveDigitalIdStatus(profile);
+  const adminHandoff = handoffSnap.exists
+    ? serializeRecord({ ...(handoffSnap.data() || {}) } as AnyRecord)
+    : {};
 
   return {
     ...profile,
@@ -945,6 +976,12 @@ export async function getVerificationProfile(userId: string) {
     email: profile.email || user.email || "",
     fullName: [profile.firstName, profile.middleName, profile.lastName].filter(Boolean).join(" "),
     queueStatus,
+    verificationAdminReviewMessage: adminHandoff.message || null,
+    verificationAdminReviewDocumentIds: Array.isArray(adminHandoff.documentIds)
+      ? adminHandoff.documentIds
+      : [],
+    verificationAdminReviewRequestedAt: adminHandoff.requestedAt || null,
+    verificationAdminReviewRequestedBy: adminHandoff.requestedBy || null,
     documents: documents.map((document) => ({
       id: document.id,
       documentType: String(document.documentType || ""),
@@ -1017,6 +1054,18 @@ export async function approveVerification(userId: string, adminEmail: string) {
     { merge: true }
   );
 
+  if (verificationProfileRecord.verificationAdminReviewMessage) {
+    await db.collection(VERIFICATION_ADMIN_HANDOFFS).doc(userId).set(
+      {
+        status: "resolved",
+        resolution: "approved",
+        resolvedAt: FieldValue.serverTimestamp(),
+        resolvedBy: adminEmail,
+      },
+      { merge: true }
+    );
+  }
+
   await createNotification({
     recipientUid: userId,
     audience: "youth",
@@ -1057,7 +1106,28 @@ export async function rejectVerification(
   reason: string,
   note?: string
 ) {
-  await db.collection("kkProfiling").doc(userId).set(
+  const [profileSnap, documentsSnap, handoffSnap] = await Promise.all([
+    db.collection("kkProfiling").doc(userId).get(),
+    db.collection("documents").where("profileId", "==", userId).get(),
+    db.collection(VERIFICATION_ADMIN_HANDOFFS).doc(userId).get(),
+  ]);
+  const profile = profileSnap.exists ? (profileSnap.data() as AnyRecord) || {} : {};
+  const documents = documentsSnap.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() || {}),
+  })) as AnyRecord[];
+  const latestByType = getLatestDocumentsByType(documents);
+  const requiredTypes = getRequiredDocumentTypes(profile);
+  const handoffDocumentIds = new Set(
+    handoffSnap.exists && Array.isArray(handoffSnap.data()?.documentIds)
+      ? handoffSnap.data()?.documentIds.map(String)
+      : []
+  );
+  const feedback = note?.trim() || reason;
+  const batch = db.batch();
+
+  batch.set(
+    db.collection("kkProfiling").doc(userId),
     {
       verified: false,
       status: "rejected",
@@ -1071,12 +1141,52 @@ export async function rejectVerification(
     { merge: true }
   );
 
+  for (const type of requiredTypes) {
+    const document = latestByType.get(type);
+    if (
+      !document?.id ||
+      (normalizeDocumentStatus(document) === "approved" &&
+        !handoffDocumentIds.has(String(document.id)))
+    ) {
+      continue;
+    }
+
+    batch.set(
+      db.collection("documents").doc(String(document.id)),
+      {
+        reviewStatus: "rejected",
+        reviewNote: feedback,
+        reviewedAt: FieldValue.serverTimestamp(),
+        reviewedBy: adminEmail,
+        reviewRequestedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+
+  if (handoffSnap.exists) {
+    batch.set(
+      db.collection(VERIFICATION_ADMIN_HANDOFFS).doc(userId),
+      {
+        status: "resolved",
+        resolution: "rejected",
+        resolvedAt: FieldValue.serverTimestamp(),
+        resolvedBy: adminEmail,
+        adminReason: reason,
+        adminNote: note || null,
+      },
+      { merge: true }
+    );
+  }
+
+  await batch.commit();
+
   await createNotification({
     recipientUid: userId,
     audience: "youth",
     type: "error",
     title: "Verification rejected",
-    body: note?.trim() || reason,
+    body: feedback,
     link: "/verification/upload",
   });
 }
@@ -1149,14 +1259,20 @@ export async function requestVerificationResubmission(
   userId: string,
   documentIds: string[],
   message: string,
-  adminEmail: string
+  adminEmail: string,
+  reviewerRole: string
 ) {
   if (!documentIds.length) {
     throw new Error("At least one document must be selected");
   }
 
   const batch = db.batch();
-  const documents = await Promise.all(documentIds.map((documentId) => db.collection("documents").doc(documentId).get()));
+  const [profileSnap, documents] = await Promise.all([
+    db.collection("kkProfiling").doc(userId).get(),
+    Promise.all(
+      documentIds.map((documentId) => db.collection("documents").doc(documentId).get())
+    ),
+  ]);
 
   for (const documentSnap of documents) {
     if (!documentSnap.exists) {
@@ -1167,7 +1283,79 @@ export async function requestVerificationResubmission(
     if (String(document.profileId || "") !== userId) {
       throw new Error("One or more documents do not belong to this profile");
     }
+  }
 
+  if (normalizeString(reviewerRole) === "superadmin") {
+    const profile = profileSnap.exists ? (profileSnap.data() as AnyRecord) || {} : {};
+    const memberName =
+      [profile.firstName, profile.middleName, profile.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      normalizeOptionalString(profile.email) ||
+      "A youth member";
+
+    batch.set(
+      db.collection("kkProfiling").doc(userId),
+      {
+        verified: false,
+        status: "pending",
+        verificationQueueStatus: ADMIN_REVERIFICATION_REQUESTED,
+        verificationResubmissionMessage: null,
+        verificationActionAt: FieldValue.serverTimestamp(),
+        verificationActionBy: adminEmail,
+        verificationLastAction: ADMIN_REVERIFICATION_REQUESTED,
+        verificationRejectReason: null,
+        verificationRejectNote: null,
+        digitalIdStatus: "draft",
+        digitalIdApprovalRequestedAt: null,
+        digitalIdApprovalRequestedBy: null,
+        verificationReferredToSuperadminAt: null,
+        verificationReferredToSuperadminBy: null,
+        verificationDocumentsApprovedAt: null,
+        verificationDocumentsApprovedBy: null,
+      },
+      { merge: true }
+    );
+    batch.set(
+      db.collection(VERIFICATION_ADMIN_HANDOFFS).doc(userId),
+      {
+        userId,
+        message,
+        documentIds,
+        status: "pending",
+        requestedAt: FieldValue.serverTimestamp(),
+        requestedBy: adminEmail,
+        resolvedAt: null,
+        resolvedBy: null,
+        resolution: null,
+        adminReason: null,
+        adminNote: null,
+      },
+      { merge: true }
+    );
+
+    await batch.commit();
+
+    await createNotificationsForRoles(["admin"], {
+      audience: "admin",
+      type: "warning",
+      title: `Re-verification requested for ${memberName}`,
+      body: message,
+      link: `/verification/${userId}?tab=documents`,
+      metadata: {
+        notificationKind: ADMIN_REVERIFICATION_REQUESTED,
+        userId,
+        memberName,
+        requestedBy: adminEmail,
+        documentIds,
+      },
+    });
+
+    return { destination: "admin" as const };
+  }
+
+  for (const documentSnap of documents) {
     batch.set(
       documentSnap.ref,
       {
@@ -1203,6 +1391,19 @@ export async function requestVerificationResubmission(
     },
     { merge: true }
   );
+  const handoffSnap = await db.collection(VERIFICATION_ADMIN_HANDOFFS).doc(userId).get();
+  if (handoffSnap.exists) {
+    batch.set(
+      db.collection(VERIFICATION_ADMIN_HANDOFFS).doc(userId),
+      {
+        status: "resolved",
+        resolution: "resubmission_requested",
+        resolvedAt: FieldValue.serverTimestamp(),
+        resolvedBy: adminEmail,
+      },
+      { merge: true }
+    );
+  }
 
   await batch.commit();
 
@@ -1214,6 +1415,8 @@ export async function requestVerificationResubmission(
     body: message,
     link: "/verification/upload",
   });
+
+  return { destination: "youth" as const };
 }
 
 export async function bulkApproveVerifications(userIds: string[], adminEmail: string) {
@@ -1512,11 +1715,19 @@ export async function updateMerchant(
     "logoUrl",
     "ownerName",
     "contactNumber",
+    "email",
+    "websiteUrl",
+    "facebookUrl",
+    "mapUrl",
+    "operatingHours",
+    "locationDetails",
     "discountInfo",
     "termsAndConditions",
     "pointsPolicy",
     "pointsRate",
     "businessInfo",
+    "galleryUrls",
+    "isFeatured",
   ];
 
   const payload: AnyRecord = {
@@ -1527,14 +1738,19 @@ export async function updateMerchant(
   for (const [key, value] of Object.entries(data)) {
     if (allowedKeys.includes(key)) {
       payload[key] =
-        key === "termsAndConditions" && Array.isArray(value)
+        ["termsAndConditions", "operatingHours", "locationDetails"].includes(key) && Array.isArray(value)
           ? value.map((entry) => String(entry || "").trim()).filter(Boolean).join("\n")
+          : key === "galleryUrls" && Array.isArray(value)
+            ? value.map((entry) => String(entry || "").trim()).filter(Boolean)
           : value;
     }
   }
 
   if (payload.pointsRate != null) {
     payload.pointsRate = Number(payload.pointsRate);
+  }
+  if (payload.isFeatured != null) {
+    payload.isFeatured = Boolean(payload.isFeatured);
   }
 
   if (payload.businessName && !payload.name) payload.name = payload.businessName;

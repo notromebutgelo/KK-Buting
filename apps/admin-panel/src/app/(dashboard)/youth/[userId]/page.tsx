@@ -111,6 +111,11 @@ export default function YouthDetailPage() {
   }
 
   const handleProfileSave = async () => {
+    if (!isSuperadmin) {
+      setMessage('Only superadmins can edit youth member profile information.')
+      return
+    }
+
     setLoadingTitle('Saving profile changes'); setIsSavingProfile(true); setMessage('')
     try {
       await api.patch(`/admin/youth/${userId}/profile`, { ...editForm, age: editForm.age ? Number(editForm.age) : null, kkAssemblyTimesAttended: editForm.kkAssemblyTimesAttended ? Number(editForm.kkAssemblyTimesAttended) : null, registeredSkVoter: parseBool(editForm.registeredSkVoter), votedLastSkElections: parseBool(editForm.votedLastSkElections), registeredNationalVoter: parseBool(editForm.registeredNationalVoter), attendedKkAssembly: parseBool(editForm.attendedKkAssembly) })
@@ -202,47 +207,64 @@ export default function YouthDetailPage() {
               </div>
             </div>
 
-            <ActionCard title="Edit Youth Profile">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <InputField label="First Name" value={editForm.firstName} onChange={(v) => patchForm('firstName', v)} />
-                <InputField label="Middle Name" value={editForm.middleName} onChange={(v) => patchForm('middleName', v)} />
-                <InputField label="Last Name" value={editForm.lastName} onChange={(v) => patchForm('lastName', v)} />
-                <InputField label="Suffix" value={editForm.suffix} onChange={(v) => patchForm('suffix', v)} />
-                <InputField label="Birthday" type="date" value={editForm.birthday} onChange={(v) => patchForm('birthday', v)} />
-                <InputField label="Age" type="number" value={editForm.age} onChange={(v) => patchForm('age', v)} />
-                <InputField label="Gender" value={editForm.gender} onChange={(v) => patchForm('gender', v)} />
-                <InputField label="Civil Status" value={editForm.civilStatus} onChange={(v) => patchForm('civilStatus', v)} />
-                <InputField label="Contact Number" value={editForm.contactNumber} onChange={(v) => patchForm('contactNumber', v)} />
-                <ReadOnlyField label="Email" value={member.email} />
-                <InputField label="Region" value={editForm.region} onChange={(v) => patchForm('region', v)} />
-                <InputField label="Province" value={editForm.province} onChange={(v) => patchForm('province', v)} />
-                <InputField label="City" value={editForm.city} onChange={(v) => patchForm('city', v)} />
-                <InputField label="Barangay" value={editForm.barangay} onChange={(v) => patchForm('barangay', v)} />
-                <InputField label="House / Block / Unit No." value={editForm.currentAddressHouseBlockUnitNumber} onChange={(v) => patchForm('currentAddressHouseBlockUnitNumber', v)} />
-                <InputField label="Street Address" value={editForm.currentAddressStreetAddress} onChange={(v) => patchForm('currentAddressStreetAddress', v)} />
-                <InputField label="Purok / Zone" value={editForm.purok} onChange={(v) => patchForm('purok', v)} />
-                <InputField label="Years in Barangay" value={editForm.yearsInBarangay} onChange={(v) => patchForm('yearsInBarangay', v)} />
-                <InputField label="Age Group" value={editForm.youthAgeGroup} onChange={(v) => patchForm('youthAgeGroup', v)} />
-                <InputField label="Education" value={editForm.educationalBackground} onChange={(v) => patchForm('educationalBackground', v)} />
-                <InputField label="Classification" value={editForm.youthClassification} onChange={(v) => patchForm('youthClassification', v)} />
-                <InputField label="Work Status" value={editForm.workStatus} onChange={(v) => patchForm('workStatus', v)} />
-                <SelectField label="Registered SK Voter" value={editForm.registeredSkVoter} onChange={(v) => patchForm('registeredSkVoter', v)} />
-                <SelectField label="Voted Last SK Elections" value={editForm.votedLastSkElections} onChange={(v) => patchForm('votedLastSkElections', v)} />
-                <SelectField label="Registered National Voter" value={editForm.registeredNationalVoter} onChange={(v) => patchForm('registeredNationalVoter', v)} />
-                <SelectField label="Attended KK Assembly" value={editForm.attendedKkAssembly} onChange={(v) => patchForm('attendedKkAssembly', v)} />
-                <InputField label="KK Assembly Times Attended" type="number" value={editForm.kkAssemblyTimesAttended} onChange={(v) => patchForm('kkAssemblyTimesAttended', v)} />
-              </div>
-              <button type="button" onClick={handleProfileSave} disabled={isSavingProfile} className="mt-4 w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60" style={{ background: 'var(--accent)' }}>{isSavingProfile ? 'Saving profile...' : 'Save Profile Changes'}</button>
-            </ActionCard>
+            {isSuperadmin ? (
+              <ActionCard title="Edit Youth Profile">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <InputField label="First Name" value={editForm.firstName} onChange={(v) => patchForm('firstName', v)} />
+                  <InputField label="Middle Name" value={editForm.middleName} onChange={(v) => patchForm('middleName', v)} />
+                  <InputField label="Last Name" value={editForm.lastName} onChange={(v) => patchForm('lastName', v)} />
+                  <InputField label="Suffix" value={editForm.suffix} onChange={(v) => patchForm('suffix', v)} />
+                  <InputField label="Birthday" type="date" value={editForm.birthday} onChange={(v) => patchForm('birthday', v)} />
+                  <InputField label="Age" type="number" value={editForm.age} onChange={(v) => patchForm('age', v)} />
+                  <InputField label="Gender" value={editForm.gender} onChange={(v) => patchForm('gender', v)} />
+                  <InputField label="Civil Status" value={editForm.civilStatus} onChange={(v) => patchForm('civilStatus', v)} />
+                  <InputField label="Contact Number" value={editForm.contactNumber} onChange={(v) => patchForm('contactNumber', v)} />
+                  <ReadOnlyField label="Email" value={member.email} />
+                  <InputField label="Region" value={editForm.region} onChange={(v) => patchForm('region', v)} />
+                  <InputField label="Province" value={editForm.province} onChange={(v) => patchForm('province', v)} />
+                  <InputField label="City" value={editForm.city} onChange={(v) => patchForm('city', v)} />
+                  <InputField label="Barangay" value={editForm.barangay} onChange={(v) => patchForm('barangay', v)} />
+                  <InputField label="House / Block / Unit No." value={editForm.currentAddressHouseBlockUnitNumber} onChange={(v) => patchForm('currentAddressHouseBlockUnitNumber', v)} />
+                  <InputField label="Street Address" value={editForm.currentAddressStreetAddress} onChange={(v) => patchForm('currentAddressStreetAddress', v)} />
+                  <InputField label="Purok / Zone" value={editForm.purok} onChange={(v) => patchForm('purok', v)} />
+                  <InputField label="Years in Barangay" value={editForm.yearsInBarangay} onChange={(v) => patchForm('yearsInBarangay', v)} />
+                  <InputField label="Age Group" value={editForm.youthAgeGroup} onChange={(v) => patchForm('youthAgeGroup', v)} />
+                  <InputField label="Education" value={editForm.educationalBackground} onChange={(v) => patchForm('educationalBackground', v)} />
+                  <InputField label="Classification" value={editForm.youthClassification} onChange={(v) => patchForm('youthClassification', v)} />
+                  <InputField label="Work Status" value={editForm.workStatus} onChange={(v) => patchForm('workStatus', v)} />
+                  <SelectField label="Registered SK Voter" value={editForm.registeredSkVoter} onChange={(v) => patchForm('registeredSkVoter', v)} />
+                  <SelectField label="Voted Last SK Elections" value={editForm.votedLastSkElections} onChange={(v) => patchForm('votedLastSkElections', v)} />
+                  <SelectField label="Registered National Voter" value={editForm.registeredNationalVoter} onChange={(v) => patchForm('registeredNationalVoter', v)} />
+                  <SelectField label="Attended KK Assembly" value={editForm.attendedKkAssembly} onChange={(v) => patchForm('attendedKkAssembly', v)} />
+                  <InputField label="KK Assembly Times Attended" type="number" value={editForm.kkAssemblyTimesAttended} onChange={(v) => patchForm('kkAssemblyTimesAttended', v)} />
+                </div>
+                <button type="button" onClick={handleProfileSave} disabled={isSavingProfile} className="mt-4 w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60" style={{ background: 'var(--accent)' }}>{isSavingProfile ? 'Saving profile...' : 'Save Profile Changes'}</button>
+              </ActionCard>
+            ) : (
+              <ActionCard title="Edit Youth Profile">
+                <GateNotice text="Only superadmins can edit youth member profile information." />
+              </ActionCard>
+            )}
           </div>
 
           <div className="flex flex-col gap-5">
             <ActionCard title="Verification Status">
               <div className="flex flex-col gap-3">
-                <SelectStatus value={statusDraft} onChange={(v) => setStatusDraft(v as typeof statusDraft)} />
-                <InputField label="Reason Note" value={statusReason} onChange={setStatusReason} />
-                <TextAreaField label="Admin Note" value={statusNote} onChange={setStatusNote} />
-                <button type="button" onClick={handleStatusSave} disabled={isSavingStatus} className="w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60" style={{ background: 'var(--accent)' }}>{isSavingStatus ? 'Saving...' : 'Save Status'}</button>
+                <SelectStatus
+                  value={statusDraft}
+                  onChange={(v) => setStatusDraft(v as typeof statusDraft)}
+                  canReject={!isSuperadmin}
+                />
+                {!isSuperadmin && statusDraft === 'rejected' ? (
+                  <>
+                    <InputField label="Rejection Reason Shown to Youth" value={statusReason} onChange={setStatusReason} />
+                    <TextAreaField label="Additional Note Shown to Youth" value={statusNote} onChange={setStatusNote} />
+                  </>
+                ) : null}
+                {isSuperadmin ? (
+                  <GateNotice text="Send re-verification feedback from the Verification workspace. Only an admin can write the final rejection note." />
+                ) : null}
+                <button type="button" onClick={handleStatusSave} disabled={isSavingStatus || (isSuperadmin && statusDraft === 'rejected')} className="w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60" style={{ background: 'var(--accent)' }}>{isSavingStatus ? 'Saving...' : 'Save Status'}</button>
                 {profile.status === 'pending' && <Link href={`/verification/${member.uid}`} className="block rounded-xl border px-4 py-2.5 text-center text-sm font-semibold transition-colors hover:bg-[color:var(--accent-soft)]" style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}>Open Verification Review</Link>}
               </div>
             </ActionCard>
@@ -314,8 +336,8 @@ function SelectField({ label, value, onChange }: { label: string; value: string;
   return <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{label}</label><select value={value} onChange={(e) => onChange(e.target.value)} className="surface-input bg-transparent w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"><option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
 }
 
-function SelectStatus({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Verification Status</label><select value={value} onChange={(e) => onChange(e.target.value)} className="surface-input bg-transparent w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option></select></div>
+function SelectStatus({ value, onChange, canReject }: { value: string; onChange: (value: string) => void; canReject: boolean }) {
+  return <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Verification Status</label><select value={value} onChange={(e) => onChange(e.target.value)} className="surface-input bg-transparent w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"><option value="pending">Pending</option><option value="verified">Verified</option>{canReject || value === 'rejected' ? <option value="rejected">Rejected</option> : null}</select></div>
 }
 
 function GateNotice({ text }: { text: string }) {

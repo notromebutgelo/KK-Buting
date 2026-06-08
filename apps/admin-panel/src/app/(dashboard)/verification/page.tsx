@@ -50,6 +50,7 @@ interface QueueProfile {
   queueStatus:
     | 'pending'
     | 'in_review'
+    | 'admin_reverification_requested'
     | 'pending_superadmin_id_generation'
     | 'resubmission_requested'
     | 'verified'
@@ -60,6 +61,10 @@ interface QueueProfile {
   verificationDocumentsApprovedBy?: string | null
   verificationReferredToSuperadminAt?: string | null
   verificationReferredToSuperadminBy?: string | null
+  verificationAdminReviewMessage?: string | null
+  verificationAdminReviewDocumentIds?: string[]
+  verificationAdminReviewRequestedAt?: string | null
+  verificationAdminReviewRequestedBy?: string | null
   idPhotoUrl?: string | null
   requiredDocuments: QueueDocument[]
   missingDocuments: QueueDocument[]
@@ -77,6 +82,7 @@ interface QueueSummary {
   inReview: number
   pendingSuperadmin: number
   resubmissionRequested: number
+  adminReverificationRequested?: number
   pendingReview?: number
   flaggedBySystem?: number
   requiringAttention?: number
@@ -140,6 +146,10 @@ interface VerificationDetailProfile {
   verificationDocumentsApprovedBy?: string | null
   verificationReferredToSuperadminAt?: string | null
   verificationReferredToSuperadminBy?: string | null
+  verificationAdminReviewMessage?: string | null
+  verificationAdminReviewDocumentIds?: string[]
+  verificationAdminReviewRequestedAt?: string | null
+  verificationAdminReviewRequestedBy?: string | null
   idPhotoUrl?: string | null
   documents: ReviewDocument[]
   requiredDocuments: ReviewDocument[]
@@ -188,6 +198,7 @@ export default function VerificationPage() {
     inReview: 0,
     pendingSuperadmin: 0,
     resubmissionRequested: 0,
+    adminReverificationRequested: 0,
     pendingReview: 0,
     flaggedBySystem: 0,
     requiringAttention: 0,
@@ -244,6 +255,7 @@ export default function VerificationPage() {
             inReview: 0,
             pendingSuperadmin: 0,
             resubmissionRequested: 0,
+            adminReverificationRequested: 0,
             pendingReview: 0,
             flaggedBySystem: 0,
             requiringAttention: 0,
@@ -384,7 +396,7 @@ export default function VerificationPage() {
       member: profile.fullName,
       email: profile.email,
       ageGroup: profile.youthAgeGroup,
-      queueStatus: getQueueStatusLabel(profile.queueStatus),
+      queueStatus: getQueueStatusLabel(profile.queueStatus, profile.digitalIdStatus),
       submitted: formatShortDate(profile.submittedAt),
       approvedBy: profile.verificationDocumentsApprovedBy || '',
       referredAt: formatShortDateTime(profile.verificationReferredToSuperadminAt),
@@ -452,7 +464,11 @@ export default function VerificationPage() {
           documentIds: resubmissionTargetIds,
           message: resubmissionMessage,
         })
-        setMessage('Resubmission request sent to the youth member.')
+        setMessage(
+          isSuperadmin
+            ? 'Re-verification request sent to the admin. The youth member was not notified.'
+            : 'Resubmission request sent to the youth member.'
+        )
       }
 
       if (selectedAction === 'reject_submission') {
@@ -475,6 +491,35 @@ export default function VerificationPage() {
     } finally {
       setIsActionLoading(false)
     }
+  }
+
+  const handleQuickApprove = async (profile: QueueProfile) => {
+    if (!canApproveQueueProfile(profile)) {
+      setSelectedUserId(profile.userId)
+      setSelectedAction('open_full_review')
+      setMessage('Open the full review first. Every required document must be approved before this member can move to Digital ID generation.')
+      return
+    }
+
+    setIsActionLoading(true)
+    setSelectedUserId(profile.userId)
+    setMessage('')
+
+    try {
+      await api.patch(`/admin/verification/${profile.userId}/approve`)
+      setMessage('Verification approved. The member is now ready for Digital ID generation.')
+      setRefreshToken((current) => current + 1)
+    } catch (error: any) {
+      setMessage(error?.response?.data?.error || 'Failed to approve this verification request.')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
+
+  const openQuickReject = (profile: QueueProfile) => {
+    setSelectedUserId(profile.userId)
+    setSelectedAction('reject_submission')
+    setMessage('Enter a rejection reason in the quick review panel, then confirm the action.')
   }
 
   const handlePreviewDocument = (fileUrl?: string | null) => {
@@ -556,9 +601,9 @@ export default function VerificationPage() {
               tone="danger"
             />
             <VerificationMetricCard
-              label="Approved Today"
+              label="Ready Today"
               value={queueMetrics.approvedToday.toLocaleString()}
-              description="Approved and ID generated."
+              description="Moved to ID generation queue."
               icon={<BadgeCheck className="h-5 w-5" strokeWidth={2.1} />}
               tone="success"
             />
@@ -607,6 +652,7 @@ export default function VerificationPage() {
                   'all',
                   'pending',
                   'in_review',
+                  'admin_reverification_requested',
                   'pending_superadmin_id_generation',
                   'resubmission_requested',
                   'verified',
@@ -653,14 +699,14 @@ export default function VerificationPage() {
             style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
           >
             <div className="overflow-x-auto">
-              <div className="min-w-[1020px]">
+              <div className="min-w-[1280px]">
                 <div
                   className="grid items-center gap-4 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em]"
                   style={{
                     background: 'var(--surface-muted)',
                     color: 'var(--muted)',
                     gridTemplateColumns:
-                      '32px minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.55fr) minmax(0,1.8fr) 92px 72px',
+                      '32px minmax(0,2.1fr) minmax(0,0.9fr) minmax(0,1.35fr) minmax(0,1.45fr) 92px minmax(330px,1.2fr)',
                   }}
                 >
                   <span />
@@ -692,11 +738,11 @@ export default function VerificationPage() {
                           key={profile.userId}
                           role="button"
                           tabIndex={0}
-                          onClick={() => setSelectedUserId(profile.userId)}
+                          onClick={() => router.push(`/verification/${profile.userId}`)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault()
-                              setSelectedUserId(profile.userId)
+                              router.push(`/verification/${profile.userId}`)
                             }
                           }}
                           className={`grid min-h-[88px] cursor-pointer items-center gap-4 px-4 py-4 transition-all ${
@@ -712,7 +758,7 @@ export default function VerificationPage() {
                               ? 'color-mix(in srgb, var(--accent-soft) 58%, var(--card-solid) 42%)'
                               : 'var(--card-solid)',
                             gridTemplateColumns:
-                              '32px minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.55fr) minmax(0,1.8fr) 92px 72px',
+                              '32px minmax(0,2.1fr) minmax(0,0.9fr) minmax(0,1.35fr) minmax(0,1.45fr) 92px minmax(330px,1.2fr)',
                           }}
                         >
                           <div className="flex items-center justify-center">
@@ -780,7 +826,7 @@ export default function VerificationPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <QueueStatusBadge status={profile.queueStatus} />
+                            <QueueStatusBadge status={profile.queueStatus} digitalIdStatus={profile.digitalIdStatus} />
                             <div className="space-y-1 text-[13px] leading-5" style={{ color: 'var(--muted)' }}>
                               {profile.verificationDocumentsApprovedBy ? (
                                 <p className="truncate">
@@ -801,17 +847,84 @@ export default function VerificationPage() {
                             <span className="block">{formatShortDate(profile.submittedAt)}</span>
                           </div>
 
-                          <div className="flex justify-end">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                router.push(`/verification/${profile.userId}?tab=profile`)
+                              }}
+                              className="admin-action-button h-9 rounded-[12px] px-3 text-[12px] font-semibold"
+                              data-variant="outline"
+                            >
+                              <Eye className="h-4 w-4" strokeWidth={2.1} />
+                              Profile
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                router.push(`/verification/${profile.userId}?tab=documents`)
+                              }}
+                              className="admin-action-button h-9 rounded-[12px] px-3 text-[12px] font-semibold"
+                              data-variant="outline"
+                            >
+                              <FileWarning className="h-4 w-4" strokeWidth={2.1} />
+                              Docs
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void handleQuickApprove(profile)
+                              }}
+                              disabled={isActionLoading || !canApproveQueueProfile(profile)}
+                              className="admin-action-button h-9 rounded-[12px] px-3 text-[12px] font-semibold"
+                              data-variant="success"
+                            >
+                              <CheckCircle2 className="h-4 w-4" strokeWidth={2.1} />
+                              Approve
+                            </button>
+                            {!isSuperadmin ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  openQuickReject(profile)
+                                }}
+                                disabled={profile.queueStatus === 'rejected' || profile.digitalIdStatus === 'active'}
+                                className="admin-action-button h-9 rounded-[12px] px-3 text-[12px] font-semibold"
+                                data-variant="danger"
+                              >
+                                <CircleAlert className="h-4 w-4" strokeWidth={2.1} />
+                                Reject
+                              </button>
+                            ) : null}
+                            {isSuperadmin && profile.queueStatus === 'pending_superadmin_id_generation' ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  router.push(`/digital-ids?member=${profile.userId}`)
+                                }}
+                                className="admin-action-button h-9 rounded-[12px] px-3 text-[12px] font-semibold"
+                                data-variant="primary"
+                              >
+                                <BadgeCheck className="h-4 w-4" strokeWidth={2.1} />
+                                Generate ID
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation()
                                 setSelectedUserId(profile.userId)
                               }}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[color:var(--surface-muted)]"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[color:var(--surface-muted)]"
                               style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
+                              aria-label="Open quick review panel"
                             >
-                              <Eye className="h-4.5 w-4.5" strokeWidth={2.1} />
+                              <ShieldCheck className="h-4.5 w-4.5" strokeWidth={2.1} />
                             </button>
                           </div>
                         </div>
@@ -1035,6 +1148,11 @@ export default function VerificationPage() {
                       <p className="truncate text-[13px]" style={{ color: 'var(--muted)' }}>
                         Uploaded: {formatShortDateTime(document.uploadedAt)}
                       </p>
+                      {document.reviewNote ? (
+                        <p className="mt-1 line-clamp-2 text-[12px] leading-5" style={{ color: '#9e4040' }}>
+                          {document.reviewNote}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="sm:justify-self-start">
@@ -1086,9 +1204,43 @@ export default function VerificationPage() {
                 </div>
               </div>
 
+              {selectedProfile.verificationAdminReviewMessage ? (
+                <div
+                  className="rounded-[16px] border px-4 py-4"
+                  style={{
+                    borderColor: 'color-mix(in srgb, var(--warning-accent) 30%, white 70%)',
+                    background: 'var(--warning-bg)',
+                  }}
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--warning-fg)' }}>
+                    Superadmin Re-verification Message
+                  </p>
+                  <p className="mt-2 text-sm leading-6" style={{ color: 'var(--warning-fg)' }}>
+                    {selectedProfile.verificationAdminReviewMessage}
+                  </p>
+                  <p className="mt-2 text-xs" style={{ color: 'var(--warning-fg)' }}>
+                    Sent by {selectedProfile.verificationAdminReviewRequestedBy || 'superadmin'}
+                    {selectedProfile.verificationAdminReviewRequestedAt
+                      ? ` on ${formatLongDateTime(selectedProfile.verificationAdminReviewRequestedAt)}`
+                      : ''}
+                  </p>
+                  {selectedProfile.verificationAdminReviewDocumentIds?.length ? (
+                    <p className="mt-2 text-xs font-semibold" style={{ color: 'var(--warning-fg)' }}>
+                      Documents for admin review:{' '}
+                      {selectedProfile.documents
+                        .filter((document) =>
+                          selectedProfile.verificationAdminReviewDocumentIds?.includes(document.id)
+                        )
+                        .map((document) => document.label)
+                        .join(', ') || 'Selected verification documents'}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div>
                 <h3 className="text-base font-black" style={{ color: 'var(--ink)' }}>
-                  Superadmin Action
+                  Review Action
                 </h3>
                 <div
                   className="mt-3 rounded-[16px] border px-4 py-3"
@@ -1127,15 +1279,24 @@ export default function VerificationPage() {
               {selectedAction === 'request_resubmission' ? (
                 <div className="space-y-2">
                   <label className="block text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
-                    Resubmission Message
+                    {isSuperadmin ? 'Message to Admin' : 'Resubmission Message'}
                   </label>
                   <textarea
                     value={resubmissionMessage}
                     onChange={(event) => setResubmissionMessage(event.target.value)}
                     rows={4}
-                    placeholder="Tell the youth member what needs to be corrected or re-uploaded."
+                    placeholder={
+                      isSuperadmin
+                        ? 'Explain what the admin should verify again before deciding the member outcome.'
+                        : 'Tell the youth member what needs to be corrected or re-uploaded.'
+                    }
                     className="surface-input w-full rounded-[14px] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/20"
                   />
+                  {isSuperadmin ? (
+                    <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
+                      This message is sent only to admins. An admin will provide the final rejection note to the youth member.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1155,13 +1316,13 @@ export default function VerificationPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
-                      Internal Note
+                      Additional Note Shown to Youth
                     </label>
                     <textarea
                       value={rejectNote}
                       onChange={(event) => setRejectNote(event.target.value)}
                       rows={3}
-                      placeholder="Add a supporting note for the rejection record."
+                      placeholder="Add any details the youth member needs before submitting again."
                       className="surface-input w-full rounded-[14px] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/20"
                     />
                   </div>
@@ -1286,13 +1447,19 @@ function FilterField({
   )
 }
 
-function QueueStatusBadge({ status }: { status: string }) {
+function QueueStatusBadge({
+  status,
+  digitalIdStatus,
+}: {
+  status: string
+  digitalIdStatus?: string
+}) {
   return (
     <span
       data-tone={getQueueTone(status)}
       className="admin-status-pill rounded-full px-2.5 py-1 text-xs font-semibold"
     >
-      {getQueueStatusLabel(status)}
+      {getQueueStatusLabel(status, digitalIdStatus)}
     </span>
   )
 }
@@ -1358,12 +1525,17 @@ function getVerificationMetricPalette(
   }
 }
 
-function getQueueStatusLabel(value: string) {
-  if (value === 'pending_superadmin_id_generation') return 'Pending Superadmin Review'
-  if (value === 'in_review') return 'Documents In Review'
+function getQueueStatusLabel(value: string, digitalIdStatus?: string) {
+  if (digitalIdStatus === 'active') return 'Digital ID Generated'
+  if (value === 'active') return 'Digital ID Generated'
+  if (value === 'pending_approval') return 'Ready for Digital ID Generation'
+  if (value === 'draft') return 'Draft'
+  if (value === 'pending_superadmin_id_generation') return 'Ready for Digital ID Generation'
+  if (value === 'admin_reverification_requested') return 'Admin Re-verification Required'
+  if (value === 'in_review') return 'Pending Review'
   if (value === 'pending') return 'Pending Review'
   if (value === 'resubmission_requested') return 'Needs Attention'
-  if (value === 'verified') return 'Verified'
+  if (value === 'verified') return digitalIdStatus ? 'Approved' : 'Digital ID Generated'
   if (value === 'rejected') return 'Rejected'
   return value.split('_').join(' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
@@ -1379,6 +1551,7 @@ function getDocumentStatusLabel(value: string) {
 function getQueueTone(status: string) {
   if (status === 'pending' || status === 'in_review') return 'info'
   if (status === 'pending_superadmin_id_generation') return 'info'
+  if (status === 'admin_reverification_requested') return 'warning'
   if (status === 'resubmission_requested') return 'warning'
   if (status === 'rejected') return 'danger'
   if (status === 'verified') return 'success'
@@ -1449,6 +1622,19 @@ function isSameDay(value?: string | null) {
 function canApproveAndRefer(profile: VerificationDetailProfile | null) {
   if (!profile) return false
   if (profile.queueStatus === 'pending_superadmin_id_generation') return false
+  if (profile.queueStatus === 'admin_reverification_requested') return false
+  if (profile.digitalIdStatus === 'active') return false
+  if (profile.missingDocuments.length > 0) return false
+  if (!profile.requiredDocuments.length) return false
+
+  return profile.requiredDocuments.every(
+    (document) => document.present && document.reviewStatus === 'approved'
+  )
+}
+
+function canApproveQueueProfile(profile: QueueProfile) {
+  if (profile.queueStatus === 'pending_superadmin_id_generation') return false
+  if (profile.queueStatus === 'admin_reverification_requested') return false
   if (profile.digitalIdStatus === 'active') return false
   if (profile.missingDocuments.length > 0) return false
   if (!profile.requiredDocuments.length) return false
@@ -1493,8 +1679,8 @@ function getReviewActionOptions(
   if (isSuperadmin && profile.queueStatus === 'pending_superadmin_id_generation') {
     options.push({
       id: 'open_digital_ids',
-      label: 'Approve and Generate ID',
-      description: 'Approve this submission and continue in the Digital IDs workspace.',
+      label: 'Generate Digital ID',
+      description: 'Open the Digital IDs workspace for this ready member.',
       tone: 'success',
     })
   } else if (canApproveAndRefer(profile)) {
@@ -1515,7 +1701,10 @@ function getReviewActionOptions(
     })
   }
 
-  if (profile.requiredDocuments.length > 0) {
+  if (
+    profile.requiredDocuments.length > 0 &&
+    !(isSuperadmin && profile.queueStatus === 'admin_reverification_requested')
+  ) {
     options.push({
       id: 'request_resubmission',
       label: isSuperadmin ? 'Request Admin to Verify Again' : 'Request Resubmission',
@@ -1526,7 +1715,11 @@ function getReviewActionOptions(
     })
   }
 
-  if (isSuperadmin) {
+  if (
+    !isSuperadmin &&
+    profile.queueStatus !== 'rejected' &&
+    profile.digitalIdStatus !== 'active'
+  ) {
     options.push({
       id: 'reject_submission',
       label: 'Reject Submission',

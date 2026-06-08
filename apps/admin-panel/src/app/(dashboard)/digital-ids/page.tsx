@@ -1081,17 +1081,36 @@ function DigitalIdPreviewCard({
 
   if (previewSide === 'front') {
     return (
-      <div ref={cardRef} className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
+      <div ref={cardRef} className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
         <img src="/images/KK ID - Front BG.png" alt="KK ID front background" className="absolute inset-0 h-full w-full object-cover" />
         <DigitalIdFrontHeader />
         <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
           <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
             <div className="flex flex-col items-center">
-              <p className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-[0.35rem] font-black leading-none tracking-[0.05em] text-[#0b2f5b]">
-                {member.memberId || member.profile?.idNumber || 'DRAFT'}
-              </p>
-              <div className="mt-[2.3%] flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
-                {photoUrl ? <img src={photoUrl} alt={fullName} className="h-full w-full object-cover" /> : <span className="text-sm font-black text-[#014384]">{getInitials(fullName)}</span>}
+              <div className="relative z-10 flex min-h-[2.25cqw] w-full items-center justify-center px-[2%]">
+                <p className="max-w-full whitespace-nowrap text-center text-[1.7cqw] font-black leading-[1.25] tracking-[0.05em] text-[#0b2f5b]">
+                  {member.memberId || member.profile?.idNumber || 'DRAFT'}
+                </p>
+              </div>
+              <div className="relative mt-[3.8%] flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
+                {photoUrl ? (
+                  <>
+                    <img
+                      src={photoUrl}
+                      alt=""
+                      aria-hidden="true"
+                      className="pointer-events-none absolute h-px w-px opacity-0"
+                    />
+                    <div
+                      role="img"
+                      aria-label={fullName}
+                      className="h-full w-full bg-cover bg-center bg-no-repeat"
+                      style={{ backgroundImage: `url("${photoUrl}")` }}
+                    />
+                  </>
+                ) : (
+                  <span className="text-[3cqw] font-black text-[#014384]">{getInitials(fullName)}</span>
+                )}
               </div>
               <div className="mt-[4.6%] flex h-[13%] w-full items-end justify-center overflow-hidden px-[4%]">
                 {signatureUrl ? (
@@ -1099,7 +1118,7 @@ function DigitalIdPreviewCard({
                 ) : null}
               </div>
               <div className="w-full border-t border-[#808080] pt-[3.2%] text-center">
-                <p className="text-[0.38rem] font-medium tracking-[0.07em] text-[#1a1a1a]">SIGNATURE</p>
+                <p className="text-[1.55cqw] font-medium tracking-[0.07em] text-[#1a1a1a]">SIGNATURE</p>
               </div>
             </div>
 
@@ -1120,7 +1139,7 @@ function DigitalIdPreviewCard({
   }
 
   return (
-    <div ref={cardRef} className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
+    <div ref={cardRef} className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
       <div className="absolute inset-[3.6%] rounded-[18px] border-[1.5px] border-[#4e5650]/65" />
       <div className="absolute inset-[6.2%] rounded-[14px] border border-[#838b85]/35" />
       <div className="relative flex h-full flex-col px-[9%] pb-[10.2%] pt-[9.8%] text-[#2b312e]">
@@ -1315,8 +1334,8 @@ function SummaryIcon({ tone }: { tone: 'draft' | 'pending' | 'active' | 'deactiv
 function PreviewField({ label, value, className = '' }: { label: string; value: string; className?: string }) {
   return (
     <div className={className}>
-      <p className="text-[0.38rem] font-bold uppercase tracking-[0.06em] text-[#1d5aa1]">{label}:</p>
-      <p className="break-words text-[0.64rem] font-black leading-[1.15] text-[#0b2f5b]">{value || '-'}</p>
+      <p className="text-[1.55cqw] font-bold uppercase leading-[1.18] tracking-[0.06em] text-[#1d5aa1]">{label}:</p>
+      <p className="break-words text-[2.62cqw] font-black leading-[1.15] text-[#0b2f5b]">{value || '-'}</p>
     </div>
   )
 }
@@ -1369,42 +1388,30 @@ async function buildDigitalIdPdf(
   canvasSource?: DigitalIdCanvasSource
 ) {
   const { front, back } = canvasSource ? await canvasSource : await renderDigitalIdCanvases(member)
-  const cardWidth = 420
-  const frontHeight = cardWidth * (front.height / front.width)
-  const backHeight = cardWidth * (back.height / back.width)
-  const pageMargin = 20
-  const pageWidth = cardWidth + pageMargin * 2
-  const pageHeight = Math.max(frontHeight, backHeight) + pageMargin * 2
   const doc = new jsPDF({
     orientation: 'landscape',
-    unit: 'pt',
-    format: [pageWidth, pageHeight],
+    unit: 'px',
+    format: [front.width, front.height],
   })
 
-  drawDigitalIdPdfPage(doc, front, cardWidth, frontHeight, pageWidth, pageHeight)
-  doc.addPage([pageWidth, pageHeight], 'landscape')
-  drawDigitalIdPdfPage(doc, back, cardWidth, backHeight, pageWidth, pageHeight)
+  drawDigitalIdPdfPage(doc, front)
+  doc.addPage([back.width, back.height], 'landscape')
+  drawDigitalIdPdfPage(doc, back)
 
   return doc
 }
 
 function drawDigitalIdPdfPage(
   doc: jsPDF,
-  canvas: HTMLCanvasElement,
-  cardWidth: number,
-  cardHeight: number,
-  pageWidth: number,
-  pageHeight: number
+  canvas: HTMLCanvasElement
 ) {
-  doc.setFillColor(245, 249, 255)
-  doc.rect(0, 0, pageWidth, pageHeight, 'F')
   doc.addImage(
     canvas.toDataURL('image/png'),
     'PNG',
-    (pageWidth - cardWidth) / 2,
-    (pageHeight - cardHeight) / 2,
-    cardWidth,
-    cardHeight
+    0,
+    0,
+    canvas.width,
+    canvas.height
   )
 }
 

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AlertModal from '@/components/ui/AlertModal'
 import { getProfiling } from '@/services/profiling.service'
-import { uploadVerificationID } from '@/services/verification.service'
+import { getVerificationStatus, uploadVerificationID } from '@/services/verification.service'
 
 type VerificationDocType =
   | 'certificate_of_residency'
@@ -19,6 +19,32 @@ interface DocumentStep {
   docType: VerificationDocType
   title: string
   helper: string
+  reviewStatus?: string
+  reviewNote?: string | null
+  reviewedAt?: string | null
+  reviewedBy?: string | null
+  present?: boolean
+}
+
+interface VerificationStatusDocument {
+  documentType: VerificationDocType | string
+  label?: string
+  reviewStatus?: string
+  reviewNote?: string | null
+  reviewedAt?: string | null
+  reviewedBy?: string | null
+  present?: boolean
+}
+
+interface VerificationStatusProfile {
+  status?: string
+  verificationQueueStatus?: string
+  documentsSubmitted?: boolean
+  verificationRejectReason?: string | null
+  verificationRejectNote?: string | null
+  verificationResubmissionMessage?: string | null
+  requiredDocuments?: VerificationStatusDocument[]
+  correctionDocuments?: VerificationStatusDocument[]
 }
 
 function isChildYouthGroup(ageGroup: string) {
@@ -36,10 +62,11 @@ export default function VerificationUploadPage() {
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [error, setError] = useState('')
   const [ageGroup, setAgeGroup] = useState('')
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatusProfile | null>(null)
   const [showSourceActions, setShowSourceActions] = useState(false)
   const isChildYouth = isChildYouthGroup(ageGroup)
 
-  const documentSteps = useMemo<DocumentStep[]>(() => {
+  const allDocumentSteps = useMemo<DocumentStep[]>(() => {
     if (isChildYouth) {
       return [
         {
@@ -79,15 +106,48 @@ export default function VerificationUploadPage() {
     ]
   }, [isChildYouth])
 
+  const isCorrectionMode = isVerificationCorrectionMode(verificationStatus)
+
+  const documentSteps = useMemo<DocumentStep[]>(() => {
+    const actionableDocuments = getActionableDocuments(verificationStatus)
+
+    if (!actionableDocuments.length) {
+      return isCorrectionMode ? [] : allDocumentSteps
+    }
+
+    const actionByType = new Map(
+      actionableDocuments.map((document) => [String(document.documentType), document])
+    )
+
+    return allDocumentSteps
+      .filter((step) => actionByType.has(step.docType))
+      .map((step) => {
+        const document = actionByType.get(step.docType)
+        return {
+          ...step,
+          helper: buildStepHelper(step, document, isCorrectionMode),
+          reviewStatus: document?.reviewStatus,
+          reviewNote: document?.reviewNote,
+          reviewedAt: document?.reviewedAt,
+          reviewedBy: document?.reviewedBy,
+          present: document?.present,
+        }
+      })
+  }, [allDocumentSteps, isCorrectionMode, verificationStatus])
+
   useEffect(() => {
     let mounted = true
 
     const loadProfile = async () => {
       setIsProfileLoading(true)
       try {
-        const profile = await getProfiling()
+        const [profile, status] = await Promise.all([
+          getProfiling(),
+          getVerificationStatus().catch(() => null),
+        ])
         if (!mounted) return
         setAgeGroup(profile?.youthAgeGroup || '')
+        setVerificationStatus(status)
       } catch {
         if (!mounted) return
         setError('We could not load your profiling record. Please try again.')
@@ -207,10 +267,12 @@ export default function VerificationUploadPage() {
       <div className="flex min-h-screen items-center justify-center bg-[#f5f5f5] px-4">
         <div className="max-w-sm rounded-[24px] bg-white px-6 py-5 text-center shadow-[0_24px_60px_rgba(1,67,132,0.18)]">
           <p className="text-sm font-medium text-[#c24b4b]">
-            We could not determine your required verification documents yet.
+            {isCorrectionMode
+              ? 'There are no rejected or pending documents to upload right now.'
+              : 'We could not determine your required verification documents yet.'}
           </p>
-          <Link href="/intro" className="mt-4 inline-block text-sm font-semibold text-[#014384]">
-            Back to profiling
+          <Link href={isCorrectionMode ? '/verification/status' : '/intro'} className="mt-4 inline-block text-sm font-semibold text-[#014384]">
+            {isCorrectionMode ? 'Back to verification status' : 'Back to profiling'}
           </Link>
         </div>
       </div>
@@ -256,6 +318,11 @@ export default function VerificationUploadPage() {
 
             <div className="rounded-[28px] bg-white px-5 pb-5 pt-6 shadow-[0_24px_60px_rgba(1,67,132,0.18)]">
               <div className="mb-5 text-center">
+                {isCorrectionMode ? (
+                  <div className="mb-4 rounded-[18px] border border-[#f3ddb1] bg-[#fff8ea] px-4 py-3 text-left text-[12px] leading-[1.55] text-[#7c5a0a]">
+                    Only the document{documentSteps.length === 1 ? '' : 's'} that need attention are shown here. Approved documents do not need to be uploaded again.
+                  </div>
+                ) : null}
                 <p className="mx-auto max-w-[250px] text-[13px] leading-[1.5] text-[#4f6f9b]">
                   {currentDocument.helper}
                 </p>
@@ -268,6 +335,14 @@ export default function VerificationUploadPage() {
                 {isIdPhotoStep ? (
                   <div className="mt-4 rounded-[18px] bg-[#fff8eb] px-4 py-3 text-left text-[12px] leading-[1.55] text-[#7c5a0a]">
                     This photo will be used on your Digital KK ID after your account is verified, so use a clear front-facing picture with good lighting.
+                  </div>
+                ) : null}
+                {currentDocument.reviewNote ? (
+                  <div className="mt-4 rounded-[18px] border border-[#f3d4d4] bg-[#fff4f4] px-4 py-3 text-left text-[12px] leading-[1.55] text-[#9e4040]">
+                    <span className="block font-bold uppercase tracking-[0.12em] text-[#c15050]">
+                      Reviewer feedback
+                    </span>
+                    <span className="mt-1 block">{currentDocument.reviewNote}</span>
                   </div>
                 ) : null}
               </div>
@@ -430,29 +505,43 @@ export default function VerificationUploadPage() {
 
             <div className="mt-4 rounded-[24px] bg-white/88 px-5 py-5 shadow-[0_16px_40px_rgba(1,67,132,0.1)] backdrop-blur-[4px]">
               <h2 className="text-[16px] font-extrabold text-[#014384]">
-                Required Documents
+                {isCorrectionMode ? 'Documents to Upload' : 'Required Documents'}
               </h2>
               <ul className="mt-3 space-y-2.5">
                 {documentSteps.map((step) => (
                   <li
                     key={step.docType}
-                    className="flex items-start gap-2.5 text-[13px] leading-[1.45] text-[#1e4f91]"
+                    className="rounded-[16px] border border-[#dce8f7] bg-[#f8fbff] px-3 py-3 text-[13px] leading-[1.45] text-[#1e4f91]"
                   >
-                    <span className="mt-[3px] inline-flex h-[16px] w-[16px] flex-shrink-0 items-center justify-center rounded-full bg-[#edf4fb] text-[#014384]">
-                      <svg
-                        width="10"
-                        height="10"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M5 13l4 4L19 7" />
-                      </svg>
-                    </span>
-                    <span>{step.title}</span>
+                    <div className="flex items-start gap-2.5">
+                      <span className="mt-[3px] inline-flex h-[16px] w-[16px] flex-shrink-0 items-center justify-center rounded-full bg-[#edf4fb] text-[#014384]">
+                        <svg
+                          width="10"
+                          height="10"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 13l4 4L19 7" />
+                        </svg>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-bold">{step.title}</span>
+                        {isCorrectionMode ? (
+                          <span className="mt-1 inline-flex rounded-full bg-white px-2 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[#4f6f9b]">
+                            {getReviewStatusLabel(step.reviewStatus)}
+                          </span>
+                        ) : null}
+                        {step.reviewNote ? (
+                          <span className="mt-2 block text-[12px] leading-[1.5] text-[#9e4040]">
+                            {step.reviewNote}
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -467,7 +556,7 @@ export default function VerificationUploadPage() {
                 <li>Use good lighting and avoid blurry photos.</li>
                 <li>Avoid glare, shadows, or cropped edges on the document.</li>
                 <li>Your final step should always be a clean ID photo.</li>
-                <li>The ID photo you submit will appear on your Digital KK ID once approved.</li>
+                <li>{isCorrectionMode ? 'Only replace the documents listed above.' : 'The ID photo you submit will appear on your Digital KK ID once approved.'}</li>
               </ul>
             </div>
 
@@ -514,4 +603,89 @@ export default function VerificationUploadPage() {
       />
     </div>
   )
+}
+
+function isVerificationCorrectionMode(profile: VerificationStatusProfile | null) {
+  if (!profile) return false
+  const documents = [
+    ...(profile.correctionDocuments || []),
+    ...(profile.requiredDocuments || []),
+  ]
+  return (
+    profile.status === 'rejected' ||
+    profile.verificationQueueStatus === 'rejected' ||
+    profile.verificationQueueStatus === 'resubmission_requested' ||
+    documents.some((document) =>
+      ['rejected', 'resubmission_requested'].includes(
+        normalizeReviewStatus(document.reviewStatus)
+      )
+    )
+  )
+}
+
+function getActionableDocuments(profile: VerificationStatusProfile | null) {
+  if (!profile) return []
+
+  const sourceDocuments =
+    profile.correctionDocuments?.length
+      ? profile.correctionDocuments
+      : profile.requiredDocuments || []
+  const correctionMode = isVerificationCorrectionMode(profile)
+
+  if (correctionMode) {
+    const flagged = sourceDocuments.filter((document) =>
+      needsUploadInCorrectionMode(document)
+    )
+
+    if (flagged.length > 0) {
+      return flagged
+    }
+
+    return (profile.requiredDocuments || []).filter(
+      (document) => normalizeReviewStatus(document.reviewStatus) !== 'approved'
+    )
+  }
+
+  return sourceDocuments.filter((document) => !document.present)
+}
+
+function needsUploadInCorrectionMode(document: VerificationStatusDocument) {
+  if (!document.present) return true
+  return ['missing', 'pending', 'rejected', 'resubmission_requested'].includes(
+    normalizeReviewStatus(document.reviewStatus)
+  )
+}
+
+function buildStepHelper(
+  step: DocumentStep,
+  document: VerificationStatusDocument | undefined,
+  correctionMode: boolean
+) {
+  if (!correctionMode) return step.helper
+
+  const status = normalizeReviewStatus(document?.reviewStatus)
+  if (status === 'rejected') {
+    return `This ${step.title} was rejected. Upload a corrected file to continue your verification.`
+  }
+  if (status === 'resubmission_requested') {
+    return `A reviewer requested a new ${step.title}. Upload the replacement file here.`
+  }
+  if (status === 'pending') {
+    return `This ${step.title} still needs a replacement before review can continue.`
+  }
+  return `Upload your ${step.title} so your verification can continue.`
+}
+
+function normalizeReviewStatus(status?: string | null) {
+  return String(status || 'missing').toLowerCase()
+}
+
+function getReviewStatusLabel(status?: string | null) {
+  const normalized = normalizeReviewStatus(status)
+  if (normalized === 'resubmission_requested') return 'Requested'
+  if (normalized === 'rejected') return 'Rejected'
+  if (normalized === 'pending') return 'Pending'
+  if (normalized === 'missing') return 'Missing'
+  if (normalized === 'approved') return 'Approved'
+  return normalized.split('_').join(' ')
 }

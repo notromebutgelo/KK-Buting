@@ -169,16 +169,7 @@ function hasAllRequiredDocumentsApproved(
   profile: Record<string, any>,
   documents: Record<string, any>[]
 ) {
-  const latestByType = new Map<string, Record<string, any>>();
-
-  for (const document of [...documents].sort((a, b) =>
-    String(toIso(b.uploadedAt) || "").localeCompare(String(toIso(a.uploadedAt) || ""))
-  )) {
-    const type = String(document.documentType || "");
-    if (type && !latestByType.has(type)) {
-      latestByType.set(type, document);
-    }
-  }
+  const latestByType = getLatestDocumentsByType(documents);
 
   return getRequiredDocumentTypes(profile.youthAgeGroup).every((type) => {
     const document = latestByType.get(type);
@@ -198,6 +189,21 @@ function normalizeDocumentStatus(document: Record<string, any>) {
   return String(document.reviewStatus || document.status || "pending");
 }
 
+function getLatestDocumentsByType(documents: Record<string, any>[]) {
+  const latestByType = new Map<string, Record<string, any>>();
+
+  for (const document of [...documents].sort((a, b) =>
+    String(toIso(b.uploadedAt) || "").localeCompare(String(toIso(a.uploadedAt) || ""))
+  )) {
+    const type = String(document.documentType || "");
+    if (type && !latestByType.has(type)) {
+      latestByType.set(type, document);
+    }
+  }
+
+  return latestByType;
+}
+
 function getDocumentBucketCandidates() {
   const primaryBucketName = storage.bucket().name;
   const candidates = [primaryBucketName];
@@ -214,6 +220,8 @@ function getDocumentBucketCandidates() {
 function computeQueueStatus(profile: Record<string, any>, documents: Record<string, any>[]) {
   const finalStatus = String(profile.status || "pending");
   if (finalStatus === "rejected") return "rejected";
+  const latestDocuments = [...getLatestDocumentsByType(documents).values()];
+
   if (
     (finalStatus === "verified" && profile.verificationReferredToSuperadminAt) ||
     (finalStatus === "verified" && profile.digitalIdApprovalRequestedAt) ||
@@ -224,11 +232,11 @@ function computeQueueStatus(profile: Record<string, any>, documents: Record<stri
     return PENDING_SUPERADMIN_ID_GENERATION;
   }
   if (finalStatus === "verified") return "verified";
-  if (documents.some((document) => normalizeDocumentStatus(document) === "resubmission_requested")) {
+  if (latestDocuments.some((document) => normalizeDocumentStatus(document) === "resubmission_requested")) {
     return "resubmission_requested";
   }
   if (
-    documents.some((document) =>
+    latestDocuments.some((document) =>
       ["approved", "rejected"].includes(normalizeDocumentStatus(document))
     )
   ) {
@@ -339,10 +347,19 @@ export async function getMyVerificationStatus(uid: string) {
       uploadedAt: toIso(source?.uploadedAt),
       reviewStatus: source ? normalizeDocumentStatus(source) : "missing",
       reviewNote: source?.reviewNote || null,
+      reviewRequestedAt: toIso(source?.reviewRequestedAt),
+      reviewedAt: toIso(source?.reviewedAt),
+      reviewedBy: source?.reviewedBy || null,
       present: Boolean(source),
       required: true,
     };
   });
+  const correctionDocuments = requiredDocuments.filter((document) =>
+    !document.present ||
+    ["missing", "pending", "rejected", "resubmission_requested"].includes(
+      String(document.reviewStatus || "")
+    )
+  );
 
   const documents = rawDocuments.map((document) => ({
     id: document.id,
@@ -352,6 +369,9 @@ export async function getMyVerificationStatus(uid: string) {
     uploadedAt: toIso(document.uploadedAt),
     reviewStatus: normalizeDocumentStatus(document),
     reviewNote: document.reviewNote || null,
+    reviewRequestedAt: toIso(document.reviewRequestedAt),
+    reviewedAt: toIso(document.reviewedAt),
+    reviewedBy: document.reviewedBy || null,
     required: requiredTypes.includes(String(document.documentType || "")),
   }));
 
@@ -419,6 +439,7 @@ export async function getMyVerificationStatus(uid: string) {
       null,
     documents,
     requiredDocuments,
+    correctionDocuments,
     missingDocuments: requiredDocuments.filter((document) => !document.present),
   };
 }

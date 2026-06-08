@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import {
   Clock3,
   Eye,
@@ -12,6 +13,8 @@ import {
   Save,
   Search,
   Store,
+  Trash2,
+  Upload,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -27,6 +30,7 @@ import {
 } from '@/components/admin/workspace'
 import { DashboardPill } from '@/components/dashboard/primitives'
 import { cn } from '@/utils/cn'
+import { prepareMerchantImage } from '@/lib/merchant-images'
 
 type MerchantStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
 
@@ -148,6 +152,7 @@ export default function MerchantsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [uploadingAsset, setUploadingAsset] = useState<'logo' | 'banner' | null>(null)
   const [loadingLabel, setLoadingLabel] = useState('Updating merchant')
   const [message, setMessage] = useState('')
   const [showDirectoryDetails, setShowDirectoryDetails] = useState(false)
@@ -423,6 +428,48 @@ export default function MerchantsPage() {
   function generateEmail(name: string) {
     const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'merchant'
     return `${slug}@kkbuting.test`
+  }
+
+  async function handleMerchantAssetUpload(assetType: 'logo' | 'banner', file: File) {
+    if (!selectedMerchant || !isSuperadmin) return
+    setUploadingAsset(assetType)
+    setMessage('')
+
+    try {
+      const fileData = await prepareMerchantImage(file, assetType === 'logo' ? 900 : 1800)
+      const response = await api.post(`/admin/merchants/${selectedMerchant.id}/assets`, {
+        assetType,
+        fileData,
+      })
+      const field = assetType === 'logo' ? 'logoUrl' : 'bannerUrl'
+      setEditor((current) => ({ ...current, [field]: response.data.fileUrl || '' }))
+      setMessage(`${assetType === 'logo' ? 'Logo' : 'Banner'} uploaded successfully.`)
+      await refreshMerchants(selectedMerchant.id)
+    } catch (error: any) {
+      setMessage(error?.response?.data?.error || error?.message || 'Failed to upload the image.')
+    } finally {
+      setUploadingAsset(null)
+    }
+  }
+
+  async function handleMerchantAssetRemove(assetType: 'logo' | 'banner') {
+    if (!selectedMerchant || !isSuperadmin) return
+    setUploadingAsset(assetType)
+    setMessage('')
+
+    try {
+      await api.delete(`/admin/merchants/${selectedMerchant.id}/assets`, {
+        data: { assetType },
+      })
+      const field = assetType === 'logo' ? 'logoUrl' : 'bannerUrl'
+      setEditor((current) => ({ ...current, [field]: '' }))
+      setMessage(`${assetType === 'logo' ? 'Logo' : 'Banner'} removed.`)
+      await refreshMerchants(selectedMerchant.id)
+    } catch (error: any) {
+      setMessage(error?.response?.data?.error || 'Failed to remove the image.')
+    } finally {
+      setUploadingAsset(null)
+    }
   }
 
   function generatePassword() {
@@ -1420,13 +1467,18 @@ export default function MerchantsPage() {
 
                       <MerchantProfileEditor
                         editor={editor}
+                        merchantId={selectedMerchant.id}
                         loginEmail={selectedMerchant.ownerEmail || ''}
                         isSaving={isSaving}
+                        isSuperadmin={isSuperadmin}
+                        uploadingAsset={uploadingAsset}
                         roleLabel={isSuperadmin ? 'Superadmin access' : 'Admin access'}
                         onChange={(field, value) =>
                           setEditor((current) => ({ ...current, [field]: value }))
                         }
                         onSave={() => void handleSaveMerchantProfile()}
+                        onUpload={handleMerchantAssetUpload}
+                        onRemove={handleMerchantAssetRemove}
                       />
 
                       <div
@@ -1607,13 +1659,18 @@ export default function MerchantsPage() {
                 <MerchantProfileEditor
                   className="xl:col-span-2"
                   editor={editor}
+                  merchantId={selectedMerchant.id}
                   loginEmail={selectedMerchant.ownerEmail || ''}
                   isSaving={isSaving}
+                  isSuperadmin={isSuperadmin}
+                  uploadingAsset={uploadingAsset}
                   roleLabel={isSuperadmin ? 'Superadmin access' : 'Admin access'}
                   onChange={(field, value) =>
                     setEditor((current) => ({ ...current, [field]: value }))
                   }
                   onSave={() => void handleSaveMerchantProfile()}
+                  onUpload={handleMerchantAssetUpload}
+                  onRemove={handleMerchantAssetRemove}
                 />
 
                 <div
@@ -1670,19 +1727,29 @@ export default function MerchantsPage() {
 
 function MerchantProfileEditor({
   editor,
+  merchantId,
   loginEmail,
   isSaving,
+  isSuperadmin,
+  uploadingAsset,
   roleLabel,
   onChange,
   onSave,
+  onUpload,
+  onRemove,
   className,
 }: {
   editor: MerchantEditor
+  merchantId: string
   loginEmail: string
   isSaving: boolean
+  isSuperadmin: boolean
+  uploadingAsset: 'logo' | 'banner' | null
   roleLabel: string
   onChange: (field: keyof MerchantEditor, value: string) => void
   onSave: () => void
+  onUpload: (assetType: 'logo' | 'banner', file: File) => Promise<void>
+  onRemove: (assetType: 'logo' | 'banner') => Promise<void>
   className?: string
 }) {
   const hasCustomCategory =
@@ -1835,43 +1902,42 @@ function MerchantProfileEditor({
           </AdminField>
         </div>
 
-        <AdminField label="Logo URL">
-          <input
-            type="url"
-            value={editor.logoUrl}
-            onChange={(event) => onChange('logoUrl', event.target.value)}
-            placeholder="https://..."
-            className={inputClass}
-          />
-        </AdminField>
+        <MerchantImageUpload
+          label="Business logo"
+          hint="Square image recommended"
+          src={editor.logoUrl}
+          assetType="logo"
+          disabled={!isSuperadmin}
+          isUploading={uploadingAsset === 'logo'}
+          previewClassName="aspect-square"
+          onUpload={onUpload}
+          onRemove={onRemove}
+        />
 
-        <AdminField label="Banner URL">
-          <input
-            type="url"
-            value={editor.bannerUrl}
-            onChange={(event) => onChange('bannerUrl', event.target.value)}
-            placeholder="https://..."
-            className={inputClass}
-          />
-        </AdminField>
-
-        {(editor.logoUrl || editor.bannerUrl) ? (
-          <div className="grid gap-3 md:col-span-2 sm:grid-cols-[120px_minmax(0,1fr)]">
-            <AssetPreview
-              label="Logo preview"
-              src={editor.logoUrl}
-              className="aspect-square"
-            />
-            <AssetPreview
-              label="Banner preview"
-              src={editor.bannerUrl}
-              className="aspect-[16/6]"
-            />
-          </div>
-        ) : null}
+        <MerchantImageUpload
+          label="Storefront banner"
+          hint="Wide landscape image recommended"
+          src={editor.bannerUrl}
+          assetType="banner"
+          disabled={!isSuperadmin}
+          isUploading={uploadingAsset === 'banner'}
+          previewClassName="aspect-[16/6]"
+          onUpload={onUpload}
+          onRemove={onRemove}
+        />
       </div>
 
-      <div className="mt-5 flex justify-end border-t pt-4" style={{ borderColor: 'var(--stroke)' }}>
+      <div className="mt-5 flex flex-wrap justify-end gap-2 border-t pt-4" style={{ borderColor: 'var(--stroke)' }}>
+        {isSuperadmin ? (
+          <Link
+            href={`/merchants/${merchantId}`}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--ink)' }}
+          >
+            <Store size={16} />
+            Manage full storefront
+          </Link>
+        ) : null}
         <button
           type="button"
           onClick={onSave}
@@ -1887,22 +1953,35 @@ function MerchantProfileEditor({
   )
 }
 
-function AssetPreview({
+function MerchantImageUpload({
   label,
+  hint,
   src,
-  className,
+  assetType,
+  disabled,
+  isUploading,
+  previewClassName,
+  onUpload,
+  onRemove,
 }: {
   label: string
+  hint: string
   src: string
-  className: string
+  assetType: 'logo' | 'banner'
+  disabled: boolean
+  isUploading: boolean
+  previewClassName: string
+  onUpload: (assetType: 'logo' | 'banner', file: File) => Promise<void>
+  onRemove: (assetType: 'logo' | 'banner') => Promise<void>
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--muted)' }}>
-        {label}
-      </p>
+      <div className="mb-2">
+        <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>{label}</p>
+        <p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>{hint}</p>
+      </div>
       <div
-        className={cn('flex w-full items-center justify-center overflow-hidden rounded-xl border', className)}
+        className={cn('flex w-full items-center justify-center overflow-hidden rounded-xl border', previewClassName)}
         style={{ borderColor: 'var(--stroke)', background: 'var(--surface-muted)' }}
       >
         {src ? (
@@ -1911,6 +1990,46 @@ function AssetPreview({
           <ImageIcon size={20} style={{ color: 'var(--muted)' }} />
         )}
       </div>
+      <div className="mt-2 flex gap-2">
+        <label
+          className={cn(
+            'inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold',
+            (disabled || isUploading) && 'cursor-not-allowed opacity-50'
+          )}
+          style={{ borderColor: 'var(--stroke)', color: 'var(--ink)' }}
+        >
+          <Upload size={14} />
+          {isUploading ? 'Uploading...' : src ? 'Replace image' : 'Upload image'}
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            disabled={disabled || isUploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ''
+              if (file) void onUpload(assetType, file)
+            }}
+          />
+        </label>
+        {src ? (
+          <button
+            type="button"
+            onClick={() => void onRemove(assetType)}
+            disabled={disabled || isUploading}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ borderColor: 'var(--stroke)' }}
+            aria-label={`Remove ${label.toLowerCase()}`}
+          >
+            <Trash2 size={14} />
+          </button>
+        ) : null}
+      </div>
+      {disabled ? (
+        <p className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+          Image management is available to Super Admins.
+        </p>
+      ) : null}
     </div>
   )
 }

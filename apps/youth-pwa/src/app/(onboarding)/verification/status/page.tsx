@@ -85,6 +85,10 @@ export default function VerificationStatusPage() {
     () => buildTimelineSteps(profile, queueStatus),
     [profile, queueStatus]
   )
+  const feedbackDocuments = useMemo(
+    () => getFeedbackDocuments(profile, queueStatus),
+    [profile, queueStatus]
+  )
 
   const handleClose = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -162,7 +166,8 @@ export default function VerificationStatusPage() {
 
             {(profile.verificationRejectReason || profile.verificationRejectNote) &&
             (profile.status === 'rejected' ||
-              queueStatus === 'resubmission_requested') ? (
+              queueStatus === 'resubmission_requested' ||
+              hasDocumentCorrection(profile)) ? (
               <section className="rounded-[24px] border border-[#f3d4d4] bg-[#fff4f4] px-5 py-4">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#c15050]">
                   Review Feedback
@@ -174,6 +179,10 @@ export default function VerificationStatusPage() {
                     : ''}
                 </p>
               </section>
+            ) : null}
+
+            {feedbackDocuments.length > 0 ? (
+              <FeedbackDocumentList documents={feedbackDocuments} />
             ) : null}
 
             <NextPanelCard panel={nextPanel} />
@@ -383,6 +392,48 @@ function NextPanelCard({ panel }: { panel: NextPanel }) {
             {panel.description}
           </p>
         </div>
+      </div>
+    </section>
+  )
+}
+
+function FeedbackDocumentList({
+  documents,
+}: {
+  documents: NonNullable<UserProfile['requiredDocuments']>
+}) {
+  return (
+    <section className="rounded-[24px] border border-[#f3ddb1] bg-[#fffaf0] px-5 py-5 shadow-[0_12px_24px_rgba(1,67,132,0.03)] sm:px-7">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#b88408]">
+        Documents Needing Action
+      </p>
+      <div className="mt-4 space-y-3">
+        {documents.map((document) => (
+          <div
+            key={`${document.documentType}-${document.id}`}
+            className="rounded-[18px] border border-[#f0ddb6] bg-white px-4 py-4"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-[16px] font-black text-[#17356d]">
+                  {document.label || prettifyDocumentType(document.documentType)}
+                </p>
+                <p className="mt-1 text-[13px] leading-6 text-[#6d5a23]">
+                  {getDocumentActionText(document.reviewStatus)}
+                </p>
+              </div>
+              <span className="inline-flex w-fit rounded-full border border-[#f0ddb6] bg-[#fff8ea] px-3 py-1.5 text-[12px] font-bold uppercase tracking-[0.1em] text-[#b88408]">
+                {getDocumentStatusLabel(document.reviewStatus)}
+              </span>
+            </div>
+            {document.reviewNote ? (
+              <div className="mt-3 rounded-[14px] border border-[#f3d4d4] bg-[#fff4f4] px-3 py-3 text-[13px] leading-6 text-[#9e4040]">
+                <span className="font-bold">Reviewer note: </span>
+                {document.reviewNote}
+              </div>
+            ) : null}
+          </div>
+        ))}
       </div>
     </section>
   )
@@ -623,11 +674,11 @@ function buildStatusHero(
   queueStatus: string,
   digitalIdIssued: boolean
 ): StatusHero {
-  if (queueStatus === 'resubmission_requested') {
+  if (queueStatus === 'resubmission_requested' || hasDocumentCorrection(profile)) {
     return {
       title: 'Update Required',
       description:
-        'Your verification needs updated documents before it can continue. Review the request below and submit the required files again.',
+        'Your verification needs updated documents before it can continue. Review the request below and upload only the documents marked for action.',
       badgeLabel: 'Resubmission Requested',
       tone: 'attention',
     }
@@ -637,7 +688,7 @@ function buildStatusHero(
     return {
       title: 'Verification Rejected',
       description:
-        'Your submission could not be approved yet. Review the feedback below and send a corrected verification set to continue.',
+        'Your submission could not be approved yet. Review the feedback below and upload only the documents that need correction.',
       badgeLabel: 'Rejected',
       tone: 'rejected',
     }
@@ -676,12 +727,12 @@ function buildNextPanel(
   queueStatus: string,
   digitalIdIssued: boolean
 ): NextPanel {
-  if (queueStatus === 'resubmission_requested') {
+  if (queueStatus === 'resubmission_requested' || hasDocumentCorrection(profile)) {
     return {
       title: 'What’s Next?',
       description:
         profile?.verificationResubmissionMessage ||
-        'Prepare the requested replacement documents and upload them again so the verification review can continue.',
+        'Prepare only the requested replacement documents and upload them so the verification review can continue.',
       tone: 'warning',
     }
   }
@@ -690,7 +741,7 @@ function buildNextPanel(
     return {
       title: 'What’s Next?',
       description:
-        'Review the feedback carefully, update your verification files, and submit a corrected application when you are ready.',
+        'Review the feedback carefully, replace the documents listed for action, and submit them when you are ready.',
       tone: 'danger',
     }
   }
@@ -727,7 +778,7 @@ function buildPrimaryAction(
   queueStatus: string,
   digitalIdIssued: boolean
 ): PrimaryAction {
-  if (queueStatus === 'resubmission_requested') {
+  if (queueStatus === 'resubmission_requested' || hasDocumentCorrection(profile)) {
     return {
       href: '/verification/upload',
       label: 'Re-upload Requested Documents',
@@ -737,7 +788,7 @@ function buildPrimaryAction(
   if (profile?.status === 'rejected') {
     return {
       href: '/verification/upload',
-      label: 'Retry Submission',
+      label: 'Upload Corrected Documents',
     }
   }
 
@@ -787,7 +838,7 @@ function buildTimelineSteps(
     {
       label: 'Under Review',
       state:
-        queueStatus === 'resubmission_requested'
+        queueStatus === 'resubmission_requested' || hasDocumentCorrection(profile)
           ? 'attention'
           : profile?.status === 'rejected'
             ? 'attention'
@@ -799,7 +850,7 @@ function buildTimelineSteps(
       detail:
         queueStatus === 'pending_superadmin_id_generation'
           ? 'Admin review completed and forwarded for issuance'
-          : queueStatus === 'resubmission_requested'
+          : queueStatus === 'resubmission_requested' || hasDocumentCorrection(profile)
             ? 'Updated files were requested before approval'
             : profile?.status === 'rejected'
               ? 'Review ended with a rejection decision'
@@ -809,7 +860,7 @@ function buildTimelineSteps(
                   ? 'Currently being reviewed by KK admin'
                   : 'Waiting for document submission',
       badgeLabel:
-        queueStatus === 'resubmission_requested'
+        queueStatus === 'resubmission_requested' || hasDocumentCorrection(profile)
           ? 'Needs Action'
           : profile?.status === 'rejected'
             ? 'Stopped'
@@ -841,6 +892,95 @@ function buildTimelineSteps(
             : 'Pending',
     },
   ]
+}
+
+function getFeedbackDocuments(profile: UserProfile | null, queueStatus: string) {
+  if (!profile) return []
+
+  const documents = [
+    ...(profile.correctionDocuments || []),
+    ...(profile.requiredDocuments || []),
+  ]
+  const correctionMode =
+    profile.status === 'rejected' ||
+    queueStatus === 'rejected' ||
+    queueStatus === 'resubmission_requested' ||
+    documents.some((document) =>
+      ['rejected', 'resubmission_requested'].includes(
+        normalizeDocumentStatus(document.reviewStatus)
+      )
+    )
+  if (!correctionMode) return []
+
+  const sourceDocuments =
+    profile.correctionDocuments?.length
+      ? profile.correctionDocuments
+      : profile.requiredDocuments || []
+  const flaggedDocuments = sourceDocuments.filter((document) => {
+    if (!document.present) return true
+    return ['missing', 'pending', 'rejected', 'resubmission_requested'].includes(
+      normalizeDocumentStatus(document.reviewStatus)
+    )
+  })
+
+  if (flaggedDocuments.length > 0) {
+    return flaggedDocuments
+  }
+
+  return (profile.requiredDocuments || []).filter(
+    (document) => normalizeDocumentStatus(document.reviewStatus) !== 'approved'
+  )
+}
+
+function hasDocumentCorrection(profile: UserProfile | null) {
+  if (!profile) return false
+  return [
+    ...(profile.correctionDocuments || []),
+    ...(profile.requiredDocuments || []),
+  ].some((document) =>
+    ['rejected', 'resubmission_requested'].includes(
+      normalizeDocumentStatus(document.reviewStatus)
+    )
+  )
+}
+
+function normalizeDocumentStatus(status?: string | null) {
+  return String(status || 'missing').toLowerCase()
+}
+
+function getDocumentStatusLabel(status?: string | null) {
+  const normalized = normalizeDocumentStatus(status)
+  if (normalized === 'resubmission_requested') return 'Requested'
+  if (normalized === 'rejected') return 'Rejected'
+  if (normalized === 'pending') return 'Pending'
+  if (normalized === 'missing') return 'Missing'
+  if (normalized === 'approved') return 'Approved'
+  return normalized.split('_').join(' ')
+}
+
+function getDocumentActionText(status?: string | null) {
+  const normalized = normalizeDocumentStatus(status)
+  if (normalized === 'rejected') {
+    return 'This document was rejected and needs a corrected upload.'
+  }
+  if (normalized === 'resubmission_requested') {
+    return 'A reviewer requested a replacement for this document.'
+  }
+  if (normalized === 'pending') {
+    return 'This document is still pending and may need a replacement for this review.'
+  }
+  if (normalized === 'missing') {
+    return 'This required document has not been uploaded yet.'
+  }
+  return 'This document needs attention before verification can continue.'
+}
+
+function prettifyDocumentType(type?: string | null) {
+  return String(type || 'Document')
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 function formatTimelineDate(value?: string) {

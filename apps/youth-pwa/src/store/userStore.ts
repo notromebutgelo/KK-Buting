@@ -50,11 +50,30 @@ export interface UserProfile {
   verificationResubmissionMessage?: string
   verificationRejectReason?: string
   verificationRejectNote?: string
+  documents?: VerificationDocument[]
+  requiredDocuments?: VerificationDocument[]
+  correctionDocuments?: VerificationDocument[]
+  missingDocuments?: VerificationDocument[]
   idPhotoUrl?: string | null
   status: 'pending' | 'verified' | 'rejected'
   submittedAt: string
   verifiedAt?: string
   verified: boolean
+}
+
+export interface VerificationDocument {
+  id: string
+  documentType: string
+  label: string
+  fileUrl?: string | null
+  uploadedAt?: string | null
+  reviewStatus: string
+  reviewNote?: string | null
+  reviewRequestedAt?: string | null
+  reviewedAt?: string | null
+  reviewedBy?: string | null
+  present?: boolean
+  required?: boolean
 }
 
 interface UserState {

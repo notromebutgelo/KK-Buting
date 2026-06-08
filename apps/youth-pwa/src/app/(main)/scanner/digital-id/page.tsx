@@ -24,6 +24,7 @@ import type { PhysicalIdRequest } from '@/services/physicalIdRequests.service'
 import { getDigitalID, getVerificationStatus } from '@/services/verification.service'
 import { useAuthStore } from '@/store/authStore'
 import { useUserStore } from '@/store/userStore'
+import type { UserProfile, VerificationDocument } from '@/store/userStore'
 
 interface DigitalIDData {
   status: string
@@ -110,8 +111,17 @@ export default function DigitalIDPage() {
     profile?.documentsSubmitted &&
       ['pending', 'in_review', 'pending_superadmin_id_generation', 'resubmission_requested', 'verified'].includes(queueStatus)
   )
-  const isUnderReview = !isVerified && hasSubmittedDocuments && queueStatus !== 'resubmission_requested'
-  const needsResubmission = queueStatus === 'resubmission_requested'
+  const feedbackDocuments = useMemo(
+    () => getFeedbackDocuments(profile, queueStatus),
+    [profile, queueStatus]
+  )
+  const hasDocumentFeedback = feedbackDocuments.length > 0
+  const isUnderReview =
+    !isVerified &&
+    hasSubmittedDocuments &&
+    queueStatus !== 'resubmission_requested' &&
+    !hasDocumentFeedback
+  const needsResubmission = queueStatus === 'resubmission_requested' || hasDocumentFeedback
   const digitalIdPhotoUrl = idData?.photoUrl || profile?.idPhotoUrl || null
   const digitalIdSignatureUrl = idData?.digitalIdSignatureUrl || profile?.digitalIdSignatureUrl || null
   const requestContactNumberError = getPhysicalIdRequestContactNumberError(
@@ -500,6 +510,10 @@ export default function DigitalIDPage() {
               </p>
             ) : null}
 
+            {feedbackDocuments.length > 0 ? (
+              <CorrectionDocumentList documents={feedbackDocuments} />
+            ) : null}
+
             <Link
               href="/verification/upload"
               className="mt-10 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
@@ -534,11 +548,15 @@ export default function DigitalIDPage() {
               </p>
             ) : null}
 
+            {feedbackDocuments.length > 0 ? (
+              <CorrectionDocumentList documents={feedbackDocuments} />
+            ) : null}
+
             <Link
               href="/verification/upload"
               className="mt-10 inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-6 py-4 text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(5,114,220,0.18)]"
             >
-              Retry Submission
+              Upload Corrected Documents
             </Link>
           </div>
         ) : isUnderReview ? (
@@ -1242,6 +1260,99 @@ function buildAddress(profile: {
 function buildPurok(value?: string) {
   const nextValue = String(value || '').trim()
   return nextValue ? nextValue.toUpperCase() : '-'
+}
+
+function CorrectionDocumentList({
+  documents,
+}: {
+  documents: VerificationDocument[]
+}) {
+  return (
+    <div className="mt-6 w-full rounded-[20px] border border-[#f2deb7] bg-[#fffaf0] px-4 py-4 text-left">
+      <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#b88408]">
+        Documents to update
+      </p>
+      <div className="mt-3 space-y-2.5">
+        {documents.map((document) => (
+          <div key={`${document.documentType}-${document.id}`} className="rounded-[14px] bg-white px-3 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[13px] font-extrabold text-[#014384]">
+                {document.label || prettifyDocumentType(document.documentType)}
+              </p>
+              <span className="shrink-0 rounded-full bg-[#fff8ea] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#b88408]">
+                {getDocumentStatusLabel(document.reviewStatus)}
+              </span>
+            </div>
+            {document.reviewNote ? (
+              <p className="mt-2 text-[12px] leading-[1.5] text-[#9e4040]">
+                {document.reviewNote}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function getFeedbackDocuments(profile: UserProfile | null, queueStatus: string) {
+  if (!profile) return []
+
+  const documents = [
+    ...(profile.correctionDocuments || []),
+    ...(profile.requiredDocuments || []),
+  ]
+  const correctionMode =
+    profile.status === 'rejected' ||
+    queueStatus === 'rejected' ||
+    queueStatus === 'resubmission_requested' ||
+    documents.some((document) =>
+      ['rejected', 'resubmission_requested'].includes(
+        normalizeDocumentStatus(document.reviewStatus)
+      )
+    )
+  if (!correctionMode) return []
+
+  const sourceDocuments =
+    profile.correctionDocuments?.length
+      ? profile.correctionDocuments
+      : profile.requiredDocuments || []
+  const flaggedDocuments = sourceDocuments.filter((document) => {
+    if (!document.present) return true
+    return ['missing', 'pending', 'rejected', 'resubmission_requested'].includes(
+      normalizeDocumentStatus(document.reviewStatus)
+    )
+  })
+
+  if (flaggedDocuments.length > 0) {
+    return flaggedDocuments
+  }
+
+  return (profile.requiredDocuments || []).filter(
+    (document) => normalizeDocumentStatus(document.reviewStatus) !== 'approved'
+  )
+}
+
+function normalizeDocumentStatus(status?: string | null) {
+  return String(status || 'missing').toLowerCase()
+}
+
+function getDocumentStatusLabel(status?: string | null) {
+  const normalized = normalizeDocumentStatus(status)
+  if (normalized === 'resubmission_requested') return 'Requested'
+  if (normalized === 'rejected') return 'Rejected'
+  if (normalized === 'pending') return 'Pending'
+  if (normalized === 'missing') return 'Missing'
+  if (normalized === 'approved') return 'Approved'
+  return normalized.split('_').join(' ')
+}
+
+function prettifyDocumentType(type?: string | null) {
+  return String(type || 'Document')
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 function buildFrontCardValue(value?: string) {

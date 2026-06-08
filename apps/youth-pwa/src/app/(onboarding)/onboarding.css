@@ -115,6 +115,57 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Public app identity for OAuth brand review */
+.app-purpose-header {
+  width: 100%;
+  max-width: 420px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding-top: max(28px, env(safe-area-inset-top));
+}
+
+.app-purpose-seal {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  border-radius: 50%;
+  box-shadow: 0 8px 18px rgba(1, 67, 132, 0.12);
+}
+
+.app-purpose-copy {
+  min-width: 0;
+}
+
+.app-purpose-kicker {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #0d5aa7;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.app-purpose-title {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--kk-blue-dk);
+}
+
+.app-purpose-text {
+  margin-top: 8px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: #536a86;
+}
+
 /* ── Slide area ───────────────────────────────────────────────── */
 .slide-area {
   flex: 1 0 auto;
@@ -124,8 +175,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 28px;
-  padding-top: 40px;
+  gap: 22px;
+  padding-top: 22px;
   transition: opacity 0.32s ease, transform 0.32s ease;
 }
 
@@ -337,7 +388,10 @@
 
 /* ── Mobile-first responsive tweaks ──────────────────────────── */
 @media (max-height: 680px) {
-  .slide-area { padding-top: 20px; gap: 18px; }
+  .app-purpose-header { padding-top: 18px; }
+  .app-purpose-text { display: none; }
+  .app-purpose-title { font-size: 22px; }
+  .slide-area { padding-top: 16px; gap: 16px; }
   .slide-media-stack { gap: 12px; }
   .slide-title { font-size: 17px; }
   .splash-seal { width: 130px; height: 130px; }

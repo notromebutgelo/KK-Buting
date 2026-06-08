@@ -42,6 +42,14 @@ function createAdminControllerMocks(overrides = {}) {
     listPendingMerchants: async (_req, res) => res.json({ merchants: [] }),
     approveMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
     updateMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
+    uploadMerchantAssetHandler: async (_req, res) => res.status(201).json({ fileUrl: "https://example.com/image.webp" }),
+    removeMerchantAssetHandler: async (_req, res) => res.json({ message: "ok" }),
+    createMerchantPromotionHandler: async (_req, res) => res.status(201).json({ promotion: {} }),
+    updateMerchantPromotionHandler: async (_req, res) => res.json({ promotion: {} }),
+    deleteMerchantPromotionHandler: async (_req, res) => res.json({ message: "ok" }),
+    createMerchantProductHandler: async (_req, res) => res.status(201).json({ product: {} }),
+    updateMerchantProductHandler: async (_req, res) => res.json({ product: {} }),
+    deleteMerchantProductHandler: async (_req, res) => res.json({ message: "ok" }),
     updateMerchantStatusHandler: async (_req, res) => res.json({ message: "ok" }),
     listMerchantTransactionsHandler: async (_req, res) => res.json({ transactions: [] }),
     getPointsTransactionsOverviewHandler: async (_req, res) => res.json({ transactions: [] }),
@@ -498,6 +506,14 @@ const tests = [
           listPendingMerchants: async (_req, res) => res.json({ merchants: [] }),
           approveMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
           updateMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
+          uploadMerchantAssetHandler: async (_req, res) => res.status(201).json({ fileUrl: "https://example.com/image.webp" }),
+          removeMerchantAssetHandler: async (_req, res) => res.json({ message: "ok" }),
+          createMerchantPromotionHandler: async (_req, res) => res.status(201).json({ promotion: {} }),
+          updateMerchantPromotionHandler: async (_req, res) => res.json({ promotion: {} }),
+          deleteMerchantPromotionHandler: async (_req, res) => res.json({ message: "ok" }),
+          createMerchantProductHandler: async (_req, res) => res.status(201).json({ product: {} }),
+          updateMerchantProductHandler: async (_req, res) => res.json({ product: {} }),
+          deleteMerchantProductHandler: async (_req, res) => res.json({ message: "ok" }),
           updateMerchantStatusHandler: async (_req, res) => res.json({ message: "ok" }),
           listMerchantTransactionsHandler: async (_req, res) => res.json({ transactions: [] }),
           getPointsTransactionsOverviewHandler: async (_req, res) => res.json({ transactions: [] }),
@@ -676,6 +692,102 @@ const tests = [
     },
   },
   {
+    name: "verification rejection and document decisions remain admin-owned while superadmin can request re-verification",
+    async run() {
+      const calls = [];
+      const router = loadDistModuleWithMocks("dist/src/modules/admin/admin.routes", {
+        "dist/src/middleware/verifyToken": {
+          verifyToken: createVerifyTokenMock(),
+        },
+        "dist/src/modules/admin/admin.controller": createAdminControllerMocks({
+          rejectVerificationHandler: async (_req, res) => {
+            calls.push("reject");
+            res.json({ message: "Verification rejected" });
+          },
+          reviewVerificationDocumentHandler: async (_req, res) => {
+            calls.push("document-review");
+            res.json({ message: "Document review updated" });
+          },
+          requestVerificationResubmissionHandler: async (_req, res) => {
+            calls.push("request-reverification");
+            res.json({
+              message: "Re-verification request sent to admin",
+              destination: "admin",
+            });
+          },
+        }),
+      }).default;
+
+      await withExpressServer(router, async (baseUrl) => {
+        const adminHeaders = {
+          Authorization: "Bearer token",
+          "x-test-role": "admin",
+        };
+        const superadminHeaders = {
+          Authorization: "Bearer token",
+          "x-test-role": "superadmin",
+        };
+
+        const adminReject = await requestJson(baseUrl, "/verification/youth-1/reject", {
+          method: "PATCH",
+          headers: adminHeaders,
+          body: { reason: "Document could not be validated." },
+        });
+        assert.equal(adminReject.status, 200);
+
+        const superadminReject = await requestJson(baseUrl, "/verification/youth-1/reject", {
+          method: "PATCH",
+          headers: superadminHeaders,
+          body: { reason: "Document could not be validated." },
+        });
+        assert.equal(superadminReject.status, 403);
+
+        const adminDocumentReview = await requestJson(
+          baseUrl,
+          "/verification/youth-1/documents/doc-1/review",
+          {
+            method: "PATCH",
+            headers: adminHeaders,
+            body: { action: "rejected", note: "Please upload a clearer copy." },
+          }
+        );
+        assert.equal(adminDocumentReview.status, 200);
+
+        const superadminDocumentReview = await requestJson(
+          baseUrl,
+          "/verification/youth-1/documents/doc-1/review",
+          {
+            method: "PATCH",
+            headers: superadminHeaders,
+            body: { action: "rejected", note: "Please upload a clearer copy." },
+          }
+        );
+        assert.equal(superadminDocumentReview.status, 403);
+
+        const superadminHandoff = await requestJson(
+          baseUrl,
+          "/verification/youth-1/request-resubmission",
+          {
+            method: "PATCH",
+            headers: superadminHeaders,
+            body: {
+              documentIds: ["doc-1"],
+              message: "Admin should verify this document again.",
+            },
+          }
+        );
+        assert.equal(superadminHandoff.status, 200);
+        assert.equal(superadminHandoff.body.destination, "admin");
+      });
+
+      assert.deepEqual(calls, [
+        "reject",
+        "document-review",
+        "request-reverification",
+      ]);
+    },
+  },
+  {
     name: "admin document review route returns the review success payload",
     async run() {
       const calls = [];
@@ -683,7 +795,7 @@ const tests = [
         "dist/src/middleware/verifyToken": {
           verifyToken: createVerifyTokenMock(),
         },
-        "dist/src/modules/admin/admin.controller": {
+        "dist/src/modules/admin/admin.controller": createAdminControllerMocks({
           getDashboard: async (_req, res) => res.json({}),
           listVerificationProfiles: async (_req, res) => res.json({ profiles: [] }),
           getVerificationProfileHandler: async (_req, res) => res.json({ profile: {} }),
@@ -718,6 +830,14 @@ const tests = [
           listPendingMerchants: async (_req, res) => res.json({ merchants: [] }),
           approveMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
           updateMerchantHandler: async (_req, res) => res.json({ message: "ok" }),
+          uploadMerchantAssetHandler: async (_req, res) => res.status(201).json({ fileUrl: "https://example.com/image.webp" }),
+          removeMerchantAssetHandler: async (_req, res) => res.json({ message: "ok" }),
+          createMerchantPromotionHandler: async (_req, res) => res.status(201).json({ promotion: {} }),
+          updateMerchantPromotionHandler: async (_req, res) => res.json({ promotion: {} }),
+          deleteMerchantPromotionHandler: async (_req, res) => res.json({ message: "ok" }),
+          createMerchantProductHandler: async (_req, res) => res.status(201).json({ product: {} }),
+          updateMerchantProductHandler: async (_req, res) => res.json({ product: {} }),
+          deleteMerchantProductHandler: async (_req, res) => res.json({ message: "ok" }),
           updateMerchantStatusHandler: async (_req, res) => res.json({ message: "ok" }),
           listMerchantTransactionsHandler: async (_req, res) => res.json({ transactions: [] }),
           getPointsTransactionsOverviewHandler: async (_req, res) => res.json({ transactions: [] }),
@@ -740,7 +860,7 @@ const tests = [
           updatePhysicalIdRequestHandler: async (_req, res) => res.json({ message: "ok", request: {} }),
           getReportsHandler: async (_req, res) => res.json({}),
           createMerchantAccountHandler: async (_req, res) => res.status(201).json({ merchant: { merchantId: "merchant-1" } }),
-        },
+        }),
       }).default;
 
       await withExpressServer(router, async (baseUrl) => {
