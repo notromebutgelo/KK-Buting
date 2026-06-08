@@ -270,8 +270,12 @@ export default function RegisterPage() {
           {/* Terms note */}
           <p className="sk-terms-text">
             By registering, you agree to our{" "}
-            <Link href="/profile/terms" className="sk-terms-link">
-              Terms &amp; Conditions
+            <Link href="/terms" className="sk-terms-link">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="sk-terms-link">
+              Privacy Policy
             </Link>
           </p>
 
