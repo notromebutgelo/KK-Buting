@@ -52,7 +52,6 @@ export default function ScanScreen() {
   const [permissionRequesting, setPermissionRequesting] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
   const [profile, setProfile] = useState<MerchantProfile | null>(null)
-  const [profileLoading, setProfileLoading] = useState(true)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [notice, setNotice] = useState<ScanNoticeState | null>(null)
 
@@ -65,15 +64,13 @@ export default function ScanScreen() {
   const pesosPerPoint = 10
   const numericAmount = Number(amountSpent || 0)
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount > 0
-  const canStartScanner =
-    hasValidAmount && !isSubmitting && !permissionRequesting && !profileLoading
+  const canStartScanner = hasValidAmount && !isSubmitting && !permissionRequesting
   const canSubmitManual = hasValidAmount && token.trim().length > 0 && !isSubmitting
   const shouldKeepScannerLive =
-    scannerRequested && hasValidAmount && profile?.status === 'active' && isFocused
+    scannerRequested && hasValidAmount && isFocused
 
   const loadMerchantProfile = useCallback(async () => {
     try {
-      setProfileLoading(true)
       setProfileError(null)
       const merchantProfile = await getMerchantProfile(user)
       setProfile(merchantProfile)
@@ -84,8 +81,6 @@ export default function ScanScreen() {
         'Merchant access could not be verified. Check your connection, then try opening the scanner again.'
       )
       return null
-    } finally {
-      setProfileLoading(false)
     }
   }, [user])
 
@@ -333,23 +328,10 @@ export default function ScanScreen() {
       return
     }
 
-    const currentProfile = profile ?? await loadMerchantProfile()
-    if (!currentProfile) {
-      openNotice({
-        title: 'Unable to Verify Merchant',
-        message:
-          'The app could not confirm merchant access. Check your connection and try again. If this continues, verify that the backend service is online.',
-        confirmLabel: 'OK',
-        iconName: 'cloud-alert',
-        tone: 'danger',
-      })
-      return
-    }
-
-    if (currentProfile.status !== 'active') {
+    if (profile && profile.status !== 'active') {
       openNotice({
         title: 'Scanner Unavailable',
-        message: currentProfile.adminNote,
+        message: profile.adminNote,
         confirmLabel: 'OK',
         iconName: 'store-alert-outline',
         tone: 'warning',
@@ -368,7 +350,7 @@ export default function ScanScreen() {
     if (!hasCameraAccess) {
       scanLockRef.current = true
     }
-  }, [hasValidAmount, loadMerchantProfile, openNotice, profile, requestCameraAccess])
+  }, [hasValidAmount, openNotice, profile, requestCameraAccess])
 
   const handleCameraMountError = useCallback(
     ({ message }: { message: string }) => {
@@ -564,11 +546,7 @@ export default function ScanScreen() {
                 disabled={!canStartScanner}
               >
                 <Text style={styles.buttonText}>
-                  {profileLoading
-                    ? 'Checking Access...'
-                    : scannerRequested
-                      ? 'Scanner Ready'
-                      : 'Open Scanner'}
+                  {scannerRequested ? 'Scanner Ready' : 'Open Scanner'}
                 </Text>
               </Pressable>
 
@@ -596,9 +574,7 @@ export default function ScanScreen() {
                     onCameraReady={() => setCameraReady(true)}
                     onMountError={handleCameraMountError}
                     onBarcodeScanned={
-                      profile?.status === 'active' && scannerEnabled && isFocused
-                        ? handleBarcodeScanned
-                        : undefined
+                      scannerEnabled && isFocused ? handleBarcodeScanned : undefined
                     }
                   />
                   <View pointerEvents="none" style={styles.frameOverlay}>

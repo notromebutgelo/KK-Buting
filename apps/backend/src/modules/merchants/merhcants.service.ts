@@ -267,7 +267,9 @@ export async function getMerchantById(id: string, options?: { includePrivate?: b
 export async function getMerchantByOwnerId(ownerId: string): Promise<AnyRecord | null> {
   const doc = await getOwnedMerchantSnapshot(ownerId);
   if (!doc) return null;
-  return getMerchantById(doc.id, { includePrivate: true });
+  return normalizeMerchant(
+    serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord
+  );
 }
 
 export async function createMerchant(data: Record<string, unknown>) {
@@ -655,18 +657,30 @@ export async function getMerchantTransactionsByOwner(ownerId: string) {
     throw new Error("Merchant profile not found");
   }
 
-  const [transactionsSnap, usersSnap] = await Promise.all([
-    db.collection("transactions").where("merchantId", "==", String(merchant.id)).get(),
-    db.collection("users").get(),
-  ]);
-
+  const transactionsSnap = await db
+    .collection("transactions")
+    .where("merchantId", "==", String(merchant.id))
+    .get();
+  const transactions = transactionsSnap.docs.map(
+    (doc) => serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord
+  );
+  const userIds = Array.from(
+    new Set(transactions.map((transaction) => String(transaction.userId || "")).filter(Boolean))
+  );
+  const userSnapshots = userIds.length
+    ? await db.getAll(...userIds.map((userId) => db.collection("users").doc(userId)))
+    : [];
   const usersMap = new Map<string, AnyRecord>(
-    usersSnap.docs.map((doc) => [doc.id, serializeRecord({ uid: doc.id, ...doc.data() }) as AnyRecord])
+    userSnapshots
+      .filter((snapshot) => snapshot.exists)
+      .map((snapshot) => [
+        snapshot.id,
+        serializeRecord({ uid: snapshot.id, ...snapshot.data() }) as AnyRecord,
+      ])
   );
 
-  return transactionsSnap.docs
-    .map((doc) => {
-      const transaction = serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord;
+  return transactions
+    .map((transaction) => {
       const user = usersMap.get(String(transaction.userId || ""));
 
       return {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +35,7 @@ export default function ShopProfileScreen() {
   const navigation = useNavigation<NavigationProp>()
   const user = useAuthStore((state) => state.user)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingAsset, setUploadingAsset] = useState<'logo' | 'banner' | null>(null)
   const [form, setForm] = useState({
@@ -53,12 +54,12 @@ export default function ShopProfileScreen() {
     adminNote: '',
   })
 
-  useEffect(() => {
-    let active = true
-
-    void getMerchantProfile(user).then((profile) => {
-      if (!active) return
-
+  const loadProfile = useCallback(
+    async (force = false) => {
+      try {
+        setLoading(true)
+        setLoadError(null)
+        const profile = await getMerchantProfile(user, { force })
       setForm({
         businessName: profile.businessName,
         category: profile.category,
@@ -74,13 +75,22 @@ export default function ShopProfileScreen() {
         status: profile.status,
         adminNote: profile.adminNote,
       })
-      setLoading(false)
-    })
+      } catch (error) {
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : 'The shop profile could not be loaded. Please try again.'
+        )
+      } finally {
+        setLoading(false)
+      }
+    },
+    [user]
+  )
 
-    return () => {
-      active = false
-    }
-  }, [user])
+  useEffect(() => {
+    void loadProfile()
+  }, [loadProfile])
 
   const handleSave = async () => {
     try {
@@ -172,6 +182,23 @@ export default function ShopProfileScreen() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#014384" />
           <Text style={styles.loadingText}>Loading shop profile...</Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centered}>
+          <View style={styles.loadErrorIcon}>
+            <MaterialCommunityIcons name="store-alert-outline" size={30} color="#b42318" />
+          </View>
+          <Text style={styles.loadErrorTitle}>Could not load shop profile</Text>
+          <Text style={styles.loadErrorText}>{loadError}</Text>
+          <Pressable style={styles.retryButton} onPress={() => void loadProfile(true)}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     )
@@ -393,6 +420,37 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#60748f',
+  },
+  loadErrorIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff1f2',
+  },
+  loadErrorTitle: {
+    color: '#014384',
+    fontSize: 20,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  loadErrorText: {
+    maxWidth: 320,
+    color: '#60748f',
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 6,
+    borderRadius: 15,
+    backgroundColor: '#014384',
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontWeight: '800',
   },
   content: {
     padding: 18,

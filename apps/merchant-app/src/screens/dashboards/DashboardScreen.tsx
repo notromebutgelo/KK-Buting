@@ -24,7 +24,7 @@ export default function DashboardScreen() {
         if (active) {
           setSnapshot(nextSnapshot)
         }
-      })
+      }).catch(() => undefined)
 
       return () => {
         active = false

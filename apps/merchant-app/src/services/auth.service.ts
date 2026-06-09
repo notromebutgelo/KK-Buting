@@ -61,8 +61,9 @@ function mapApiError(error: unknown): never {
 
 export async function signIn(email: string, password: string): Promise<AuthPayload> {
   try {
-    void warmUpApi()
+    const backendWarmup = warmUpApi()
     const firebaseSession = await signInWithFirebasePassword(email, password)
+    await backendWarmup
     const response = await api.post(
       '/auth/login',
       { password },

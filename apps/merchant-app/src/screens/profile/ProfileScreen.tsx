@@ -24,7 +24,7 @@ export default function ProfileScreen() {
         if (active) {
           setProfile(merchantProfile)
         }
-      })
+      }).catch(() => undefined)
 
       return () => {
         active = false

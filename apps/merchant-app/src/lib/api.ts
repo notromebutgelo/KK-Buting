@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { InternalAxiosRequestConfig } from 'axios'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 
@@ -181,6 +182,7 @@ function getApiConfig(): ApiConfig {
 }
 
 const apiConfig = getApiConfig()
+const API_REQUEST_TIMEOUT_MS = 30000
 
 export const API_BASE_URL = apiConfig.apiUrl
 export const API_CONFIGURATION_ERROR = apiConfig.configurationError
@@ -219,7 +221,7 @@ export function warmUpApi() {
   }
 
   backendWarmupPromise = axios
-    .get(healthCheckUrl, { timeout: 75000 })
+    .get(healthCheckUrl, { timeout: API_REQUEST_TIMEOUT_MS })
     .then(() => {
       lastBackendWarmupAt = Date.now()
       return true
@@ -234,11 +236,19 @@ export function warmUpApi() {
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 75000,
+  timeout: API_REQUEST_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
   },
 })
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  merchantRetryCount?: number
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
 
 api.interceptors.request.use(async (config) => {
   if (API_CONFIGURATION_ERROR) {
@@ -273,10 +283,31 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
       void useAuthStore.getState().logout()
     }
+
+    const config = error.config as RetryableRequestConfig | undefined
+    const method = String(config?.method || '').toLowerCase()
+    const status = Number(error.response?.status || 0)
+    const isCanceled = error.code === 'ERR_CANCELED'
+    const isRetryableFailure =
+      !error.response || status === 408 || status === 429 || status === 502 || status === 503 || status === 504
+
+    if (
+      config &&
+      method === 'get' &&
+      !isCanceled &&
+      status !== 401 &&
+      isRetryableFailure &&
+      (config.merchantRetryCount || 0) < 1
+    ) {
+      config.merchantRetryCount = (config.merchantRetryCount || 0) + 1
+      await wait(700)
+      return api.request(config)
+    }
+
     return Promise.reject(error)
   }
 )

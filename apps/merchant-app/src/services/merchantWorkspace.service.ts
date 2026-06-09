@@ -13,6 +13,22 @@ import type {
 } from '../types/merchant'
 import { getStatusMessage, maskMemberId } from '../utils/merchant'
 
+const PROFILE_CACHE_TTL_MS = 30000
+
+let cachedProfile:
+  | {
+      userId: string
+      value: MerchantProfile
+      fetchedAt: number
+    }
+  | undefined
+let profileRequest:
+  | {
+      userId: string
+      promise: Promise<MerchantProfile>
+    }
+  | undefined
+
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
@@ -135,6 +151,14 @@ function mapBackendNotification(item: Record<string, unknown>): MerchantNotifica
 
 function rethrowApiError(error: unknown): never {
   if (axios.isAxiosError(error)) {
+    if (!error.response) {
+      throw new Error(
+        error.code === 'ECONNABORTED'
+          ? 'The merchant service took too long to respond. Please try again.'
+          : 'Cannot reach the merchant service. Check your internet connection and try again.'
+      )
+    }
+
     const baseMessage = String(error.response?.data?.error || error.message || 'Request failed')
     const details = Array.isArray(error.response?.data?.details)
       ? error.response?.data?.details.map((detail: unknown) => String(detail)).filter(Boolean).join('\n')
@@ -146,9 +170,47 @@ function rethrowApiError(error: unknown): never {
   throw error
 }
 
-export async function getMerchantProfile(user: MerchantUser | null | undefined) {
-  const response = await api.get('/merchants/me')
-  return mapBackendProfile(response.data?.merchant ?? response.data, user)
+function storeProfile(userId: string, profile: MerchantProfile) {
+  cachedProfile = {
+    userId,
+    value: profile,
+    fetchedAt: Date.now(),
+  }
+  return profile
+}
+
+export async function getMerchantProfile(
+  user: MerchantUser | null | undefined,
+  options: { force?: boolean } = {}
+) {
+  const userId = String(user?.uid || '')
+
+  if (
+    !options.force &&
+    cachedProfile?.userId === userId &&
+    Date.now() - cachedProfile.fetchedAt < PROFILE_CACHE_TTL_MS
+  ) {
+    return cachedProfile.value
+  }
+
+  if (!options.force && profileRequest?.userId === userId) {
+    return profileRequest.promise
+  }
+
+  const promise = api
+    .get('/merchants/me')
+    .then((response) =>
+      storeProfile(userId, mapBackendProfile(response.data?.merchant ?? response.data, user))
+    )
+    .catch(rethrowApiError)
+    .finally(() => {
+      if (profileRequest?.promise === promise) {
+        profileRequest = undefined
+      }
+    })
+
+  profileRequest = { userId, promise }
+  return promise
 }
 
 export async function updateMerchantProfile(
@@ -170,7 +232,10 @@ export async function updateMerchantProfile(
       bannerUrl: patch.bannerUrl,
       imageUrl: patch.bannerUrl || patch.logoUrl,
     })
-    return mapBackendProfile(response.data?.merchant ?? response.data, user)
+    return storeProfile(
+      String(user?.uid || ''),
+      mapBackendProfile(response.data?.merchant ?? response.data, user)
+    )
   } catch (error) {
     rethrowApiError(error)
   }
@@ -194,9 +259,13 @@ export async function uploadMerchantAsset(
 }
 
 export async function getMerchantPromotions(_user: MerchantUser | null | undefined) {
-  const response = await api.get('/merchants/me/promotions')
-  const promotions = (response.data?.promotions || response.data || []) as Array<Record<string, unknown>>
-  return promotions.map(mapBackendPromotion)
+  try {
+    const response = await api.get('/merchants/me/promotions')
+    const promotions = (response.data?.promotions || response.data || []) as Array<Record<string, unknown>>
+    return promotions.map(mapBackendPromotion)
+  } catch (error) {
+    rethrowApiError(error)
+  }
 }
 
 export async function saveMerchantPromotion(
@@ -260,9 +329,13 @@ export async function deleteMerchantProduct(_user: MerchantUser | null | undefin
 }
 
 export async function getMerchantNotifications(user: MerchantUser | null | undefined) {
-  const response = await api.get('/notifications/me')
-  const notifications = (response.data?.notifications || response.data || []) as Array<Record<string, unknown>>
-  return notifications.map(mapBackendNotification)
+  try {
+    const response = await api.get('/notifications/me')
+    const notifications = (response.data?.notifications || response.data || []) as Array<Record<string, unknown>>
+    return notifications.map(mapBackendNotification)
+  } catch (error) {
+    rethrowApiError(error)
+  }
 }
 
 export async function markAllNotificationsRead(user: MerchantUser | null | undefined) {
@@ -271,20 +344,27 @@ export async function markAllNotificationsRead(user: MerchantUser | null | undef
 }
 
 export async function getMerchantTransactions(_user: MerchantUser | null | undefined) {
-  const response = await api.get('/merchants/me/transactions')
-  const transactions = (response.data?.transactions || response.data || []) as Array<Record<string, unknown>>
-  return transactions.map(mapBackendTransaction)
+  try {
+    const response = await api.get('/merchants/me/transactions')
+    const transactions = (response.data?.transactions || response.data || []) as Array<Record<string, unknown>>
+    return transactions.map(mapBackendTransaction)
+  } catch (error) {
+    rethrowApiError(error)
+  }
 }
 
 export async function getMerchantDashboardSnapshot(
   user: MerchantUser | null | undefined
 ): Promise<MerchantDashboardSnapshot> {
-  const [profile, promotions, notifications, transactions] = await Promise.all([
-    getMerchantProfile(user),
+  const profile = await getMerchantProfile(user)
+  const [promotionsResult, notificationsResult, transactionsResult] = await Promise.allSettled([
     getMerchantPromotions(user),
     getMerchantNotifications(user),
     getMerchantTransactions(user),
   ])
+  const promotions = promotionsResult.status === 'fulfilled' ? promotionsResult.value : []
+  const notifications = notificationsResult.status === 'fulfilled' ? notificationsResult.value : []
+  const transactions = transactionsResult.status === 'fulfilled' ? transactionsResult.value : []
 
   const todayKey = new Date().toISOString().slice(0, 10)
   const monthKey = new Date().toISOString().slice(0, 7)

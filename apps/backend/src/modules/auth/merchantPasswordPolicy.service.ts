@@ -68,6 +68,10 @@ export async function syncMerchantPasswordRequirement(uid: string, password: str
     return false;
   }
 
+  if (record.mustChangePassword === false) {
+    return false;
+  }
+
   const matchesTemporaryPassword = await doesPasswordMatchTemporaryPassword(password, record);
   const nextMustChangePassword = matchesTemporaryPassword;
 
