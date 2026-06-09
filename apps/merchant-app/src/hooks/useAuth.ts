@@ -5,6 +5,8 @@ import { getCurrentMerchant } from '../services/auth.service'
 import type { MerchantUser } from '../store/authStore'
 import { useAuthStore } from '../store/authStore'
 
+const SESSION_VERIFY_TIMEOUT_MS = 6000
+
 function toMerchantUser(payload: Awaited<ReturnType<typeof getCurrentMerchant>>, existingUser?: MerchantUser | null) {
   return {
     uid: payload.uid || existingUser?.uid || '',
@@ -18,6 +20,20 @@ function toMerchantUser(payload: Awaited<ReturnType<typeof getCurrentMerchant>>,
     createdAt: payload.createdAt,
     mustChangePassword: Boolean(payload.mustChangePassword),
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string) {
+  let timeout: ReturnType<typeof setTimeout> | null = null
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(message)), milliseconds)
+  })
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeout) {
+      clearTimeout(timeout)
+    }
+  })
 }
 
 export function useAuth() {
@@ -42,7 +58,11 @@ export function useAuth() {
 
       try {
         setLoading(true)
-        const payload = await getCurrentMerchant()
+        const payload = await withTimeout(
+          getCurrentMerchant(),
+          SESSION_VERIFY_TIMEOUT_MS,
+          'Merchant session verification timed out.'
+        )
         if (active) {
           setUser(toMerchantUser(payload, existingState.user))
         }

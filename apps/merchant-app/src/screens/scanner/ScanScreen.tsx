@@ -25,6 +25,11 @@ import { getMerchantProfile } from '../../services/merchantWorkspace.service'
 import { scanMemberQr } from '../../services/transaction.service'
 import { useAuthStore } from '../../store/authStore'
 import type { MerchantProfile } from '../../types/merchant'
+import {
+  estimatePointsFromAmount,
+  formatPointsRateLabel,
+  getMerchantPointsRate,
+} from '../../utils/points'
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>
 
@@ -64,7 +69,9 @@ export default function ScanScreen() {
   const lastCapturedTokenRef = useRef<string | null>(null)
   const lastCaptureAtRef = useRef(0)
 
-  const pesosPerPoint = 10
+  const pesosPerPoint = getMerchantPointsRate(profile?.pointsRate)
+  const pointsRateLabel = formatPointsRateLabel(pesosPerPoint)
+  const pointsRateShortLabel = formatPointsRateLabel(pesosPerPoint, 'pt')
   const numericAmount = Number(amountSpent || 0)
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount > 0
   const canStartScanner =
@@ -134,9 +141,8 @@ export default function ScanScreen() {
   }, [isFocused, notice, permission?.granted, shouldKeepScannerLive])
 
   const pointsPreview = useMemo(() => {
-    if (!numericAmount) return 0
-    return Math.max(1, Math.floor(numericAmount / pesosPerPoint))
-  }, [numericAmount])
+    return estimatePointsFromAmount(numericAmount, pesosPerPoint)
+  }, [numericAmount, pesosPerPoint])
 
   const openNotice = useCallback((nextNotice: ScanNoticeState) => {
     setNotice(nextNotice)
@@ -587,8 +593,8 @@ export default function ScanScreen() {
           <View style={styles.heroCard}>
             <Text style={styles.title}>Scan Member QR</Text>
             <Text style={styles.subtitle}>
-              Start with the purchase amount, then open the scanner to award points using the
-              current rule of 10 points for every PHP 100 spent.
+              Start with the purchase amount, then open the scanner to award points using your
+              merchant rate of {pointsRateLabel}.
             </Text>
 
             <View style={styles.previewRow}>
@@ -600,7 +606,7 @@ export default function ScanScreen() {
               <MiniInfoCard
                 icon="cash-marker"
                 label="Current rule"
-                value="10 pts / PHP 100"
+                value={pointsRateShortLabel}
               />
             </View>
           </View>
@@ -628,9 +634,9 @@ export default function ScanScreen() {
 
             <Text style={styles.previewText}>
               {hasValidAmount
-                ? `Estimated reward: around ${pointsPreview} point${
+                ? `Estimated reward: ${pointsPreview} point${
                     pointsPreview === 1 ? '' : 's'
-                  } based on PHP 10 per point, or 10 points for every PHP 100 spent.`
+                  } based on ${pointsRateLabel}.`
                 : 'Enter a purchase amount greater than zero before opening the QR scanner or submitting a manual QR token.'}
             </Text>
 

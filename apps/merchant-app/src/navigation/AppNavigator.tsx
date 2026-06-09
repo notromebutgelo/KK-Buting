@@ -1,5 +1,5 @@
 import React from 'react'
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -35,9 +35,11 @@ const Stack = createNativeStackNavigator<RootStackParamList>()
 function FullScreenLoader({
   title,
   message,
+  actions,
 }: {
   title: string
   message: string
+  actions?: React.ReactNode
 }) {
   return (
     <View style={styles.loader}>
@@ -50,6 +52,7 @@ function FullScreenLoader({
           <Text style={styles.loadingTitle}>{title}</Text>
           <Text style={styles.loadingMessage}>{message}</Text>
         </View>
+        {actions ? <View style={styles.loadingActions}>{actions}</View> : null}
       </View>
     </View>
   )
@@ -59,6 +62,8 @@ export default function AppNavigator() {
   const user = useAuthStore((state) => state.user)
   const isLoading = useAuthStore((state) => state.isLoading)
   const hasHydrated = useAuthStore((state) => state.hasHydrated)
+  const setLoading = useAuthStore((state) => state.setLoading)
+  const logout = useAuthStore((state) => state.logout)
 
   if (!hasHydrated) {
     return (
@@ -74,6 +79,18 @@ export default function AppNavigator() {
       <FullScreenLoader
         title="Preparing Your Workspace"
         message="Please wait while we verify your merchant account and load access details."
+        actions={
+          user ? (
+            <>
+              <Pressable style={styles.primaryAction} onPress={() => setLoading(false)}>
+                <Text style={styles.primaryActionText}>Continue with saved session</Text>
+              </Pressable>
+              <Pressable style={styles.secondaryAction} onPress={() => void logout()}>
+                <Text style={styles.secondaryActionText}>Return to login</Text>
+              </Pressable>
+            </>
+          ) : undefined
+        }
       />
     )
   }
@@ -143,6 +160,10 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
   },
+  loadingActions: {
+    width: '100%',
+    gap: 10,
+  },
   loadingTitle: {
     color: '#014384',
     fontSize: 19,
@@ -155,5 +176,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 20,
     textAlign: 'center',
+  },
+  primaryAction: {
+    borderRadius: 16,
+    backgroundColor: '#014384',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  primaryActionText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  secondaryAction: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d9e4f0',
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  secondaryActionText: {
+    color: '#014384',
+    fontSize: 14,
+    fontWeight: '800',
   },
 })

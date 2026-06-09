@@ -182,9 +182,9 @@ function getApiConfig(): ApiConfig {
 }
 
 const apiConfig = getApiConfig()
-const API_REQUEST_TIMEOUT_MS = 90000
-const API_WARMUP_TIMEOUT_MS = 75000
-const API_RETRY_DELAY_MS = 1500
+const API_REQUEST_TIMEOUT_MS = 20000
+const API_WARMUP_TIMEOUT_MS = 6000
+const API_RETRY_DELAY_MS = 800
 const API_WARMUP_CACHE_MS = 5 * 60 * 1000
 
 export const API_BASE_URL = apiConfig.apiUrl
@@ -260,9 +260,20 @@ function wait(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-function isRetryableMutation(config: RetryableRequestConfig | undefined, method: string) {
-  const url = String(config?.url || '')
-  return method === 'post' && url.includes('/auth/login')
+function hasAuthorizationHeader(config: InternalAxiosRequestConfig) {
+  const headers = config.headers as
+    | (InternalAxiosRequestConfig['headers'] & {
+        Authorization?: unknown
+        authorization?: unknown
+        has?: (name: string) => boolean
+      })
+    | undefined
+
+  return Boolean(
+    headers?.Authorization ||
+      headers?.authorization ||
+      (typeof headers?.has === 'function' && headers.has('Authorization'))
+  )
 }
 
 api.interceptors.request.use(async (config) => {
@@ -271,9 +282,11 @@ api.interceptors.request.use(async (config) => {
   }
 
   const currentState = useAuthStore.getState()
+  const requestHasAuthHeader = hasAuthorizationHeader(config)
   let token = currentState.token
   const refreshToken = currentState.refreshToken
   const shouldRefreshToken =
+    !requestHasAuthHeader &&
     !!refreshToken &&
     (!token || !currentState.tokenExpiresAt || Date.now() > currentState.tokenExpiresAt - 120000)
 
@@ -290,7 +303,7 @@ api.interceptors.request.use(async (config) => {
     }
   }
 
-  if (token) {
+  if (token && !requestHasAuthHeader) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
@@ -309,7 +322,7 @@ api.interceptors.response.use(
     const isCanceled = error.code === 'ERR_CANCELED'
     const isRetryableFailure =
       !error.response || status === 408 || status === 429 || status === 502 || status === 503 || status === 504
-    const canRetryMethod = method === 'get' || isRetryableMutation(config, method)
+    const canRetryMethod = method === 'get'
 
     if (
       config &&

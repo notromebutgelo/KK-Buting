@@ -15,6 +15,8 @@ type AuthPayload = {
   expiresAt: number
 }
 
+const AUTH_LOGIN_TIMEOUT_MS = 12000
+
 function normalizeUser(payload: Record<string, unknown>, fallbackEmail: string): MerchantUser {
   return {
     uid: String(payload.uid ?? payload.id ?? ''),
@@ -30,10 +32,15 @@ function mapApiError(error: unknown): never {
   if (axios.isAxiosError(error) && !error.response) {
     const usingLocalhost =
       API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1')
+    const timedOut = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
 
     throw new Error(
       usingLocalhost
         ? `Cannot reach merchant API at ${API_BASE_URL}. On a physical device, localhost points to the phone instead of your computer.`
+        : timedOut
+          ? `The merchant service at ${API_BASE_URL} did not respond within ${Math.round(
+              AUTH_LOGIN_TIMEOUT_MS / 1000
+            )} seconds. Render may still be waking up. Try again in a moment.`
         : `The merchant service at ${API_BASE_URL} is unavailable or taking too long to start. Check your internet connection and try again.`
     )
   }
@@ -61,14 +68,14 @@ function mapApiError(error: unknown): never {
 
 export async function signIn(email: string, password: string): Promise<AuthPayload> {
   try {
-    const backendWarmup = warmUpApi()
+    void warmUpApi()
     const firebaseSession = await signInWithFirebasePassword(email, password)
-    await backendWarmup
     const response = await api.post(
       '/auth/login',
       { password },
       {
         headers: { Authorization: `Bearer ${firebaseSession.idToken}` },
+        timeout: AUTH_LOGIN_TIMEOUT_MS,
       }
     )
     const user = normalizeUser(response.data.user ?? response.data, firebaseSession.email || email)

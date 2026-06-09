@@ -10,6 +10,7 @@ import { getMerchantDashboardSnapshot } from '../../services/merchantWorkspace.s
 import { useAuthStore } from '../../store/authStore'
 import type { MerchantDashboardSnapshot, MerchantStatus } from '../../types/merchant'
 import { getStatusLabel, getStatusMessage } from '../../utils/merchant'
+import { formatPointsRateLabel } from '../../utils/points'
 
 export default function DashboardScreen() {
   const user = useAuthStore((state) => state.user)
@@ -43,6 +44,7 @@ export default function DashboardScreen() {
   const greeting = getGreeting()
   const statusCopy = profile?.adminNote?.trim() || getStatusMessage(profile?.status || 'active')
   const statusTone = getStatusTone(profile?.status || 'active')
+  const pointsRuleLabel = formatPointsRateLabel(profile?.pointsRate, 'pt')
   const activePromoLabel =
     snapshot?.spotlightPromotion?.valueLabel || `${snapshot?.activePromotionCount ?? 0} active promo${snapshot?.activePromotionCount === 1 ? '' : 's'}`
 
@@ -219,7 +221,7 @@ export default function DashboardScreen() {
             <FooterMetric
               icon="cash-marker"
               label="Points rule"
-              value="10 pts / PHP 100"
+              value={pointsRuleLabel}
             />
             <FooterMetric
               icon="ticket-percent-outline"

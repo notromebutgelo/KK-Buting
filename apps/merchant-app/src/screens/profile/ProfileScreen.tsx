@@ -9,6 +9,7 @@ import { signOut } from '../../services/auth.service'
 import { getMerchantProfile } from '../../services/merchantWorkspace.service'
 import { useAuthStore } from '../../store/authStore'
 import type { MerchantProfile } from '../../types/merchant'
+import { formatPointsRateLabel } from '../../utils/points'
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>()
@@ -59,7 +60,7 @@ export default function ProfileScreen() {
           <DetailRow icon="storefront-outline" label="Owner" value={profile?.ownerName ?? user?.UserName ?? 'Merchant Owner'} />
           <DetailRow icon="email-outline" label="Email" value={user?.email ?? 'No email available'} />
           <DetailRow icon="shield-account-outline" label="Role" value={user?.role ?? 'merchant'} />
-          <DetailRow icon="cash-multiple" label="Points rate" value={`PHP ${profile?.pointsRate ?? 10} = 1 point`} />
+          <DetailRow icon="cash-multiple" label="Points rate" value={formatPointsRateLabel(profile?.pointsRate)} />
         </View>
 
         <View style={styles.card}>

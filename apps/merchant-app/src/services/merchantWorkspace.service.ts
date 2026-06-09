@@ -12,6 +12,7 @@ import type {
   MerchantTransaction,
 } from '../types/merchant'
 import { getStatusMessage, maskMemberId } from '../utils/merchant'
+import { getDefaultPointsPolicy, getMerchantPointsRate } from '../utils/points'
 
 const PROFILE_CACHE_TTL_MS = 30000
 
@@ -60,6 +61,7 @@ function toTextLines(value: unknown) {
 
 function mapBackendProfile(payload: Record<string, unknown>, user: MerchantUser | null | undefined): MerchantProfile {
   const status = mapBackendStatus(String(payload.status || 'pending'))
+  const pointsRate = getMerchantPointsRate(payload.pointsRate)
 
   return {
     id: String(payload.id || user?.uid || 'merchant-demo'),
@@ -73,11 +75,8 @@ function mapBackendProfile(payload: Record<string, unknown>, user: MerchantUser 
     businessInfo: String(payload.businessInfo || ''),
     discountInfo: String(payload.discountInfo || ''),
     termsAndConditions: normalizeTextBlock(payload.termsAndConditions),
-    pointsPolicy: String(
-      payload.pointsPolicy ||
-        'Earn 10 points for every PHP 100 spent at this shop. Present your youth QR during checkout.'
-    ),
-    pointsRate: Number(payload.pointsRate || 10),
+    pointsPolicy: String(payload.pointsPolicy || getDefaultPointsPolicy(pointsRate)),
+    pointsRate,
     logoUrl: String(payload.logoUrl || ''),
     bannerUrl: String(payload.bannerUrl || payload.imageUrl || ''),
     status,
