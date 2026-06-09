@@ -10,6 +10,10 @@ const {
   getPointsFromAmount,
 } = require("../dist/src/modules/qr/qr.helpers");
 const {
+  generateQrToken,
+  verifyQrToken,
+} = require("../dist/utils/renerateQrToken");
+const {
   buildMerchantPayload,
   getInlineAssetLimit,
   normalizeMerchant,
@@ -78,6 +82,22 @@ const tests = [
         extractScanToken(JSON.stringify({ qrToken: "qr-token" })),
         "qr-token"
       );
+      assert.equal(
+        extractScanToken(JSON.stringify(JSON.stringify({ token: "nested-token" }))),
+        "nested-token"
+      );
+    },
+  },
+  {
+    name: "QR token generation and verification round-trip",
+    run() {
+      const token = generateQrToken("youth-1", 3);
+      const result = verifyQrToken(token);
+
+      assert.ok(result);
+      assert.equal(result.userId, "youth-1");
+      assert.equal(result.revision, 3);
+      assert.ok(Date.now() - result.timestamp < 1000);
     },
   },
   {

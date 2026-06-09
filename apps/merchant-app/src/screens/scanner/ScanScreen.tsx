@@ -449,10 +449,12 @@ export default function ScanScreen() {
     ]
   )
 
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
+  const handleBarcodeScanned = ({ data, raw }: { data: string; raw?: string }) => {
+    const qrPayload = raw?.trim() || data
+
     if (isSubmitting || !scannerEnabled || !isFocused || scanLockRef.current) return
-    if (!prepareCameraSubmission(data)) return
-    void processToken(data, 'camera')
+    if (!prepareCameraSubmission(qrPayload)) return
+    void processToken(qrPayload, 'camera')
   }
 
   const openEmbeddedScanner = useCallback(async () => {
@@ -502,8 +504,10 @@ export default function ScanScreen() {
     scanLockRef.current = false
 
     nativeScannerSubscriptionRef.current?.remove()
-    const subscription = CameraView.onModernBarcodeScanned(({ data }) => {
-      if (nativeScanHandledRef.current || !prepareCameraSubmission(data)) {
+    const subscription = CameraView.onModernBarcodeScanned(({ data, raw }) => {
+      const qrPayload = raw?.trim() || data
+
+      if (nativeScanHandledRef.current || !prepareCameraSubmission(qrPayload)) {
         return
       }
 
@@ -511,7 +515,7 @@ export default function ScanScreen() {
       nativeScannerSubscriptionRef.current?.remove()
       nativeScannerSubscriptionRef.current = null
       setNativeScannerLaunching(false)
-      void processToken(data, 'camera')
+      void processToken(qrPayload, 'camera')
     })
     nativeScannerSubscriptionRef.current = subscription
 

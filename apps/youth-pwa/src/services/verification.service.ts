@@ -30,7 +30,13 @@ export async function getVerificationStatus() {
 }
 
 export async function getDigitalID() {
-  const res = await api.get('/digital-id/me')
+  const res = await api.get('/digital-id/me', {
+    params: { refreshedAt: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  })
   return res.data
 }
 

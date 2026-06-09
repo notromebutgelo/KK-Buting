@@ -6,20 +6,31 @@ type MerchantLike = {
 };
 
 export function extractScanToken(rawValue: string): string {
-  const trimmed = String(rawValue || "").trim();
+  let trimmed = String(rawValue || "").trim();
   if (!trimmed) return "";
 
-  try {
-    const parsed = JSON.parse(trimmed) as {
-      token?: string;
-      qrToken?: string;
-      signedToken?: string;
-    };
+  for (let depth = 0; depth < 2; depth += 1) {
+    try {
+      const parsed = JSON.parse(trimmed) as
+        | string
+        | {
+            token?: string;
+            qrToken?: string;
+            signedToken?: string;
+          };
 
-    return String(parsed.token || parsed.qrToken || parsed.signedToken || "").trim();
-  } catch {
-    return trimmed;
+      if (typeof parsed === "string") {
+        trimmed = parsed.trim();
+        continue;
+      }
+
+      return String(parsed.token || parsed.qrToken || parsed.signedToken || "").trim();
+    } catch {
+      return trimmed;
+    }
   }
+
+  return trimmed;
 }
 
 export function getPointsFromAmount(amountSpent: number, pointsRate: number): number {

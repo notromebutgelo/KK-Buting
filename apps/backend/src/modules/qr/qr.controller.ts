@@ -5,6 +5,9 @@ import { generateUserQr, processQrScan, processQrRedeem } from "./qr.service";
 export async function generateQr(req: AuthRequest, res: Response) {
   try {
     const token = await generateUserQr(req.user!.uid);
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
     return res.json({ token });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

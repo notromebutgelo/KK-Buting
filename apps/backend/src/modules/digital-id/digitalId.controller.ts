@@ -12,6 +12,9 @@ export async function getDigitalIdHandler(req: AuthRequest, res: Response) {
   try {
     const id = await getDigitalId(req.user!.uid);
     if (!id) return res.status(404).json({ error: "No profile found" });
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
     return res.json(id);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
