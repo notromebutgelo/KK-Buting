@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-import api, { API_BASE_URL } from '../lib/api'
+import api, { API_BASE_URL, warmUpApi } from '../lib/api'
 import {
   signInWithFirebasePassword,
   updateFirebasePassword,
@@ -34,7 +34,7 @@ function mapApiError(error: unknown): never {
     throw new Error(
       usingLocalhost
         ? `Cannot reach merchant API at ${API_BASE_URL}. On a physical device, localhost points to the phone instead of your computer.`
-        : `Cannot reach merchant API at ${API_BASE_URL}. Check that the backend is running and that this device can reach your computer on the same network.`
+        : `The merchant service at ${API_BASE_URL} is unavailable or taking too long to start. Check your internet connection and try again.`
     )
   }
 
@@ -61,6 +61,7 @@ function mapApiError(error: unknown): never {
 
 export async function signIn(email: string, password: string): Promise<AuthPayload> {
   try {
+    void warmUpApi()
     const firebaseSession = await signInWithFirebasePassword(email, password)
     const response = await api.post(
       '/auth/login',

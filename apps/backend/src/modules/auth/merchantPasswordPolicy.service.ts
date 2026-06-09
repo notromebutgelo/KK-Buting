@@ -82,14 +82,6 @@ export async function syncMerchantPasswordRequirement(uid: string, password: str
       },
       { merge: true }
     );
-  } else if (matchesTemporaryPassword) {
-    await db.collection(MERCHANT_SECURITY_COLLECTION).doc(uid).set(
-      {
-        lastTemporaryPasswordMatchAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
   }
 
   return nextMustChangePassword;

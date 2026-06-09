@@ -37,12 +37,15 @@ type HardcodedAdminUsername = keyof typeof HARDCODED_ADMIN_CREDENTIALS;
 
 async function buildAuthUserResponse(
   req: AuthRequest,
-  storedUser?: Record<string, any> | null
+  storedUser?: Record<string, any> | null,
+  mustChangePasswordOverride?: boolean
 ): Promise<AuthUserResponse> {
   const uid = String(storedUser?.uid || storedUser?.id || req.user?.uid || "");
   const role = String(storedUser?.role || req.user?.role || "");
   const mustChangePassword =
-    role === "merchant" && uid ? await getMerchantPasswordRequirement(uid) : false;
+    role === "merchant" && uid
+      ? mustChangePasswordOverride ?? await getMerchantPasswordRequirement(uid)
+      : false;
 
   return {
     uid,
@@ -105,14 +108,15 @@ export async function loginUser(req: AuthRequest, res: Response) {
     }
 
     const storedRole = String(user.role || req.user?.role || "");
+    let mustChangePassword: boolean | undefined;
     if (storedRole === "merchant") {
       const password = String(req.body?.password || "");
       if (password) {
-        await syncMerchantPasswordRequirement(uid, password);
+        mustChangePassword = await syncMerchantPasswordRequirement(uid, password);
       }
     }
 
-    const normalizedUser = await buildAuthUserResponse(req, user);
+    const normalizedUser = await buildAuthUserResponse(req, user, mustChangePassword);
     return res.json({ user: normalizedUser });
   } catch (err: any) {
     if (req.user?.role) {

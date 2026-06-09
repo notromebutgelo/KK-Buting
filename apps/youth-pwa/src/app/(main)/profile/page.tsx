@@ -209,6 +209,7 @@ export default function ProfilePage() {
       label: 'Email',
       value: user?.email || 'No email on file',
       icon: <MailIcon />,
+      truncateAfterTwoLines: true,
     },
     {
       label: 'Barangay',
@@ -290,11 +291,11 @@ export default function ProfilePage() {
         </div>
       </Modal>
 
-      <div className="min-h-full bg-gray-50 px-5 pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)]">
-        <section>
+      <div className="min-h-full w-full min-w-0 overflow-x-hidden bg-gray-50 px-3 pb-10 pt-[calc(env(safe-area-inset-top,0px)+1rem)] min-[360px]:px-4 sm:px-5">
+        <section className="min-w-0">
           <div className="rounded-[30px] bg-[linear-gradient(135deg,#014384_0%,#035db7_58%,#0a74de_100%)] p-[1px] text-white shadow-[0_18px_38px_rgba(1,67,132,0.18)]">
-            <div className="rounded-[29px] border border-white/10 bg-[linear-gradient(140deg,#014384_0%,#045fb8_56%,#0a74de_100%)] px-5 pb-5 pt-4.5">
-              <div className="flex items-start justify-between gap-3 border-b border-white/12 pb-4">
+            <div className="min-w-0 rounded-[29px] border border-white/10 bg-[linear-gradient(140deg,#014384_0%,#045fb8_56%,#0a74de_100%)] px-4 pb-5 pt-4.5 min-[400px]:px-5">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-white/12 pb-4">
                 <div className="min-w-0">
                   <p className="pt-0.5 text-[10px] font-semibold uppercase leading-[1.45] tracking-[0.18em] text-white/68">
                     Account Overview
@@ -305,13 +306,13 @@ export default function ProfilePage() {
                 {profile ? (
                   <Badge
                     status={profile.status}
-                    className="border-white/20 bg-white/12 text-white [&>span:first-child]:bg-[#fcb315]"
+                    className="shrink-0 border-white/20 bg-white/12 text-white [&>span:first-child]:bg-[#fcb315]"
                   />
                 ) : null}
               </div>
 
-              <div className="mt-5 flex items-center gap-4">
-                <div className="relative h-[74px] w-[74px] flex-shrink-0">
+              <div className="mt-5 flex min-w-0 flex-col items-start gap-4 min-[360px]:flex-row min-[360px]:items-center">
+                <div className="relative h-[68px] w-[68px] flex-shrink-0 min-[400px]:h-[74px] min-[400px]:w-[74px]">
                   <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-white/14 ring-[10px] ring-white/10">
                     {profilePhotoUrl ? (
                       <img
@@ -330,18 +331,20 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-[20px] font-black leading-[1.08] tracking-[-0.02em] text-white">
+                <div className="w-full min-w-0 flex-1">
+                  <h1 className="max-w-full break-words text-[clamp(1.05rem,5vw,1.25rem)] font-black leading-[1.12] tracking-[-0.02em] text-white [overflow-wrap:anywhere]">
                     {displayName}
                   </h1>
-                  <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-[12px] text-white/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <div className="mt-3 flex w-full min-w-0 max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-[12px] text-white/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] min-[400px]:w-fit">
                     <MailChipIcon />
-                    <span className="truncate">{user.email || 'No email on file'}</span>
+                    <span className="min-w-0 truncate" title={user.email || 'No email on file'}>
+                      {user.email || 'No email on file'}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="mt-5 grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-2 min-[360px]:auto-rows-fr">
                 {overviewStats.map((item) => (
                   <ProfileStat
                     key={item.label}
@@ -363,28 +366,29 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-[26px] bg-white px-5 py-5 shadow-[0_12px_28px_rgba(1,67,132,0.08)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+          <div className="mt-4 min-w-0 rounded-[26px] bg-white px-4 py-5 shadow-[0_12px_28px_rgba(1,67,132,0.08)] min-[400px]:px-5">
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#7e95b2]">
                   Member Snapshot
                 </p>
-                <h2 className="mt-1 text-[18px] font-extrabold text-[#014384]">
+                <h2 className="mt-1 break-words text-[clamp(1rem,4.6vw,1.125rem)] font-extrabold text-[#014384]">
                   Your community profile
                 </h2>
               </div>
-              <div className="rounded-full bg-[#edf4fb] px-3 py-1 text-[11px] font-bold text-[#0a4e99]">
+              <div className="shrink-0 rounded-full bg-[#edf4fb] px-3 py-1 text-[11px] font-bold text-[#0a4e99]">
                 KK Buting
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-2">
               {snapshotItems.map((item) => (
                 <InfoCard
                   key={item.label}
                   label={item.label}
                   value={item.value}
                   icon={item.icon}
+                  truncateAfterTwoLines={item.truncateAfterTwoLines}
                 />
               ))}
             </div>
@@ -497,16 +501,16 @@ function ProfileStat({
   icon: React.ReactNode
 }) {
   return (
-    <div className="min-h-[116px] overflow-hidden rounded-[20px] border border-white/14 bg-white/10 px-4 py-4 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-      <div className="grid grid-cols-[32px_minmax(0,1fr)] items-start gap-2">
+    <div className="h-full min-w-0 rounded-[20px] border border-white/14 bg-white/10 px-3.5 py-4 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] min-[360px]:min-h-[122px]">
+      <div className="grid min-w-0 grid-cols-[32px_minmax(0,1fr)] items-start gap-3 min-[360px]:grid-cols-1 min-[360px]:gap-2.5">
         <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[12px] bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           {icon}
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="block min-w-0">
           <p className="text-[9px] font-semibold uppercase leading-[1.3] tracking-[0.1em] text-white/62">
             {label}
           </p>
-          <p className="mt-1.5 text-[12px] font-bold leading-[1.38] text-white break-words">
+          <p className="mt-1.5 min-w-0 break-words text-[clamp(0.72rem,3.2vw,0.8rem)] font-bold leading-[1.42] text-white [overflow-wrap:anywhere]">
             {value}
           </p>
         </span>
@@ -519,22 +523,29 @@ function InfoCard({
   label,
   value,
   icon,
+  truncateAfterTwoLines = false,
 }: {
   label: string
   value: string
   icon: React.ReactNode
+  truncateAfterTwoLines?: boolean
 }) {
   return (
-    <div className="min-w-0 rounded-[20px] border border-[#e1ebf5] bg-[#f8fbff] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#edf4fb_0%,#dcecff_100%)] text-[#0b5db7]">
+    <div className="h-full min-w-0 rounded-[20px] border border-[#e1ebf5] bg-[#f8fbff] px-3.5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] min-[360px]:min-h-[122px]">
+      <div className="grid min-w-0 grid-cols-[36px_minmax(0,1fr)] items-start gap-3 min-[360px]:grid-cols-1 min-[360px]:gap-2.5">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,#edf4fb_0%,#dcecff_100%)] text-[#0b5db7]">
           {icon}
         </span>
-        <span className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7e95b2]">
+        <span className="block min-w-0">
+          <p className="break-words text-[9px] font-semibold uppercase leading-[1.35] tracking-[0.12em] text-[#7e95b2] [overflow-wrap:anywhere]">
             {label}
           </p>
-          <p className="mt-1.5 text-[13px] font-bold leading-[1.35] text-[#014384] [overflow-wrap:anywhere]">
+          <p
+            className={`mt-1.5 min-w-0 text-[clamp(0.75rem,3.35vw,0.82rem)] font-bold leading-[1.4] text-[#014384] [overflow-wrap:anywhere] ${
+              truncateAfterTwoLines ? 'line-clamp-2' : 'break-words'
+            }`}
+            title={truncateAfterTwoLines ? value : undefined}
+          >
             {value}
           </p>
         </span>

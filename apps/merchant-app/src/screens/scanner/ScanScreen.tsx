@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AppState,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -41,13 +43,17 @@ export default function ScanScreen() {
   const navigation = useNavigation<NavigationProp>()
   const isFocused = useIsFocused()
   const user = useAuthStore((state) => state.user)
-  const [permission, requestPermission] = useCameraPermissions()
+  const [permission, requestPermission, getPermission] = useCameraPermissions()
   const [token, setToken] = useState('')
   const [amountSpent, setAmountSpent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [scannerRequested, setScannerRequested] = useState(false)
   const [scannerEnabled, setScannerEnabled] = useState(false)
+  const [permissionRequesting, setPermissionRequesting] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
   const [profile, setProfile] = useState<MerchantProfile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+  const [profileError, setProfileError] = useState<string | null>(null)
   const [notice, setNotice] = useState<ScanNoticeState | null>(null)
 
   const scanLockRef = useRef(false)
@@ -59,47 +65,71 @@ export default function ScanScreen() {
   const pesosPerPoint = 10
   const numericAmount = Number(amountSpent || 0)
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount > 0
-  const canStartScanner = hasValidAmount && !isSubmitting && profile?.status === 'active'
+  const canStartScanner =
+    hasValidAmount && !isSubmitting && !permissionRequesting && !profileLoading
   const canSubmitManual = hasValidAmount && token.trim().length > 0 && !isSubmitting
   const shouldKeepScannerLive =
     scannerRequested && hasValidAmount && profile?.status === 'active' && isFocused
 
+  const loadMerchantProfile = useCallback(async () => {
+    try {
+      setProfileLoading(true)
+      setProfileError(null)
+      const merchantProfile = await getMerchantProfile(user)
+      setProfile(merchantProfile)
+      return merchantProfile
+    } catch {
+      setProfile(null)
+      setProfileError(
+        'Merchant access could not be verified. Check your connection, then try opening the scanner again.'
+      )
+      return null
+    } finally {
+      setProfileLoading(false)
+    }
+  }, [user])
+
   useFocusEffect(
     useCallback(() => {
-      let active = true
-
-      void getMerchantProfile(user).then((merchantProfile) => {
-        if (active) {
-          setProfile(merchantProfile)
-        }
-      })
+      void getPermission()
+      void loadMerchantProfile()
 
       return () => {
-        active = false
         setScannerEnabled(false)
         setNotice(null)
         scanLockRef.current = true
       }
-    }, [user])
+    }, [getPermission, loadMerchantProfile])
   )
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void getPermission()
+      }
+    })
+
+    return () => subscription.remove()
+  }, [getPermission])
 
   useEffect(() => {
     if (!hasValidAmount && scannerRequested) {
       setScannerRequested(false)
       setScannerEnabled(false)
+      setCameraReady(false)
       scanLockRef.current = false
     }
   }, [hasValidAmount, scannerRequested])
 
   useEffect(() => {
-    if (!isFocused || notice) {
+    if (!isFocused || notice || !permission?.granted) {
       setScannerEnabled(false)
       return
     }
 
     setScannerEnabled(shouldKeepScannerLive)
     scanLockRef.current = false
-  }, [isFocused, notice, shouldKeepScannerLive])
+  }, [isFocused, notice, permission?.granted, shouldKeepScannerLive])
 
   const pointsPreview = useMemo(() => {
     if (!numericAmount) return 0
@@ -133,6 +163,7 @@ export default function ScanScreen() {
     setAmountSpent('')
     setScannerRequested(false)
     setScannerEnabled(false)
+    setCameraReady(false)
     scanLockRef.current = false
   }, [])
 
@@ -144,6 +175,7 @@ export default function ScanScreen() {
     setToken('')
     setScannerRequested(false)
     setScannerEnabled(false)
+    setCameraReady(false)
     scanLockRef.current = false
   }, [])
 
@@ -260,7 +292,35 @@ export default function ScanScreen() {
     return true
   }, [])
 
-  const openScannerSession = useCallback(() => {
+  const requestCameraAccess = useCallback(async () => {
+    if (permissionRequesting) {
+      return false
+    }
+
+    if (permission?.granted) {
+      return true
+    }
+
+    if (permission && !permission.canAskAgain) {
+      await Linking.openSettings()
+      return false
+    }
+
+    try {
+      setPermissionRequesting(true)
+      const nextPermission = await requestPermission()
+      return nextPermission.granted
+    } catch {
+      showScannerErrorNotice(
+        'Android could not request camera access. Reopen the app settings and allow Camera permission.'
+      )
+      return false
+    } finally {
+      setPermissionRequesting(false)
+    }
+  }, [permission, permissionRequesting, requestPermission, showScannerErrorNotice])
+
+  const openScannerSession = useCallback(async () => {
     if (!hasValidAmount) {
       openNotice({
         title: 'Enter Purchase Amount',
@@ -273,15 +333,54 @@ export default function ScanScreen() {
       return
     }
 
+    const currentProfile = profile ?? await loadMerchantProfile()
+    if (!currentProfile) {
+      openNotice({
+        title: 'Unable to Verify Merchant',
+        message:
+          'The app could not confirm merchant access. Check your connection and try again. If this continues, verify that the backend service is online.',
+        confirmLabel: 'OK',
+        iconName: 'cloud-alert',
+        tone: 'danger',
+      })
+      return
+    }
+
+    if (currentProfile.status !== 'active') {
+      openNotice({
+        title: 'Scanner Unavailable',
+        message: currentProfile.adminNote,
+        confirmLabel: 'OK',
+        iconName: 'store-alert-outline',
+        tone: 'warning',
+      })
+      return
+    }
+
+    const hasCameraAccess = await requestCameraAccess()
+
     setNotice(null)
     setScannerRequested(true)
-    setScannerEnabled(true)
+    setCameraReady(false)
+    setScannerEnabled(hasCameraAccess)
     scanLockRef.current = false
 
-    if (!permission?.granted) {
-      void requestPermission()
+    if (!hasCameraAccess) {
+      scanLockRef.current = true
     }
-  }, [hasValidAmount, openNotice, permission?.granted, requestPermission])
+  }, [hasValidAmount, loadMerchantProfile, openNotice, profile, requestCameraAccess])
+
+  const handleCameraMountError = useCallback(
+    ({ message }: { message: string }) => {
+      setCameraReady(false)
+      setScannerRequested(false)
+      showScannerErrorNotice(
+        message ||
+          'Android could not start the camera. Close other camera apps, then reopen the scanner.'
+      )
+    },
+    [showScannerErrorNotice]
+  )
 
   const handleAmountChange = useCallback((value: string) => {
     const sanitized = value.replace(/[^0-9.]/g, '')
@@ -430,6 +529,12 @@ export default function ScanScreen() {
           </View>
 
           {profile ? <StatusBanner status={profile.status} message={profile.adminNote} /> : null}
+          {profileError ? (
+            <View style={styles.profileError}>
+              <MaterialCommunityIcons name="cloud-alert" size={20} color="#b42318" />
+              <Text style={styles.profileErrorText}>{profileError}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Transaction setup</Text>
@@ -455,11 +560,15 @@ export default function ScanScreen() {
             <View style={styles.buttonRow}>
               <Pressable
                 style={[styles.button, !canStartScanner && styles.buttonDisabled]}
-                onPress={openScannerSession}
+                onPress={() => void openScannerSession()}
                 disabled={!canStartScanner}
               >
                 <Text style={styles.buttonText}>
-                  {scannerRequested ? 'Scanner Ready' : 'Open Scanner'}
+                  {profileLoading
+                    ? 'Checking Access...'
+                    : scannerRequested
+                      ? 'Scanner Ready'
+                      : 'Open Scanner'}
                 </Text>
               </Pressable>
 
@@ -484,6 +593,8 @@ export default function ScanScreen() {
                     facing="back"
                     active={isFocused}
                     barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                    onCameraReady={() => setCameraReady(true)}
+                    onMountError={handleCameraMountError}
                     onBarcodeScanned={
                       profile?.status === 'active' && scannerEnabled && isFocused
                         ? handleBarcodeScanned
@@ -493,6 +604,12 @@ export default function ScanScreen() {
                   <View pointerEvents="none" style={styles.frameOverlay}>
                     <QRFrame />
                   </View>
+                  {!cameraReady ? (
+                    <View pointerEvents="none" style={styles.cameraLoading}>
+                      <MaterialCommunityIcons name="camera-outline" size={28} color="#ffffff" />
+                      <Text style={styles.cameraLoadingText}>Starting camera...</Text>
+                    </View>
+                  ) : null}
                 </>
               ) : (
                 <View style={styles.permissionCard}>
@@ -504,8 +621,18 @@ export default function ScanScreen() {
                     Allow camera access so merchants can scan youth QR passes directly from this
                     screen.
                   </Text>
-                  <Pressable style={styles.permissionButton} onPress={() => void requestPermission()}>
-                    <Text style={styles.permissionButtonText}>Grant Camera Access</Text>
+                  <Pressable
+                    style={styles.permissionButton}
+                    onPress={() => void requestCameraAccess()}
+                    disabled={permissionRequesting}
+                  >
+                    <Text style={styles.permissionButtonText}>
+                      {permissionRequesting
+                        ? 'Requesting Access...'
+                        : permission && !permission.canAskAgain
+                          ? 'Open Android Settings'
+                          : 'Grant Camera Access'}
+                    </Text>
                   </Pressable>
                 </View>
               )}
@@ -658,6 +785,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  profileError: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#ffd8d3',
+    backgroundColor: '#fff7f6',
+    padding: 14,
+  },
+  profileErrorText: {
+    flex: 1,
+    color: '#7a271a',
+    fontWeight: '700',
+    lineHeight: 20,
+  },
   placeholderIcon: {
     width: 60,
     height: 60,
@@ -684,6 +827,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cameraLoading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(1, 22, 48, 0.72)',
+  },
+  cameraLoadingText: {
+    color: '#ffffff',
+    fontWeight: '800',
   },
   permissionCard: {
     flex: 1,

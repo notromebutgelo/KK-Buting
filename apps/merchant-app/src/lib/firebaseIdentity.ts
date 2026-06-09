@@ -15,6 +15,7 @@ export type FirebaseIdentitySession = {
 
 const identityToolkitBaseUrl = 'https://identitytoolkit.googleapis.com/v1'
 const secureTokenBaseUrl = 'https://securetoken.googleapis.com/v1'
+const firebaseIdentityApi = axios.create({ timeout: 15000 })
 const firebaseExtra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtraConfig
 const firebaseApiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || firebaseExtra.apiKey || ''
 
@@ -93,7 +94,7 @@ export async function signInWithFirebasePassword(
   assertFirebaseConfigured()
 
   try {
-    const response = await axios.post(
+    const response = await firebaseIdentityApi.post(
       `${identityToolkitBaseUrl}/accounts:signInWithPassword?key=${firebaseApiKey}`,
       {
         email: email.trim(),
@@ -118,7 +119,7 @@ export async function updateFirebasePassword(idToken: string, nextPassword: stri
   assertFirebaseConfigured()
 
   try {
-    const response = await axios.post(
+    const response = await firebaseIdentityApi.post(
       `${identityToolkitBaseUrl}/accounts:update?key=${firebaseApiKey}`,
       {
         idToken,
@@ -145,7 +146,7 @@ export async function refreshFirebaseIdToken(refreshToken: string) {
   try {
     const body = `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
 
-    const response = await axios.post(`${secureTokenBaseUrl}/token?key=${firebaseApiKey}`, body.toString(), {
+    const response = await firebaseIdentityApi.post(`${secureTokenBaseUrl}/token?key=${firebaseApiKey}`, body.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     })
 

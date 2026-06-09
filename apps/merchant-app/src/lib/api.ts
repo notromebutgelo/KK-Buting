@@ -185,8 +185,56 @@ const apiConfig = getApiConfig()
 export const API_BASE_URL = apiConfig.apiUrl
 export const API_CONFIGURATION_ERROR = apiConfig.configurationError
 
+function getHealthCheckUrl() {
+  try {
+    const url = new URL(API_BASE_URL)
+    url.pathname = '/health'
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return ''
+  }
+}
+
+let backendWarmupPromise: Promise<boolean> | null = null
+let lastBackendWarmupAt = 0
+
+export function warmUpApi() {
+  if (API_CONFIGURATION_ERROR) {
+    return Promise.resolve(false)
+  }
+
+  if (Date.now() - lastBackendWarmupAt < 60000) {
+    return Promise.resolve(true)
+  }
+
+  if (backendWarmupPromise) {
+    return backendWarmupPromise
+  }
+
+  const healthCheckUrl = getHealthCheckUrl()
+  if (!healthCheckUrl) {
+    return Promise.resolve(false)
+  }
+
+  backendWarmupPromise = axios
+    .get(healthCheckUrl, { timeout: 75000 })
+    .then(() => {
+      lastBackendWarmupAt = Date.now()
+      return true
+    })
+    .catch(() => false)
+    .finally(() => {
+      backendWarmupPromise = null
+    })
+
+  return backendWarmupPromise
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 75000,
   headers: {
     'Content-Type': 'application/json',
   },

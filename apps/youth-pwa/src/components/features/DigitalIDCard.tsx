@@ -1,5 +1,7 @@
 'use client'
 
+import { RotateCw } from 'lucide-react'
+import { useState } from 'react'
 import type { UserProfile } from '@/store/userStore'
 
 interface DigitalIDCardProps {
@@ -8,7 +10,6 @@ interface DigitalIDCardProps {
   memberId?: string
   photoUrl?: string | null
   signatureUrl?: string | null
-  showBack?: boolean
 }
 
 const DIGITAL_ID_TERMS_TEXT =
@@ -23,8 +24,8 @@ export default function DigitalIDCard({
   memberId,
   photoUrl,
   signatureUrl,
-  showBack = true,
 }: DigitalIDCardProps) {
+  const [isFlipped, setIsFlipped] = useState(false)
   const fullName = [profile.firstName, profile.middleName, profile.lastName]
     .filter(Boolean)
     .join(' ')
@@ -53,31 +54,75 @@ export default function DigitalIDCard({
       profile.verifiedAt
     )
   )
+  const visibleSide = isFlipped ? 'back' : 'front'
+  const nextSide = isFlipped ? 'front' : 'back'
+
+  const flipCard = () => {
+    setIsFlipped((current) => !current)
+  }
 
   return (
-    <div className="space-y-4">
-      <DigitalIdFace
-        backgroundSrc="/images/KK ID - Front BG.png"
-        fullName={fullName}
-        address={address}
-        purok={purok}
-        birthday={formatBirthday(profile.birthday)}
-        gender={profile.gender || '-'}
-        contactNumber={contactNumber}
-        photoUrl={photoUrl}
-        signatureUrl={memberSignatureUrl}
-        memberId={memberId}
-        showQr={false}
-      />
+    <div className="relative aspect-[1.58/1] w-full [perspective:1200px]">
+      <button
+        type="button"
+        onClick={flipCard}
+        aria-label={`Digital ID ${visibleSide} side. Show ${nextSide} side.`}
+        aria-pressed={isFlipped}
+        className="absolute inset-0 block h-full w-full cursor-pointer rounded-[26px] text-left touch-manipulation focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5ca9ed]/55 focus-visible:ring-offset-2"
+      >
+        <span className="sr-only">
+          Showing the {visibleSide} side of the Digital ID. Press Enter or Space to show the {nextSide} side.
+        </span>
+        <div
+          className="relative block h-full w-full [transform-style:preserve-3d] transition-transform duration-[650ms] ease-in-out will-change-transform motion-reduce:transition-none"
+          style={{ transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+        >
+          <div
+            className="absolute inset-0 block [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
+            aria-hidden={isFlipped}
+          >
+            <DigitalIdFace
+              backgroundSrc="/images/KK ID - Front BG.png"
+              fullName={fullName}
+              address={address}
+              purok={purok}
+              birthday={formatBirthday(profile.birthday)}
+              gender={profile.gender || '-'}
+              contactNumber={contactNumber}
+              photoUrl={photoUrl}
+              signatureUrl={memberSignatureUrl}
+              memberId={memberId}
+              showQr={false}
+            />
+          </div>
 
-      {showBack ? (
-        <DigitalIdBack
-          emergencyContactName={emergencyContactName}
-          emergencyContactPhone={emergencyContactPhone}
-          emergencyContactRelationship={emergencyContactRelationship}
-          validThru={validThru}
-        />
-      ) : null}
+          <div
+            className="absolute inset-0 block [backface-visibility:hidden] [-webkit-backface-visibility:hidden] [transform:rotateY(180deg)]"
+            aria-hidden={!isFlipped}
+          >
+            <DigitalIdBack
+              emergencyContactName={emergencyContactName}
+              emergencyContactPhone={emergencyContactPhone}
+              emergencyContactRelationship={emergencyContactRelationship}
+              validThru={validThru}
+            />
+          </div>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={flipCard}
+        aria-label={`Flip Digital ID to show the ${nextSide} side`}
+        className="absolute -bottom-3 right-[4%] z-10 inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-[#014384]/92 px-3 py-2 text-[11px] font-bold text-white shadow-[0_8px_20px_rgba(1,42,82,0.28)] backdrop-blur-sm transition-transform duration-200 hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5ca9ed]/55 active:scale-[0.98] motion-reduce:transition-none"
+      >
+        <RotateCw aria-hidden="true" size={14} strokeWidth={2.4} />
+        Flip ID
+      </button>
+
+      <span className="sr-only" aria-live="polite">
+        Digital ID {visibleSide} side displayed.
+      </span>
     </div>
   )
 }
@@ -256,7 +301,7 @@ export function DigitalIdBack({
                 alt="Signature of Mark Jervin B. Ventura"
                 draggable={false}
                 className="block h-full w-auto max-w-[48%] object-contain"
-                style={{ transform: 'none' }}
+                style={{ transform: 'rotate(180deg)' }}
               />
             </div>
             <div className="-mt-[0.4%] h-px w-[58%] bg-[#4d544e]" />

@@ -193,19 +193,6 @@ export default function DigitalIDPage() {
   const issuedSinceLabel =
     isVerified || isDigitalIdReady ? String(extractYear(digitalIdIssuedAt)) : 'Pending'
   const barangayLabel = digitalIdProfile?.barangay || profile?.barangay || 'Not set'
-  const emergencyContactName = formatEmergencyContactValue(
-    digitalIdProfile?.digitalIdEmergencyContactName,
-    'Not Provided Yet'
-  )
-  const emergencyContactPhone = formatEmergencyContactValue(
-    digitalIdProfile?.digitalIdEmergencyContactPhone,
-    'Not Provided Yet'
-  )
-  const emergencyContactRelationship = formatEmergencyContactValue(
-    digitalIdProfile?.digitalIdEmergencyContactRelationship,
-    'Not Provided Yet'
-  )
-  const digitalIdValidThru = getDigitalIdValidThru(digitalIdIssuedAt)
 
   useEffect(() => {
     let active = true
@@ -682,10 +669,9 @@ export default function DigitalIDPage() {
                 memberId={idData.memberId || idData.idNumber || ''}
                 photoUrl={digitalIdPhotoUrl}
                 signatureUrl={digitalIdSignatureUrl}
-                showBack={false}
               />
               <p className="px-1 text-center text-[13px] leading-6 text-[#5c7aa3]">
-                Present this credential to KK officers whenever they need to verify your membership.
+                Tap the card or use Flip ID to view the reverse side. Present this credential to KK officers whenever they need to verify your membership.
               </p>
             </div>
 
@@ -704,12 +690,6 @@ export default function DigitalIDPage() {
               onSaveJpeg={() => handleSaveId('jpeg')}
             />
 
-            <EmergencyCredentialPanel
-              emergencyContactName={emergencyContactName}
-              emergencyContactPhone={emergencyContactPhone}
-              emergencyContactRelationship={emergencyContactRelationship}
-              validThru={digitalIdValidThru}
-            />
           </div>
         )}
           </div>
@@ -1049,40 +1029,6 @@ function CredentialActionsSection({
         >
           Update Signature
         </Link>
-      </div>
-    </section>
-  )
-}
-
-function EmergencyCredentialPanel({
-  emergencyContactName,
-  emergencyContactPhone,
-  emergencyContactRelationship,
-  validThru,
-}: {
-  emergencyContactName: string
-  emergencyContactPhone: string
-  emergencyContactRelationship: string
-  validThru: string
-}) {
-  return (
-    <section className="rounded-[28px] border border-[#e2e8f1] bg-white/68 px-4 py-4 shadow-[0_8px_18px_rgba(1,67,132,0.04)] backdrop-blur-sm">
-      <div className="px-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8a9bb2]">
-          Emergency & Validity
-        </p>
-        <p className="mt-2 text-[13px] leading-6 text-[#6b81a1]">
-          These are the emergency and validity details shown on the back of your digital credential.
-        </p>
-      </div>
-
-      <div className="mt-4">
-        <DigitalIdBack
-          emergencyContactName={emergencyContactName}
-          emergencyContactPhone={emergencyContactPhone}
-          emergencyContactRelationship={emergencyContactRelationship}
-          validThru={validThru}
-        />
       </div>
     </section>
   )

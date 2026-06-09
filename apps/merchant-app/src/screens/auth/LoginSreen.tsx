@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
+import { warmUpApi } from '../../lib/api'
 import { signIn } from '../../services/auth.service'
 import { useAuthStore } from '../../store/authStore'
 
@@ -34,6 +35,8 @@ export default function LoginSreen() {
   const setInteractiveLogin = useAuthStore((state) => state.setInteractiveLogin)
 
   useEffect(() => {
+    void warmUpApi()
+
     return () => {
       if (toastTimerRef.current) {
         clearTimeout(toastTimerRef.current)

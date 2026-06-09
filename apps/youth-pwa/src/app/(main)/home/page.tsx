@@ -7,7 +7,6 @@ import {
   Bell,
   ChevronRight,
   Gift,
-  Heart,
   Star,
   Store,
 } from 'lucide-react'
@@ -277,10 +276,11 @@ export default function HomePage() {
           <div className="mt-3">
             <Link
               href={featuredMerchant.href}
-              className="block rounded-[24px] text-[#163a70]"
+              aria-label={`View details for ${featuredMerchant.name}`}
+              className="group block h-[350px] overflow-hidden rounded-[24px] bg-white text-[#163a70] shadow-[0_18px_36px_rgba(15,76,151,0.12)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5ca9ed]/45 motion-reduce:transition-none"
             >
-              <div className="rounded-[24px] bg-transparent">
-                <div className="relative h-[188px] w-full overflow-hidden rounded-[24px] shadow-[0_18px_36px_rgba(15,76,151,0.12)]">
+              <article className="flex h-full min-w-0 flex-col">
+                <div className="relative h-[188px] w-full shrink-0 overflow-hidden bg-[#dceafd]">
                   {featuredMerchant.imageUrl ? (
                     <Image
                       src={featuredMerchant.imageUrl}
@@ -291,41 +291,52 @@ export default function HomePage() {
                   ) : (
                     <div className="absolute inset-0 bg-[linear-gradient(135deg,#dceafd_0%,#9bbde7_100%)]" />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0f223d]/10 via-transparent to-transparent" />
-                  <div className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#314766] shadow-[0_16px_28px_rgba(15,76,151,0.16)]">
-                    <Heart className="h-4.5 w-4.5" strokeWidth={2.1} />
-                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0f223d]/20 via-transparent to-transparent" />
                 </div>
 
-                <div className="-mt-10 px-0 pb-2">
-                  <div className="relative z-10 rounded-[24px] bg-white px-4 pb-5 pt-4 shadow-[0_18px_38px_rgba(15,76,151,0.12)]">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-[#fff6df] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                        {featuredMerchant.logoUrl ? (
-                          <Image
-                            src={featuredMerchant.logoUrl}
-                            alt={`${featuredMerchant.name} logo`}
-                            width={48}
-                            height={48}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <Store className="h-6 w-6 text-[#f7ae18]" strokeWidth={2.2} />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-[17px] font-black leading-tight tracking-[-0.03em] text-[#0f4c97]">
-                          {featuredMerchant.name}
-                        </h3>
-                        <p className="mt-1.5 text-[13px] leading-[1.7] text-[#58697f]">
-                          {featuredMerchant.description ||
-                            'This merchant has not added a storefront description yet.'}
-                        </p>
-                      </div>
+                <div className="relative z-10 -mt-6 flex min-h-0 flex-1 flex-col rounded-t-[24px] bg-white px-4 pb-3 pt-3.5">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-[#fff6df] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                      {featuredMerchant.logoUrl ? (
+                        <Image
+                          src={featuredMerchant.logoUrl}
+                          alt={`${featuredMerchant.name} logo`}
+                          width={48}
+                          height={48}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Store className="h-6 w-6 text-[#f7ae18]" strokeWidth={2.2} />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <h3 className="line-clamp-2 break-words text-[17px] font-black leading-[1.2] tracking-[-0.03em] text-[#0f4c97] [overflow-wrap:anywhere]">
+                        {featuredMerchant.name}
+                      </h3>
                     </div>
                   </div>
+
+                  <div className="relative mt-2.5 h-[64px] shrink-0 overflow-hidden">
+                    <p className="line-clamp-3 text-[13px] leading-[1.65] text-[#58697f]">
+                      {featuredMerchant.description ||
+                        'This merchant has not added a storefront description yet.'}
+                    </p>
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.96)_88%,#ffffff_100%)]"
+                    />
+                  </div>
+
+                  <span className="mt-1.5 inline-flex items-center gap-1.5 self-end text-[12px] font-black text-[#0f4c97]">
+                    View Details
+                    <ChevronRight
+                      aria-hidden="true"
+                      className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                      strokeWidth={2.4}
+                    />
+                  </span>
                 </div>
-              </div>
+              </article>
             </Link>
 
             {featuredMerchants.length > 1 ? (
@@ -501,12 +512,7 @@ function PromoGiftArt() {
 }
 
 function formatDisplayName(value: string) {
-  const parts = value.split(' ').filter(Boolean)
-  if (parts.length <= 2) {
-    return parts.join(' ')
-  }
-
-  return `${parts[0]} ${parts[parts.length - 1]}`
+  return value.split(/\s+/).filter(Boolean).join(' ')
 }
 
 function formatPoints(value: number) {

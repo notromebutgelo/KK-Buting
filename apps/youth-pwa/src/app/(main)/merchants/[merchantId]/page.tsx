@@ -181,23 +181,27 @@ export default function MerchantDetailPage() {
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,53,108,0.08)_0%,rgba(5,53,108,0.32)_100%)]" />
       </section>
 
-      <div className="-mt-14 px-4">
-        <section className="rounded-[30px] bg-white px-4 pb-5 pt-4 shadow-[0_18px_36px_rgba(4,60,121,0.16)]">
-          <div className="flex items-start gap-3">
-            <div className="relative h-[86px] w-[86px] flex-shrink-0 overflow-hidden rounded-full border-4 border-white bg-[#edf4fb] shadow-[0_10px_18px_rgba(4,60,121,0.18)]">
+      <div className="relative z-10 -mt-14 px-4">
+        <section className="min-w-0 rounded-[30px] bg-white px-4 pb-5 pt-4 shadow-[0_18px_36px_rgba(4,60,121,0.16)]">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <div className="relative h-[74px] w-[74px] flex-shrink-0 overflow-hidden rounded-full border-4 border-white bg-[#edf4fb] shadow-[0_10px_18px_rgba(4,60,121,0.18)] min-[380px]:h-[86px] min-[380px]:w-[86px]">
               {getMerchantLogo(merchant) ? (
                 <Image src={getMerchantLogo(merchant)} alt={merchant.businessName || merchant.name} fill className="object-cover" />
               ) : null}
             </div>
 
-            <div className="min-w-0 flex-1 pt-1">
-              <h2 className="text-[30px] font-black leading-none text-[#0d4f92]">{merchant.businessName || merchant.name}</h2>
-              <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-[#7892af]">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#8fa7c1]" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="min-w-0 flex-1">
+              <h2 className="min-w-0 break-words text-[clamp(1.25rem,6.4vw,1.875rem)] font-black leading-[1.08] text-[#0d4f92] [overflow-wrap:anywhere]">
+                {merchant.businessName || merchant.name}
+              </h2>
+              <div className="mt-2 flex min-w-0 items-start gap-1.5 text-[11px] font-semibold leading-[1.45] text-[#7892af]">
+                <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-[#8fa7c1]" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 21s-6-4.35-6-10a6 6 0 1 1 12 0c0 5.65-6 10-6 10Z" />
                   <circle cx="12" cy="11" r="2" />
                 </svg>
-                <span className="line-clamp-1">{merchant.address}</span>
+                <span className="min-w-0 line-clamp-2 break-words [overflow-wrap:anywhere]">
+                  {merchant.address}
+                </span>
               </div>
             </div>
           </div>
