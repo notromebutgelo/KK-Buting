@@ -395,10 +395,19 @@ const tests = [
         "dist/src/config/firebase": createFirebaseConfigMock(db),
         "dist/utils/renerateQrToken": {
           generateQrToken: () => "generated-token",
+          QR_TOKEN_TTL_MS: 600000,
           verifyQrToken: () => ({
             userId: "youth-1",
             revision: 3,
             timestamp: Date.now(),
+            expiresAt: Date.now() + 600000,
+          }),
+          verifyQrTokenDetailed: () => ({
+            valid: true,
+            userId: "youth-1",
+            revision: 3,
+            timestamp: Date.now(),
+            expiresAt: Date.now() + 600000,
           }),
         },
         "dist/src/modules/points/points.service": pointsService,
@@ -473,10 +482,19 @@ const tests = [
         "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
         "dist/utils/renerateQrToken": {
           generateQrToken: () => "generated-token",
+          QR_TOKEN_TTL_MS: 600000,
           verifyQrToken: () => ({
             userId: "youth-1",
             revision: 3,
             timestamp: Date.now(),
+            expiresAt: Date.now() + 600000,
+          }),
+          verifyQrTokenDetailed: () => ({
+            valid: true,
+            userId: "youth-1",
+            revision: 3,
+            timestamp: Date.now(),
+            expiresAt: Date.now() + 600000,
           }),
         },
         "dist/src/modules/points/points.service": {

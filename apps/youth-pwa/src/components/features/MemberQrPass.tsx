@@ -17,6 +17,7 @@ interface MemberQrPassProps {
   lockedActionLabel?: string
   isRefreshing: boolean
   lastUpdatedAt?: number | null
+  expiresAt?: string | null
   onRefresh: () => Promise<void> | void
 }
 
@@ -32,6 +33,7 @@ export default function MemberQrPass({
   lockedActionLabel = 'Go to Verification',
   isRefreshing,
   lastUpdatedAt,
+  expiresAt,
   onRefresh,
 }: MemberQrPassProps) {
   const [qrImageUrl, setQrImageUrl] = useState('')
@@ -39,7 +41,7 @@ export default function MemberQrPass({
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 60_000)
+    const interval = window.setInterval(() => setNow(Date.now()), 15_000)
     return () => window.clearInterval(interval)
   }, [])
 
@@ -97,8 +99,34 @@ export default function MemberQrPass({
     return `Last updated: ${elapsedMinutes} minutes ago`
   }, [lastUpdatedAt, now])
 
+  const expiresAtTime = useMemo(() => {
+    if (!expiresAt) return null
+    const value = Date.parse(expiresAt)
+    return Number.isNaN(value) ? null : value
+  }, [expiresAt])
+
+  const secondsUntilExpiry =
+    expiresAtTime == null ? null : Math.max(0, Math.ceil((expiresAtTime - now) / 1000))
+  const isQrExpired = !isLocked && secondsUntilExpiry != null && secondsUntilExpiry <= 0
+  const expiryLabel = useMemo(() => {
+    if (secondsUntilExpiry == null) {
+      return 'Open this screen live at checkout. Saved QR images may expire.'
+    }
+
+    if (secondsUntilExpiry <= 0) {
+      return 'QR expired. Refresh before letting a merchant scan it.'
+    }
+
+    if (secondsUntilExpiry < 60) {
+      return `Expires in ${secondsUntilExpiry} second${secondsUntilExpiry === 1 ? '' : 's'}`
+    }
+
+    const minutes = Math.ceil(secondsUntilExpiry / 60)
+    return `Expires in about ${minutes} minute${minutes === 1 ? '' : 's'}`
+  }, [secondsUntilExpiry])
+
   async function handleSave() {
-    if (!qrImageUrl || !qrValue || isLocked) return
+    if (!qrImageUrl || !qrValue || isLocked || isQrExpired) return
 
     setSaveState('saving')
 
@@ -117,7 +145,7 @@ export default function MemberQrPass({
       ) {
         await navigator.share({
           title: 'My KK QR Code',
-          text: `${fullName} • ${memberId}`,
+          text: `${fullName} - ${memberId}`,
           files: [file],
         })
       } else {
@@ -172,7 +200,7 @@ export default function MemberQrPass({
 
         <div className="relative flex flex-col items-center">
           <div className="relative">
-            <div className={cn('rounded-[30px] bg-white p-4 shadow-[0_14px_24px_rgba(1,67,132,0.12)]', isLocked && 'blur-[3px]')}>
+            <div className={cn('rounded-[30px] bg-white p-4 shadow-[0_14px_24px_rgba(1,67,132,0.12)]', (isLocked || isQrExpired) && 'blur-[3px]')}>
               {qrImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={qrImageUrl} alt="Youth QR code" className="h-[264px] w-[264px] rounded-[24px] bg-white" />
@@ -181,11 +209,18 @@ export default function MemberQrPass({
               )}
             </div>
 
-            {isLocked ? (
+            {isLocked || isQrExpired ? (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex h-[84px] w-[84px] items-center justify-center rounded-full bg-[#0E2E58] text-white shadow-[0_16px_30px_rgba(14,46,88,0.26)]">
-                  <LockIcon />
-                </div>
+                {isLocked ? (
+                  <div className="flex h-[84px] w-[84px] items-center justify-center rounded-full bg-[#0E2E58] text-white shadow-[0_16px_30px_rgba(14,46,88,0.26)]">
+                    <LockIcon />
+                  </div>
+                ) : (
+                  <div className="rounded-[24px] bg-[#0E2E58] px-5 py-4 text-center text-white shadow-[0_16px_30px_rgba(14,46,88,0.26)]">
+                    <p className="text-[16px] font-black">QR Expired</p>
+                    <p className="mt-1 text-[12px] font-semibold text-white/82">Tap refresh before scanning.</p>
+                  </div>
+                )}
               </div>
             ) : null}
           </div>
@@ -213,6 +248,20 @@ export default function MemberQrPass({
           <p className="mt-4 text-[12px] font-medium text-[#6c839e]">
             {lastUpdatedLabel}
           </p>
+          {!isLocked ? (
+            <p
+              className={cn(
+                'mt-2 text-center text-[12px] font-semibold',
+                isQrExpired
+                  ? 'text-[#c53030]'
+                  : secondsUntilExpiry != null && secondsUntilExpiry <= 90
+                    ? 'text-[#b88408]'
+                    : 'text-[#24724a]'
+              )}
+            >
+              {expiryLabel}
+            </p>
+          ) : null}
 
           {isLocked ? (
             <div className="mt-4 w-full rounded-[24px] border border-[#f3d38e] bg-[#fff8e8] px-4 py-4 text-center">
@@ -248,13 +297,23 @@ export default function MemberQrPass({
               <button
                 type="button"
                 onClick={() => void handleSave()}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-5 py-3.5 text-[14px] font-bold text-white shadow-[0_12px_22px_rgba(5,114,220,0.18)]"
+                disabled={isQrExpired}
+                className={cn(
+                  'inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-5 py-3.5 text-[14px] font-bold text-white shadow-[0_12px_22px_rgba(5,114,220,0.18)]',
+                  isQrExpired && 'cursor-not-allowed opacity-60'
+                )}
               >
                 <DownloadIcon />
-                Save QR as Image
+                Save Current QR
               </button>
             </div>
           )}
+
+          {!isLocked ? (
+            <p className="mt-3 text-center text-[11px] font-medium leading-[1.5] text-[#7c91aa]">
+              Use a freshly opened QR at checkout. Saved QR images expire and can fail merchant scans.
+            </p>
+          ) : null}
 
           {saveState !== 'idle' ? (
             <p

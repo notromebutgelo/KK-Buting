@@ -1,14 +1,14 @@
 import { Response } from "express";
 import { AuthRequest } from "../../middleware/verifyToken";
-import { generateUserQr, processQrScan, processQrRedeem } from "./qr.service";
+import { generateUserQrDetails, processQrScan, processQrRedeem } from "./qr.service";
 
 export async function generateQr(req: AuthRequest, res: Response) {
   try {
-    const token = await generateUserQr(req.user!.uid);
+    const qr = await generateUserQrDetails(req.user!.uid);
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
-    return res.json({ token });
+    return res.json(qr);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

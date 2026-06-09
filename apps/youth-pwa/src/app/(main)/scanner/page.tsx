@@ -18,8 +18,13 @@ interface DigitalIdResponse {
   qrCode?: string
   qrPayload?: string
   qrToken?: string
+  qrIssuedAt?: string | null
+  qrExpiresAt?: string | null
+  qrTtlSeconds?: number
   photoUrl?: string | null
 }
+
+const QR_REFRESH_BUFFER_MS = 45_000
 
 export default function ScannerPage() {
   const { user } = useAuthStore()
@@ -45,6 +50,7 @@ export default function ScannerPage() {
     Boolean(idData?.memberId || idData?.idNumber) &&
     Boolean(idData?.qrPayload || idData?.qrCode || idData?.qrToken)
   const memberId = idData?.memberId || idData?.idNumber || 'KK-BUTING-PENDING'
+  const qrExpiresAt = isDigitalIdReady ? idData?.qrExpiresAt || null : null
   const qrValue = isDigitalIdReady
     ? idData?.qrPayload ||
       buildFallbackQrPayload(
@@ -82,8 +88,9 @@ export default function ScannerPage() {
 
     try {
       const nextIdData = await getDigitalID()
+      const issuedAt = Date.parse(nextIdData?.qrIssuedAt || '')
       setIdData(nextIdData)
-      setLastUpdatedAt(Date.now())
+      setLastUpdatedAt(Number.isNaN(issuedAt) ? Date.now() : issuedAt)
     } catch (nextError: any) {
       setError(nextError?.response?.data?.error || 'Could not load your QR code right now.')
     } finally {
@@ -128,6 +135,42 @@ export default function ScannerPage() {
 
     void loadQr()
   }, [isProfileLoading, isVerified, loadQr])
+
+  useEffect(() => {
+    if (!isDigitalIdReady || !qrExpiresAt || isQrLoading) return
+
+    const expiresAtTime = Date.parse(qrExpiresAt)
+    if (Number.isNaN(expiresAtTime)) return
+
+    const refreshDelay = Math.max(5_000, expiresAtTime - Date.now() - QR_REFRESH_BUFFER_MS)
+    const timeout = window.setTimeout(() => {
+      void loadQr()
+    }, refreshDelay)
+
+    return () => window.clearTimeout(timeout)
+  }, [isDigitalIdReady, isQrLoading, loadQr, qrExpiresAt])
+
+  useEffect(() => {
+    if (!isDigitalIdReady || !qrExpiresAt) return
+
+    function refreshIfStale() {
+      if (document.visibilityState && document.visibilityState !== 'visible') return
+      if (isQrLoading) return
+
+      const expiresAtTime = Date.parse(qrExpiresAt || '')
+      if (!Number.isNaN(expiresAtTime) && expiresAtTime - Date.now() <= QR_REFRESH_BUFFER_MS) {
+        void loadQr()
+      }
+    }
+
+    window.addEventListener('focus', refreshIfStale)
+    document.addEventListener('visibilitychange', refreshIfStale)
+
+    return () => {
+      window.removeEventListener('focus', refreshIfStale)
+      document.removeEventListener('visibilitychange', refreshIfStale)
+    }
+  }, [isDigitalIdReady, isQrLoading, loadQr, qrExpiresAt])
 
   if (isProfileLoading) {
     return (
@@ -239,6 +282,7 @@ export default function ScannerPage() {
           lockedActionLabel={lockConfig?.label}
           isRefreshing={isQrLoading}
           lastUpdatedAt={lastUpdatedAt}
+          expiresAt={qrExpiresAt}
           onRefresh={loadQr}
         />
 

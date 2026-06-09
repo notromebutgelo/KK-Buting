@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { generateIdNumber } from "../../../utils/generateIdNumber";
 import { storage } from "../../config/firebase";
 import { randomUUID } from "crypto";
-import { generateQrToken } from "../../../utils/renerateQrToken";
+import { generateQrToken, QR_TOKEN_TTL_MS } from "../../../utils/renerateQrToken";
 import { createNotificationsForRoles } from "../notifications/notifications.service";
 
 const REQUIRED_DOCUMENTS_BY_GROUP: Record<string, string[]> = {
@@ -268,7 +268,9 @@ export async function getDigitalId(uid: string) {
   }
   const idNumber = data.idNumber || generateIdNumber(uid);
   const revision = Number(data.digitalIdRevision || 1);
-  const qrToken = generateQrToken(uid, revision);
+  const qrIssuedAt = Date.now();
+  const qrToken = generateQrToken(uid, revision, qrIssuedAt);
+  const qrExpiresAt = qrIssuedAt + QR_TOKEN_TTL_MS;
   const qrPayload = JSON.stringify({
     digitalIdNumber: idNumber,
     uid,
@@ -281,6 +283,9 @@ export async function getDigitalId(uid: string) {
     qrCode: qrPayload,
     qrPayload,
     qrToken,
+    qrIssuedAt: new Date(qrIssuedAt).toISOString(),
+    qrExpiresAt: new Date(qrExpiresAt).toISOString(),
+    qrTtlSeconds: Math.floor(QR_TOKEN_TTL_MS / 1000),
     firstName: data.firstName,
     lastName: data.lastName,
     middleName: data.middleName,

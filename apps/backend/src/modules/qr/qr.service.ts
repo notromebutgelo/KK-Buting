@@ -1,7 +1,11 @@
 import crypto from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../../config/firebase";
-import { generateQrToken, verifyQrToken } from "../../../utils/renerateQrToken";
+import {
+  generateQrToken,
+  QR_TOKEN_TTL_MS,
+  verifyQrTokenDetailed,
+} from "../../../utils/renerateQrToken";
 import { logMerchantScanFailure } from "../points/points.service";
 import { getMerchantByOwnerId } from "../merchants/merhcants.service";
 import {
@@ -24,10 +28,24 @@ function getUsedQrTokenId(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function getQrValidationError(reason: string) {
+  if (reason === "expired") {
+    return makeQrError(
+      "QR code expired. Ask the youth member to refresh their QR code, then scan again.",
+      410
+    );
+  }
+
+  return makeQrError(
+    "Invalid QR code. Ask the youth member to open the Youth app and refresh their QR code.",
+    400
+  );
+}
+
 function parseYouthQr(rawValue: string) {
   const token = extractScanToken(rawValue);
-  const result = verifyQrToken(token);
-  if (!result) throw makeQrError("Invalid or expired QR code", 400);
+  const result = verifyQrTokenDetailed(token);
+  if (!result.valid) throw getQrValidationError(result.reason);
 
   return {
     token,
@@ -52,15 +70,28 @@ function buildYouthSummary(
   };
 }
 
-export async function generateUserQr(uid: string): Promise<string> {
+export async function generateUserQrDetails(uid: string) {
   const profileSnap = await db.collection("kkProfiling").doc(uid).get();
   const profile = profileSnap.data() || {};
   if (profile.digitalIdStatus !== "active") {
     throw new Error("Digital ID is not active");
   }
 
-  const token = generateQrToken(uid, Number(profile.digitalIdRevision || 1));
-  return token;
+  const issuedAt = Date.now();
+  const token = generateQrToken(uid, Number(profile.digitalIdRevision || 1), issuedAt);
+  const expiresAt = issuedAt + QR_TOKEN_TTL_MS;
+
+  return {
+    token,
+    qrIssuedAt: new Date(issuedAt).toISOString(),
+    qrExpiresAt: new Date(expiresAt).toISOString(),
+    qrTtlSeconds: Math.floor(QR_TOKEN_TTL_MS / 1000),
+  };
+}
+
+export async function generateUserQr(uid: string): Promise<string> {
+  const details = await generateUserQrDetails(uid);
+  return details.token;
 }
 
 export async function processQrScan(rawValue: string, merchantOwnerId: string, amountSpent: number) {
@@ -120,7 +151,10 @@ export async function processQrRedeem(rawValue: string, merchantOwnerId: string,
       }
 
       if (Number(profile.digitalIdRevision || 1) !== qr.revision) {
-        throw makeQrError("QR code is no longer valid", 400);
+        throw makeQrError(
+          "QR code is no longer valid. Ask the youth member to refresh their QR code.",
+          400
+        );
       }
 
       const youth = buildYouthSummary(qr.userId, profile, user);

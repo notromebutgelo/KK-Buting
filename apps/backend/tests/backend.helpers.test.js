@@ -83,6 +83,16 @@ const tests = [
         "qr-token"
       );
       assert.equal(
+        extractScanToken("https://kk.example/scanner?token=url-token"),
+        "url-token"
+      );
+      assert.equal(
+        extractScanToken(
+          JSON.stringify({ qrPayload: JSON.stringify({ token: "payload-token" }) })
+        ),
+        "payload-token"
+      );
+      assert.equal(
         extractScanToken(JSON.stringify(JSON.stringify({ token: "nested-token" }))),
         "nested-token"
       );

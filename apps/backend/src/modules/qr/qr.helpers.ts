@@ -5,32 +5,97 @@ type MerchantLike = {
   status?: string | null;
 };
 
-export function extractScanToken(rawValue: string): string {
-  let trimmed = String(rawValue || "").trim();
-  if (!trimmed) return "";
+const TOKEN_KEYS = ["token", "qrToken", "signedToken", "qrData", "qrPayload"];
 
-  for (let depth = 0; depth < 2; depth += 1) {
+function parsePossibleJson(value: string) {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function decodePossibleUriPayload(value: string) {
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded !== value ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractTokenFromUrl(value: string, depth: number): string {
+  const candidates = [value];
+
+  if (value.startsWith("/")) {
+    candidates.push(`https://kk.local${value}`);
+  }
+
+  for (const candidate of candidates) {
     try {
-      const parsed = JSON.parse(trimmed) as
-        | string
-        | {
-            token?: string;
-            qrToken?: string;
-            signedToken?: string;
-          };
-
-      if (typeof parsed === "string") {
-        trimmed = parsed.trim();
-        continue;
+      const parsed = new URL(candidate);
+      for (const key of TOKEN_KEYS) {
+        const token = parsed.searchParams.get(key);
+        if (token) {
+          return extractScanTokenValue(token, depth + 1);
+        }
       }
 
-      return String(parsed.token || parsed.qrToken || parsed.signedToken || "").trim();
+      const hash = parsed.hash.replace(/^#/, "");
+      if (hash) {
+        const hashAsUrl = hash.startsWith("/") ? `https://kk.local${hash}` : `https://kk.local/?${hash}`;
+        const token = extractTokenFromUrl(hashAsUrl, depth + 1);
+        if (token) return token;
+      }
     } catch {
-      return trimmed;
+      // Not a URL-shaped payload.
     }
   }
 
+  return "";
+}
+
+function extractTokenFromRecord(record: Record<string, unknown>, depth: number): string {
+  for (const key of TOKEN_KEYS) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      const extracted = extractScanTokenValue(value, depth + 1);
+      return extracted || value.trim();
+    }
+  }
+
+  return "";
+}
+
+function extractScanTokenValue(value: string, depth: number): string {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (depth > 5) return trimmed;
+
+  const decodedPayload = decodePossibleUriPayload(trimmed);
+  if (decodedPayload) {
+    const extracted = extractScanTokenValue(decodedPayload, depth + 1);
+    if (extracted) return extracted;
+  }
+
+  const urlToken = extractTokenFromUrl(trimmed, depth);
+  if (urlToken) return urlToken;
+
+  const parsed = parsePossibleJson(trimmed);
+  if (typeof parsed === "string") {
+    return extractScanTokenValue(parsed, depth + 1);
+  }
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const extracted = extractTokenFromRecord(parsed as Record<string, unknown>, depth + 1);
+    if (extracted) return extracted;
+  }
+
   return trimmed;
+}
+
+export function extractScanToken(rawValue: string): string {
+  return extractScanTokenValue(rawValue, 0);
 }
 
 export function getPointsFromAmount(amountSpent: number, pointsRate: number): number {

@@ -222,7 +222,9 @@ const tests = [
         "module:firebase-admin/firestore": { FieldValue },
         "dist/utils/renerateQrToken": {
           generateQrToken: () => "generated-token",
-          verifyQrToken: () => ({ userId: "youth-1", revision: 2, timestamp: Date.now() }),
+          QR_TOKEN_TTL_MS: 600000,
+          verifyQrToken: () => ({ userId: "youth-1", revision: 2, timestamp: Date.now(), expiresAt: Date.now() + 600000 }),
+          verifyQrTokenDetailed: () => ({ valid: true, userId: "youth-1", revision: 2, timestamp: Date.now(), expiresAt: Date.now() + 600000 }),
         },
         "dist/src/modules/points/points.service": {
           logMerchantScanFailure: async (...args) => {
@@ -407,7 +409,9 @@ const tests = [
         },
         "dist/utils/renerateQrToken": {
           generateQrToken: () => "generated-token",
-          verifyQrToken: () => ({ userId: "youth-1", revision: 2, timestamp: Date.now() }),
+          QR_TOKEN_TTL_MS: 600000,
+          verifyQrToken: () => ({ userId: "youth-1", revision: 2, timestamp: Date.now(), expiresAt: Date.now() + 600000 }),
+          verifyQrTokenDetailed: () => ({ valid: true, userId: "youth-1", revision: 2, timestamp: Date.now(), expiresAt: Date.now() + 600000 }),
         },
         "dist/src/modules/points/points.service": {
           logMerchantScanFailure: async (...args) => {
@@ -468,7 +472,9 @@ const tests = [
         "dist/src/config/firebase": { db },
         "dist/utils/renerateQrToken": {
           generateQrToken: () => "generated-token",
+          QR_TOKEN_TTL_MS: 600000,
           verifyQrToken: () => null,
+          verifyQrTokenDetailed: () => ({ valid: false, reason: "bad_signature" }),
         },
         "dist/src/modules/points/points.service": {
           addPoints: async () => {
@@ -490,7 +496,7 @@ const tests = [
 
       await assert.rejects(
         service.processQrRedeem("bad-token", "owner-1", 100),
-        /Invalid or expired QR code/
+        /Invalid QR code/
       );
 
       assert.deepEqual(failureCalls, [
@@ -498,7 +504,7 @@ const tests = [
           "merchant-1",
           {
             amountSpent: 100,
-            reason: "Invalid or expired QR code",
+            reason: "Invalid QR code. Ask the youth member to open the Youth app and refresh their QR code.",
           },
         ],
       ]);
