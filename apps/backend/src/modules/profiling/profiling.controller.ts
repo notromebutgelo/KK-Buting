@@ -26,6 +26,6 @@ export async function updateProfilingHandler(req: AuthRequest, res: Response) {
     await updateProfiling(req.user!.uid, req.body);
     return res.json({ message: "Profile updated" });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    return res.status(Number(err.statusCode || 500)).json({ error: err.message });
   }
 }

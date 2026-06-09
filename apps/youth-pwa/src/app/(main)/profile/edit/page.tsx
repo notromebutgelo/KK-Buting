@@ -10,6 +10,7 @@ import PageHeader from '@/components/layout/PageHeader'
 import AlertModal from '@/components/ui/AlertModal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import Modal from '@/components/ui/Modal'
 import Select from '@/components/ui/Select'
 import Spinner from '@/components/ui/Spinner'
 
@@ -29,6 +30,7 @@ type SaveFeedbackState = {
   message: string
   actionLabel: string
   tone: 'success' | 'error'
+  goBackOnClose?: boolean
 }
 
 export default function EditProfilePage() {
@@ -44,13 +46,23 @@ export default function EditProfilePage() {
   const [emergencyContactName, setEmergencyContactName] = useState('')
   const [emergencyContactRelationship, setEmergencyContactRelationship] = useState('')
   const [emergencyContactPhone, setEmergencyContactPhone] = useState('')
+  const [yearsInBarangay, setYearsInBarangay] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isYearsSubmitting, setIsYearsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<SaveFeedbackState | null>(null)
   const [showContactNumberValidation, setShowContactNumberValidation] = useState(false)
+  const [showYearsValidation, setShowYearsValidation] = useState(false)
+  const [isYearsConfirmOpen, setIsYearsConfirmOpen] = useState(false)
 
   const contactNumberError = showContactNumberValidation
     ? getMemberContactNumberError(contactNumber)
     : ''
+  const yearsInBarangayError = showYearsValidation
+    ? getYearsInBarangayError(yearsInBarangay)
+    : ''
+  const canSubmitMissingYears =
+    Boolean(profile) && !hasStoredYearsInBarangay(profile?.yearsInBarangay)
+  const normalizedYearsInBarangay = normalizeYearsInBarangay(yearsInBarangay)
 
   useEffect(() => {
     if (user) {
@@ -70,6 +82,11 @@ export default function EditProfilePage() {
           profile.digitalIdEmergencyContactPhone || '',
           EMERGENCY_CONTACT_PHONE_MAX_LENGTH
         )
+      )
+      setYearsInBarangay(
+        hasStoredYearsInBarangay(profile.yearsInBarangay)
+          ? String(profile.yearsInBarangay)
+          : ''
       )
     }
   }, [profile])
@@ -168,6 +185,7 @@ export default function EditProfilePage() {
         message: 'Your profile changes have been saved successfully.',
         actionLabel: 'Back to Profile',
         tone: 'success',
+        goBackOnClose: true,
       })
     } catch {
       setFeedback({
@@ -181,8 +199,63 @@ export default function EditProfilePage() {
     }
   }
 
+  const handleYearsSubmitRequest = () => {
+    setFeedback(null)
+    setShowYearsValidation(true)
+
+    if (!canSubmitMissingYears) {
+      setFeedback({
+        title: 'Already Submitted',
+        message:
+          'Years in Barangay has already been saved for this profile. Contact SK admin if this value needs correction.',
+        actionLabel: 'OK',
+        tone: 'error',
+      })
+      return
+    }
+
+    if (getYearsInBarangayError(yearsInBarangay)) {
+      return
+    }
+
+    setIsYearsConfirmOpen(true)
+  }
+
+  const handleConfirmYearsSubmit = async () => {
+    if (!profile || getYearsInBarangayError(yearsInBarangay)) return
+
+    setIsYearsSubmitting(true)
+    try {
+      await updateProfiling({ yearsInBarangay: Number(normalizedYearsInBarangay) })
+      setProfile({
+        ...profile,
+        yearsInBarangay: Number(normalizedYearsInBarangay),
+      })
+      setIsYearsConfirmOpen(false)
+      setFeedback({
+        title: 'Years in Barangay Saved',
+        message:
+          'Your Years in Barangay has been saved and will now appear in the admin and superadmin records.',
+        actionLabel: 'OK',
+        tone: 'success',
+      })
+    } catch (error: any) {
+      setIsYearsConfirmOpen(false)
+      setFeedback({
+        title: 'Unable to Save Years',
+        message:
+          error?.response?.data?.error ||
+          'Years in Barangay could not be saved. Please try again or contact SK admin.',
+        actionLabel: 'OK',
+        tone: 'error',
+      })
+    } finally {
+      setIsYearsSubmitting(false)
+    }
+  }
+
   const handleFeedbackClose = () => {
-    const shouldGoBack = feedback?.tone === 'success'
+    const shouldGoBack = Boolean(feedback?.goBackOnClose)
     setFeedback(null)
 
     if (shouldGoBack) {
@@ -249,6 +322,38 @@ export default function EditProfilePage() {
                 />
               </div>
             </div>
+            {canSubmitMissingYears ? (
+              <div className="rounded-2xl border border-[#f4d58b] bg-[#fff8e8] p-4">
+                <div className="mb-3">
+                  <h2 className="text-[15px] font-bold text-[#9c6500]">Complete Years in Barangay</h2>
+                  <p className="mt-1 text-sm leading-6 text-[#7b641d]">
+                    Your account was created before this field was added. Submit it once so admin and superadmin records stay complete.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  <Input
+                    label="Years in Barangay"
+                    type="number"
+                    value={yearsInBarangay}
+                    onChange={(e) => setYearsInBarangay(normalizeYearsInBarangay(e.target.value))}
+                    onBlur={() => setShowYearsValidation(true)}
+                    placeholder="Example: 5"
+                    inputMode="numeric"
+                    error={yearsInBarangayError}
+                    hint="Use 0 if you have lived in the barangay for less than one year. This can only be submitted once."
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    fullWidth
+                    isLoading={isYearsSubmitting}
+                    onClick={handleYearsSubmitRequest}
+                  >
+                    Submit Years in Barangay
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             <div className="rounded-2xl border border-[#d8e5f4] bg-[#f7fbff] p-4">
               <div className="mb-3">
                 <h2 className="text-[15px] font-bold text-[#014384]">Digital ID Emergency Contact</h2>
@@ -306,6 +411,40 @@ export default function EditProfilePage() {
         tone={feedback?.tone}
         onClose={handleFeedbackClose}
       />
+
+      <Modal
+        isOpen={isYearsConfirmOpen}
+        onClose={() => {
+          if (!isYearsSubmitting) setIsYearsConfirmOpen(false)
+        }}
+        title="Confirm Years in Barangay"
+        size="sm"
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-[#5c7aa3]">
+            You are about to save <strong>{normalizedYearsInBarangay || '0'} year{normalizedYearsInBarangay === '1' ? '' : 's'}</strong> in Barangay. This is a one-time submission from your account. Continue?
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsYearsConfirmOpen(false)}
+              disabled={isYearsSubmitting}
+              fullWidth
+            >
+              Review
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmYearsSubmit}
+              isLoading={isYearsSubmitting}
+              fullWidth
+            >
+              Confirm & Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -316,6 +455,27 @@ function normalizeEmergencyContactPhone(value: string, maxLength: number) {
 
 function normalizeMemberContactNumber(value: string) {
   return value.replace(/\D/g, '').slice(0, MEMBER_CONTACT_NUMBER_MAX_LENGTH)
+}
+
+function normalizeYearsInBarangay(value: string) {
+  return value.replace(/\D/g, '')
+}
+
+function hasStoredYearsInBarangay(value: unknown) {
+  if (value === null || typeof value === 'undefined' || String(value).trim() === '') {
+    return false
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0
+}
+
+function getYearsInBarangayError(value: string) {
+  const normalized = normalizeYearsInBarangay(value)
+  if (!normalized) return 'Enter your years in barangay.'
+  if (!/^\d+$/.test(normalized)) return 'Years in Barangay must be a whole number.'
+
+  return ''
 }
 
 function getMemberContactNumberError(value: string) {

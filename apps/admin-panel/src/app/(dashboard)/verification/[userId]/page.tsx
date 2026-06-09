@@ -961,9 +961,13 @@ function ProfileField({ label, value }: { label: string; value?: string | number
   return (
     <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--accent-soft)' }}>
       <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>{label}</p>
-      <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{value || '-'}</p>
+      <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{formatProfileFieldValue(value)}</p>
     </div>
   )
+}
+
+function formatProfileFieldValue(value?: string | number | null) {
+  return value === null || typeof value === 'undefined' || value === '' ? '-' : String(value)
 }
 
 function SummaryMini({ label, value }: { label: string; value: number }) {

@@ -89,7 +89,7 @@ export default function YouthDetailPage() {
         barangay: nextMember.profile?.barangay || '', purok: nextMember.profile?.purok || '',
         currentAddressHouseBlockUnitNumber: nextMember.profile?.currentAddressHouseBlockUnitNumber || '',
         currentAddressStreetAddress: nextMember.profile?.currentAddressStreetAddress || '',
-        yearsInBarangay: nextMember.profile?.yearsInBarangay || '', youthAgeGroup: nextMember.profile?.youthAgeGroup || '',
+        yearsInBarangay: normalizeFieldValue(nextMember.profile?.yearsInBarangay), youthAgeGroup: nextMember.profile?.youthAgeGroup || '',
         educationalBackground: nextMember.profile?.educationalBackground || '', youthClassification: nextMember.profile?.youthClassification || '',
         workStatus: nextMember.profile?.workStatus || '', registeredSkVoter: normalizeBool(nextMember.profile?.registeredSkVoter),
         votedLastSkElections: normalizeBool(nextMember.profile?.votedLastSkElections), registeredNationalVoter: normalizeBool(nextMember.profile?.registeredNationalVoter),
@@ -308,7 +308,7 @@ function FieldGrid({ fields }: { fields: Array<[string, any]> }) {
       {fields.map(([label, value]) => (
         <div key={label} className="rounded-[var(--radius-sm)] border p-4" style={{ borderColor: 'var(--stroke)', background: 'var(--card)' }}>
           <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{label}</p>
-          <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{value || '-'}</p>
+          <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{formatFieldValue(value)}</p>
         </div>
       ))}
     </div>
@@ -329,7 +329,7 @@ function TextAreaField({ label, value, onChange }: { label: string; value: strin
 }
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
-  return <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{label}</label><div className="rounded-xl px-4 py-2.5 text-sm" style={{ border: '1px solid var(--stroke)', background: 'var(--surface-muted)', color: 'var(--muted)' }}>{value || '-'}</div></div>
+  return <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{label}</label><div className="rounded-xl px-4 py-2.5 text-sm" style={{ border: '1px solid var(--stroke)', background: 'var(--surface-muted)', color: 'var(--muted)' }}>{formatFieldValue(value)}</div></div>
 }
 
 function SelectField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
@@ -360,7 +360,9 @@ function SummaryMini({ label, value }: { label: string; value: number }) {
 
 function formatDate(value?: string) { if (!value) return '-'; const d = new Date(value); if (Number.isNaN(d.getTime())) return value; return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }
 function formatDateTime(value?: string) { if (!value) return '-'; const d = new Date(value); if (Number.isNaN(d.getTime())) return value; return d.toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) }
+function formatFieldValue(value: any) { return value === null || typeof value === 'undefined' || value === '' ? '-' : String(value) }
 function formatBool(value?: boolean | string) { if (value === true || value === 'Yes') return 'Yes'; if (value === false || value === 'No') return 'No'; return '-' }
 function normalizeBool(value?: boolean | string) { if (value === true || value === 'Yes') return 'Yes'; if (value === false || value === 'No') return 'No'; return '' }
+function normalizeFieldValue(value: any) { return value === null || typeof value === 'undefined' ? '' : String(value) }
 function parseBool(value: string) { if (value === 'Yes') return true; if (value === 'No') return false; return null }
 function normalizeDate(value?: string) { if (!value) return ''; if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value; const d = new Date(value); if (Number.isNaN(d.getTime())) return ''; return d.toISOString().slice(0, 10) }

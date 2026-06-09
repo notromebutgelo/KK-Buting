@@ -28,6 +28,7 @@ export interface UserProfile {
   currentAddressHouseBlockUnitNumber?: string
   currentAddressStreetAddress?: string
   purok: string
+  yearsInBarangay?: number | string | null
   civilStatus: string
   youthAgeGroup: string
   educationalBackground: string

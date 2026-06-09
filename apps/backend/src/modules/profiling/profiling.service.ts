@@ -31,6 +31,7 @@ export async function getProfiling(uid: string) {
 
 export async function updateProfiling(uid: string, data: Record<string, unknown>) {
   const normalizedData = normalizeProfilingData(data);
+  await assertCanUpdateYearsInBarangay(uid, normalizedData);
 
   await db.collection("kkProfiling").doc(uid).update({
     ...normalizedData,
@@ -63,7 +64,43 @@ function normalizeProfilingData(data: Record<string, unknown>) {
     );
   }
 
+  if ("yearsInBarangay" in normalizedData) {
+    const yearsInBarangay = parseNonNegativeInteger(
+      normalizedData.yearsInBarangay
+    );
+    if (yearsInBarangay === null) {
+      delete normalizedData.yearsInBarangay;
+    } else {
+      normalizedData.yearsInBarangay = yearsInBarangay;
+    }
+  }
+
   return normalizedData;
+}
+
+async function assertCanUpdateYearsInBarangay(
+  uid: string,
+  normalizedData: Record<string, unknown>
+) {
+  if (!Object.prototype.hasOwnProperty.call(normalizedData, "yearsInBarangay")) {
+    return;
+  }
+
+  const nextYears = parseNonNegativeInteger(normalizedData.yearsInBarangay);
+  if (nextYears === null) {
+    return;
+  }
+
+  const snap = await db.collection("kkProfiling").doc(uid).get();
+  const existingYears = parseNonNegativeInteger(snap.data()?.yearsInBarangay);
+
+  if (existingYears !== null && existingYears !== nextYears) {
+    const error = new Error(
+      "Years in Barangay can only be submitted once from the youth app. Contact SK admin if this value needs correction."
+    ) as Error & { statusCode?: number };
+    error.statusCode = 409;
+    throw error;
+  }
 }
 
 function normalizeEmergencyContactPhone(value: unknown) {
@@ -79,10 +116,18 @@ function normalizeProfileContactNumber(value: unknown) {
 }
 
 function normalizeNonNegativeInteger(value: unknown) {
+  return parseNonNegativeInteger(value) ?? 0;
+}
+
+function parseNonNegativeInteger(value: unknown) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
   const parsed = Number(value);
 
   if (!Number.isFinite(parsed) || parsed < 0) {
-    return 0;
+    return null;
   }
 
   return Math.floor(parsed);

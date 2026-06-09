@@ -53,6 +53,7 @@ export type ProfilingDraft = {
   religiousAffiliation?: string;
   currentAddressBarangay?: string;
   purok?: string;
+  yearsInBarangay?: string;
   contactNumber?: string;
   currentAddressStreetAddress?: string;
   currentAddressHouseBlockUnitNumber?: string;
@@ -915,6 +916,17 @@ export const PROFILING_STEPS: ProfilingStepConfig[] = [
             placeholder: "Piliin ang iyong purok.",
             helperText:
               "Optional ito, pero ito ang ipapakita sa front ng iyong Digital ID kapag nilagyan mo.",
+          },
+          {
+            key: "yearsInBarangay",
+            label: "Years in Barangay (Ilang taon ka nang naninirahan sa barangay?)",
+            type: "text",
+            required: true,
+            placeholder: "Example: 5",
+            inputType: "number",
+            inputMode: "numeric",
+            helperText:
+              "Ilagay ang bilang ng taon. Kung wala pang isang taon, ilagay ang 0.",
           },
           {
             key: "currentAddressHouseBlockUnitNumber",
@@ -1937,6 +1949,10 @@ export function getFieldValidationError(field: ProfilingFieldConfig, draft: Prof
     return getProfileContactNumberError(draft.contactNumber);
   }
 
+  if (field.key === "yearsInBarangay") {
+    return getNonNegativeWholeNumberError(draft.yearsInBarangay, "Years in Barangay");
+  }
+
   return "";
 }
 
@@ -2144,6 +2160,7 @@ export function buildProfilingPayload(draft: ProfilingDraft) {
     city: "Pasig City",
     barangay: currentBarangay,
     purok: String(profileDraft.purok || "").trim(),
+    yearsInBarangay: String(profileDraft.yearsInBarangay || "").trim(),
     civilStatus: profileDraft.civilStatus || "",
     youthAgeGroup,
     educationalBackground: profileDraft.highestEducationalAttainment || "",
@@ -2187,6 +2204,17 @@ export function normalizeProfileContactNumber(value: string | undefined) {
   return String(value || "")
     .replace(/\D/g, "")
     .slice(0, PROFILE_CONTACT_NUMBER_MAX_LENGTH);
+}
+
+function getNonNegativeWholeNumberError(value: string | undefined, label: string) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+
+  if (!/^\d+$/.test(normalized)) {
+    return `${label} must be a whole number.`;
+  }
+
+  return "";
 }
 
 export function getProfileContactNumberError(value: string | undefined) {
