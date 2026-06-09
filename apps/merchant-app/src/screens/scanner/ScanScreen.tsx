@@ -51,11 +51,14 @@ export default function ScanScreen() {
   const [scannerEnabled, setScannerEnabled] = useState(false)
   const [permissionRequesting, setPermissionRequesting] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
+  const [nativeScannerLaunching, setNativeScannerLaunching] = useState(false)
   const [profile, setProfile] = useState<MerchantProfile | null>(null)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [notice, setNotice] = useState<ScanNoticeState | null>(null)
 
   const scanLockRef = useRef(false)
+  const nativeScannerSubscriptionRef = useRef<{ remove: () => void } | null>(null)
+  const nativeScanHandledRef = useRef(false)
   const lastSuccessfulTokenRef = useRef<string | null>(null)
   const ignoredVisibleTokenRef = useRef<string | null>(null)
   const lastCapturedTokenRef = useRef<string | null>(null)
@@ -64,7 +67,8 @@ export default function ScanScreen() {
   const pesosPerPoint = 10
   const numericAmount = Number(amountSpent || 0)
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount > 0
-  const canStartScanner = hasValidAmount && !isSubmitting && !permissionRequesting
+  const canStartScanner =
+    hasValidAmount && !isSubmitting && !permissionRequesting && !nativeScannerLaunching
   const canSubmitManual = hasValidAmount && token.trim().length > 0 && !isSubmitting
   const shouldKeepScannerLive =
     scannerRequested && hasValidAmount && isFocused
@@ -90,7 +94,10 @@ export default function ScanScreen() {
       void loadMerchantProfile()
 
       return () => {
+        nativeScannerSubscriptionRef.current?.remove()
+        nativeScannerSubscriptionRef.current = null
         setScannerEnabled(false)
+        setNativeScannerLaunching(false)
         setNotice(null)
         scanLockRef.current = true
       }
@@ -159,6 +166,10 @@ export default function ScanScreen() {
     setScannerRequested(false)
     setScannerEnabled(false)
     setCameraReady(false)
+    setNativeScannerLaunching(false)
+    nativeScannerSubscriptionRef.current?.remove()
+    nativeScannerSubscriptionRef.current = null
+    nativeScanHandledRef.current = false
     scanLockRef.current = false
   }, [])
 
@@ -171,6 +182,10 @@ export default function ScanScreen() {
     setScannerRequested(false)
     setScannerEnabled(false)
     setCameraReady(false)
+    setNativeScannerLaunching(false)
+    nativeScannerSubscriptionRef.current?.remove()
+    nativeScannerSubscriptionRef.current = null
+    nativeScanHandledRef.current = false
     scanLockRef.current = false
   }, [])
 
@@ -315,43 +330,6 @@ export default function ScanScreen() {
     }
   }, [permission, permissionRequesting, requestPermission, showScannerErrorNotice])
 
-  const openScannerSession = useCallback(async () => {
-    if (!hasValidAmount) {
-      openNotice({
-        title: 'Enter Purchase Amount',
-        message:
-          'Add a valid purchase amount greater than zero before opening the QR scanner.',
-        confirmLabel: 'OK',
-        iconName: 'cash-remove',
-        tone: 'warning',
-      })
-      return
-    }
-
-    if (profile && profile.status !== 'active') {
-      openNotice({
-        title: 'Scanner Unavailable',
-        message: profile.adminNote,
-        confirmLabel: 'OK',
-        iconName: 'store-alert-outline',
-        tone: 'warning',
-      })
-      return
-    }
-
-    const hasCameraAccess = await requestCameraAccess()
-
-    setNotice(null)
-    setScannerRequested(true)
-    setCameraReady(false)
-    setScannerEnabled(hasCameraAccess)
-    scanLockRef.current = false
-
-    if (!hasCameraAccess) {
-      scanLockRef.current = true
-    }
-  }, [hasValidAmount, openNotice, profile, requestCameraAccess])
-
   const handleCameraMountError = useCallback(
     ({ message }: { message: string }) => {
       setCameraReady(false)
@@ -477,6 +455,91 @@ export default function ScanScreen() {
     void processToken(data, 'camera')
   }
 
+  const openEmbeddedScanner = useCallback(async () => {
+    const hasCameraAccess = await requestCameraAccess()
+
+    setNotice(null)
+    setScannerRequested(true)
+    setCameraReady(false)
+    setScannerEnabled(hasCameraAccess)
+    scanLockRef.current = !hasCameraAccess
+  }, [requestCameraAccess])
+
+  const openScannerSession = useCallback(async () => {
+    if (!hasValidAmount) {
+      openNotice({
+        title: 'Enter Purchase Amount',
+        message:
+          'Add a valid purchase amount greater than zero before opening the QR scanner.',
+        confirmLabel: 'OK',
+        iconName: 'cash-remove',
+        tone: 'warning',
+      })
+      return
+    }
+
+    if (profile && profile.status !== 'active') {
+      openNotice({
+        title: 'Scanner Unavailable',
+        message: profile.adminNote,
+        confirmLabel: 'OK',
+        iconName: 'store-alert-outline',
+        tone: 'warning',
+      })
+      return
+    }
+
+    if (Platform.OS !== 'android' || !CameraView.isModernBarcodeScannerAvailable) {
+      await openEmbeddedScanner()
+      return
+    }
+
+    setNotice(null)
+    setScannerRequested(false)
+    setScannerEnabled(false)
+    setNativeScannerLaunching(true)
+    nativeScanHandledRef.current = false
+    scanLockRef.current = false
+
+    nativeScannerSubscriptionRef.current?.remove()
+    const subscription = CameraView.onModernBarcodeScanned(({ data }) => {
+      if (nativeScanHandledRef.current || !prepareCameraSubmission(data)) {
+        return
+      }
+
+      nativeScanHandledRef.current = true
+      nativeScannerSubscriptionRef.current?.remove()
+      nativeScannerSubscriptionRef.current = null
+      setNativeScannerLaunching(false)
+      void processToken(data, 'camera')
+    })
+    nativeScannerSubscriptionRef.current = subscription
+
+    try {
+      await CameraView.launchScanner({ barcodeTypes: ['qr'] })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      const wasCancelled = message.toLowerCase().includes('cancel')
+
+      if (!wasCancelled && !nativeScanHandledRef.current) {
+        await openEmbeddedScanner()
+      }
+    } finally {
+      subscription.remove()
+      if (nativeScannerSubscriptionRef.current === subscription) {
+        nativeScannerSubscriptionRef.current = null
+      }
+      setNativeScannerLaunching(false)
+    }
+  }, [
+    hasValidAmount,
+    openEmbeddedScanner,
+    openNotice,
+    prepareCameraSubmission,
+    processToken,
+    profile,
+  ])
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -546,7 +609,11 @@ export default function ScanScreen() {
                 disabled={!canStartScanner}
               >
                 <Text style={styles.buttonText}>
-                  {scannerRequested ? 'Scanner Ready' : 'Open Scanner'}
+                  {nativeScannerLaunching
+                    ? 'Opening Scanner...'
+                    : scannerRequested
+                      ? 'Scanner Ready'
+                      : 'Open Scanner'}
                 </Text>
               </Pressable>
 
@@ -569,7 +636,7 @@ export default function ScanScreen() {
                   <CameraView
                     style={styles.camera}
                     facing="back"
-                    active={isFocused}
+                    active={Platform.OS === 'ios' ? isFocused : undefined}
                     barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
                     onCameraReady={() => setCameraReady(true)}
                     onMountError={handleCameraMountError}
@@ -748,8 +815,7 @@ const styles = StyleSheet.create({
   cameraShell: {
     height: 300,
     borderRadius: 28,
-    overflow: 'hidden',
-    backgroundColor: '#0c3e74',
+    backgroundColor: '#061f3d',
     position: 'relative',
   },
   placeholderCard: {
@@ -797,7 +863,8 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   camera: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 28,
   },
   frameOverlay: {
     ...StyleSheet.absoluteFillObject,

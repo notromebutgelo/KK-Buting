@@ -242,8 +242,8 @@ function DigitalIdFrontHeader() {
         <p className="whitespace-nowrap font-serif text-[clamp(1rem,4.4cqw,2.05rem)] leading-none tracking-[0.08em]">
           KATIPUNAN NG KABATAAN
         </p>
-        <p className="mt-[1.2%] whitespace-nowrap text-[clamp(0.34rem,1.45cqw,0.68rem)] font-semibold uppercase leading-none tracking-[0.12em]">
-          Sangguniang Kabataan ng Barangay Buting
+        <p className="mt-[1.2%] whitespace-nowrap text-[clamp(0.32rem,1.25cqw,0.64rem)] font-semibold uppercase leading-none tracking-[0.08em]">
+          SANGGUNIANG KABATAAN NG BARANGAY BUTING, PASIG CITY
         </p>
       </div>
     </div>

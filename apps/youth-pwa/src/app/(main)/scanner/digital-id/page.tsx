@@ -671,7 +671,7 @@ export default function DigitalIDPage() {
                 signatureUrl={digitalIdSignatureUrl}
               />
               <p className="px-1 text-center text-[13px] leading-6 text-[#5c7aa3]">
-                Tap the card or use Flip ID to view the reverse side. Present this credential to KK officers whenever they need to verify your membership.
+                Tap the card or use Flip ID to view the back side of your ID. Present this credential to KK officers whenever they need to verify your membership.
               </p>
             </div>
 
