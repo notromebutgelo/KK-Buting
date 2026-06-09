@@ -5,6 +5,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
+import { API_BASE_URL } from '../../lib/api'
 import type { RootStackParamList } from '../../navigation/AppNavigator'
 
 type ScreenRoute = RouteProp<RootStackParamList, 'ScanFailed'>
@@ -21,6 +22,15 @@ export default function ScanFailedScreen() {
         </View>
         <Text style={styles.title}>Scan Failed</Text>
         <Text style={styles.message}>{route.params?.message ?? 'The QR token could not be processed.'}</Text>
+        {route.params?.scanPayloadKind ? (
+          <Text style={styles.scanHint}>
+            QR decoded as {route.params.scanPayloadKind}
+            {route.params.scanPayloadLength != null
+              ? ` (${route.params.scanPayloadLength} chars)`
+              : ''}
+          </Text>
+        ) : null}
+        <Text style={styles.apiHint}>Backend: {API_BASE_URL}</Text>
         <Pressable style={styles.button} onPress={() => navigation.goBack()}>
           <Text style={styles.buttonText}>Try Again</Text>
         </Pressable>
@@ -64,6 +74,19 @@ const styles = StyleSheet.create({
     color: '#6f6141',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  apiHint: {
+    color: '#7d91aa',
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  scanHint: {
+    color: '#35506d',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    textAlign: 'center',
   },
   button: {
     marginTop: 10,

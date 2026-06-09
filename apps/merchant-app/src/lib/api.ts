@@ -182,7 +182,10 @@ function getApiConfig(): ApiConfig {
 }
 
 const apiConfig = getApiConfig()
-const API_REQUEST_TIMEOUT_MS = 30000
+const API_REQUEST_TIMEOUT_MS = 90000
+const API_WARMUP_TIMEOUT_MS = 75000
+const API_RETRY_DELAY_MS = 1500
+const API_WARMUP_CACHE_MS = 5 * 60 * 1000
 
 export const API_BASE_URL = apiConfig.apiUrl
 export const API_CONFIGURATION_ERROR = apiConfig.configurationError
@@ -207,7 +210,7 @@ export function warmUpApi() {
     return Promise.resolve(false)
   }
 
-  if (Date.now() - lastBackendWarmupAt < 60000) {
+  if (Date.now() - lastBackendWarmupAt < API_WARMUP_CACHE_MS) {
     return Promise.resolve(true)
   }
 
@@ -220,16 +223,23 @@ export function warmUpApi() {
     return Promise.resolve(false)
   }
 
-  backendWarmupPromise = axios
-    .get(healthCheckUrl, { timeout: API_REQUEST_TIMEOUT_MS })
-    .then(() => {
-      lastBackendWarmupAt = Date.now()
-      return true
-    })
-    .catch(() => false)
-    .finally(() => {
-      backendWarmupPromise = null
-    })
+  backendWarmupPromise = (async () => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await axios.get(healthCheckUrl, { timeout: API_WARMUP_TIMEOUT_MS })
+        lastBackendWarmupAt = Date.now()
+        return true
+      } catch {
+        if (attempt === 0) {
+          await wait(API_RETRY_DELAY_MS)
+        }
+      }
+    }
+
+    return false
+  })().finally(() => {
+    backendWarmupPromise = null
+  })
 
   return backendWarmupPromise
 }
@@ -248,6 +258,11 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 
 function wait(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+function isRetryableMutation(config: RetryableRequestConfig | undefined, method: string) {
+  const url = String(config?.url || '')
+  return method === 'post' && url.includes('/auth/login')
 }
 
 api.interceptors.request.use(async (config) => {
@@ -294,17 +309,18 @@ api.interceptors.response.use(
     const isCanceled = error.code === 'ERR_CANCELED'
     const isRetryableFailure =
       !error.response || status === 408 || status === 429 || status === 502 || status === 503 || status === 504
+    const canRetryMethod = method === 'get' || isRetryableMutation(config, method)
 
     if (
       config &&
-      method === 'get' &&
+      canRetryMethod &&
       !isCanceled &&
       status !== 401 &&
       isRetryableFailure &&
       (config.merchantRetryCount || 0) < 1
     ) {
       config.merchantRetryCount = (config.merchantRetryCount || 0) + 1
-      await wait(700)
+      await wait(API_RETRY_DELAY_MS)
       return api.request(config)
     }
 

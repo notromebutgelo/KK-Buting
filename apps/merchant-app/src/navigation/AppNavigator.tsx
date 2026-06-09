@@ -23,7 +23,11 @@ export type RootStackParamList = {
   Promotions: undefined
   Products: undefined
   ScanSuccess: { points?: number; memberLabel?: string; memberIdMasked?: string; amountSpent?: number }
-  ScanFailed: { message?: string }
+  ScanFailed: {
+    message?: string
+    scanPayloadKind?: string
+    scanPayloadLength?: number
+  }
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>()

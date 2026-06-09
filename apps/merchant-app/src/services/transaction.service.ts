@@ -11,8 +11,28 @@ type ScanInput = {
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
-    const response = error.response as { data?: { error?: string } } | undefined
+    const response = error.response as {
+      data?: {
+        error?: string
+        details?: {
+          qrReason?: string
+          scanPayloadKind?: string
+          extractedTokenLength?: number
+        }
+      }
+    } | undefined
     if (response?.data?.error) {
+      const details = response.data.details
+      const diagnosticParts = [
+        details?.qrReason ? `reason=${details.qrReason}` : '',
+        details?.scanPayloadKind ? `payload=${details.scanPayloadKind}` : '',
+        details?.extractedTokenLength != null ? `tokenLength=${details.extractedTokenLength}` : '',
+      ].filter(Boolean)
+
+      if (diagnosticParts.length > 0) {
+        return `${response.data.error}\nDiagnostic: ${diagnosticParts.join(', ')}`
+      }
+
       return response.data.error
     }
   }

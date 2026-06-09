@@ -30,7 +30,10 @@ export async function scanQr(req: AuthRequest, res: Response) {
     return res.json(result);
   } catch (err: any) {
     const statusCode = Number(err?.status || err?.statusCode || 400);
-    return res.status(statusCode).json({ error: err.message });
+    return res.status(statusCode).json({
+      error: err.message,
+      ...(err?.details ? { details: err.details } : {}),
+    });
   }
 }
 
@@ -48,6 +51,9 @@ export async function redeemQr(req: AuthRequest, res: Response) {
     return res.json(result);
   } catch (err: any) {
     const statusCode = Number(err?.status || err?.statusCode || 400);
-    return res.status(statusCode).json({ error: err.message });
+    return res.status(statusCode).json({
+      error: err.message,
+      ...(err?.details ? { details: err.details } : {}),
+    });
   }
 }

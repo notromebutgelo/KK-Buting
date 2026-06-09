@@ -302,6 +302,29 @@ export default function ScanScreen() {
     return true
   }, [])
 
+  const getQrPayloadFromScan = useCallback(
+    ({ data, raw }: { data?: string | null; raw?: string | null }) => {
+      const decodedData = String(data || '').trim()
+      const rawData = String(raw || '').trim()
+
+      // Expo's decoded `data` is the QR text we generated. Some Android scanner
+      // paths expose `raw` differently, so treat it only as a fallback.
+      return decodedData || rawData
+    },
+    []
+  )
+
+  const getScanPayloadKind = useCallback((value: string) => {
+    const trimmed = value.trim()
+
+    if (!trimmed) return 'empty'
+    if (trimmed.startsWith('{') && trimmed.includes('"token"')) return 'json-token-payload'
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return 'url-payload'
+    if (/^[A-Za-z0-9_-]+$/.test(trimmed)) return 'plain-token-like-text'
+
+    return 'plain-text'
+  }, [])
+
   const requestCameraAccess = useCallback(async () => {
     if (permissionRequesting) {
       return false
@@ -416,11 +439,14 @@ export default function ScanScreen() {
 
         if (source === 'camera') {
           ignoredVisibleTokenRef.current = normalizedToken
+          setToken(normalizedToken)
         }
 
         setScannerEnabled(false)
         navigation.navigate('ScanFailed', {
           message,
+          scanPayloadKind: getScanPayloadKind(normalizedToken),
+          scanPayloadLength: normalizedToken.length,
         })
         shouldResumeScanner = false
       } finally {
@@ -436,6 +462,7 @@ export default function ScanScreen() {
     [
       isDuplicateScanError,
       isDuplicateScanToken,
+      getScanPayloadKind,
       navigation,
       numericAmount,
       profile?.adminNote,
@@ -450,7 +477,7 @@ export default function ScanScreen() {
   )
 
   const handleBarcodeScanned = ({ data, raw }: { data: string; raw?: string }) => {
-    const qrPayload = raw?.trim() || data
+    const qrPayload = getQrPayloadFromScan({ data, raw })
 
     if (isSubmitting || !scannerEnabled || !isFocused || scanLockRef.current) return
     if (!prepareCameraSubmission(qrPayload)) return
@@ -505,7 +532,7 @@ export default function ScanScreen() {
 
     nativeScannerSubscriptionRef.current?.remove()
     const subscription = CameraView.onModernBarcodeScanned(({ data, raw }) => {
-      const qrPayload = raw?.trim() || data
+      const qrPayload = getQrPayloadFromScan({ data, raw })
 
       if (nativeScanHandledRef.current || !prepareCameraSubmission(qrPayload)) {
         return
@@ -537,6 +564,7 @@ export default function ScanScreen() {
     }
   }, [
     hasValidAmount,
+    getQrPayloadFromScan,
     openEmbeddedScanner,
     openNotice,
     prepareCameraSubmission,

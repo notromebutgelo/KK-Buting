@@ -18,9 +18,18 @@ async function resolveMerchant(ownerId: string) {
   return assertMerchantCanRedeem(await getMerchantByOwnerId(ownerId));
 }
 
-function makeQrError(message: string, status: number): Error {
-  const error = new Error(message) as Error & { status?: number };
+type QrErrorDetails = {
+  qrReason?: string;
+  scanPayloadKind?: string;
+  extractedTokenLength?: number;
+};
+
+function makeQrError(message: string, status: number, details?: QrErrorDetails): Error {
+  const error = new Error(message) as Error & { status?: number; details?: QrErrorDetails };
   error.status = status;
+  if (details) {
+    error.details = details;
+  }
   return error;
 }
 
@@ -28,24 +37,43 @@ function getUsedQrTokenId(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function getQrValidationError(reason: string) {
+function describeScanPayload(rawValue: string) {
+  const value = String(rawValue || "").trim();
+
+  if (!value) return "empty";
+  if (value.startsWith("{") && value.includes('"token"')) return "json-token-payload";
+  if (value.startsWith("http://") || value.startsWith("https://")) return "url-payload";
+  if (/^[A-Za-z0-9_-]+$/.test(value)) return "plain-token-like-text";
+
+  return "plain-text";
+}
+
+function getQrValidationError(reason: string, rawValue: string, token: string) {
+  const details = {
+    qrReason: reason,
+    scanPayloadKind: describeScanPayload(rawValue),
+    extractedTokenLength: token.length,
+  };
+
   if (reason === "expired") {
     return makeQrError(
       "QR code expired. Ask the youth member to refresh their QR code, then scan again.",
-      410
+      410,
+      details
     );
   }
 
   return makeQrError(
     "Invalid QR code. Ask the youth member to open the Youth app and refresh their QR code.",
-    400
+    400,
+    details
   );
 }
 
 function parseYouthQr(rawValue: string) {
   const token = extractScanToken(rawValue);
   const result = verifyQrTokenDetailed(token);
-  if (!result.valid) throw getQrValidationError(result.reason);
+  if (!result.valid) throw getQrValidationError(result.reason, rawValue, token);
 
   return {
     token,
