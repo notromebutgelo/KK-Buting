@@ -41,6 +41,16 @@ import {
   createMerchantAccount,
 } from "./admin.service";
 import {
+  createAdminAccount,
+  listAdminAccounts,
+  resetAdminTemporaryPassword,
+  updateAdminAccountStatus,
+} from "./adminAccounts.service";
+import {
+  exportAuditLogsCsv,
+  listAuditLogs,
+} from "./audit.service";
+import {
   getPhysicalIdRequestDetail,
   listPhysicalIdRequestsForAdmin,
   updatePhysicalIdRequestByAdmin,
@@ -660,6 +670,108 @@ export async function createMerchantAccountHandler(req: AuthRequest, res: Respon
       return res.status(400).json({ error: "Enter a valid merchant login email address." });
     }
     return res.status(500).json({ error: message });
+  }
+}
+
+export async function listAdminAccountsHandler(req: AuthRequest, res: Response) {
+  try {
+    const result = await listAdminAccounts();
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed to list admin accounts." });
+  }
+}
+
+export async function createAdminAccountHandler(req: AuthRequest, res: Response) {
+  try {
+    const result = await createAdminAccount(
+      {
+        email: String(req.body?.email || ""),
+        displayName: String(req.body?.displayName || ""),
+      },
+      req.user?.email || "superadmin"
+    );
+    return res.status(201).json(result);
+  } catch (err: any) {
+    const message = String(err?.message || "Failed to create admin account.");
+    if (message.includes("email-already-exists") || message.includes("EMAIL_EXISTS")) {
+      return res.status(409).json({ error: "An account with this email already exists." });
+    }
+    if (message.includes("invalid-email") || message.includes("INVALID_EMAIL")) {
+      return res.status(400).json({ error: "Enter a valid admin login email address." });
+    }
+    return res.status(500).json({ error: message });
+  }
+}
+
+export async function resetAdminPasswordHandler(req: AuthRequest, res: Response) {
+  try {
+    const result = await resetAdminTemporaryPassword(
+      req.params.uid,
+      req.user?.email || "superadmin"
+    );
+    return res.json(result);
+  } catch (err: any) {
+    const message = String(err?.message || "Failed to reset admin password.");
+    return res.status(message.includes("not found") ? 404 : 500).json({ error: message });
+  }
+}
+
+export async function updateAdminAccountStatusHandler(req: AuthRequest, res: Response) {
+  try {
+    const account = await updateAdminAccountStatus(
+      req.params.uid,
+      req.body.status,
+      {
+        uid: req.user!.uid,
+        email: req.user?.email || "superadmin",
+      }
+    );
+    return res.json({ account });
+  } catch (err: any) {
+    const message = String(err?.message || "Failed to update admin account.");
+    const statusCode = message.includes("not found") ? 404 : message.includes("your own") ? 400 : 500;
+    return res.status(statusCode).json({ error: message });
+  }
+}
+
+export async function listAuditLogsHandler(req: AuthRequest, res: Response) {
+  try {
+    const result = await listAuditLogs({
+      actor: req.query.actor as string | undefined,
+      module: req.query.module as string | undefined,
+      action: req.query.action as string | undefined,
+      target: req.query.target as string | undefined,
+      status: req.query.status as string | undefined,
+      search: req.query.search as string | undefined,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      pageSize: req.query.pageSize ? Number(req.query.pageSize) : undefined,
+    });
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed to list audit logs." });
+  }
+}
+
+export async function exportAuditLogsHandler(req: AuthRequest, res: Response) {
+  try {
+    const csv = await exportAuditLogsCsv({
+      actor: req.query.actor as string | undefined,
+      module: req.query.module as string | undefined,
+      action: req.query.action as string | undefined,
+      target: req.query.target as string | undefined,
+      status: req.query.status as string | undefined,
+      search: req.query.search as string | undefined,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+    });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=\"audit-logs.csv\"");
+    return res.send(csv);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed to export audit logs." });
   }
 }
 

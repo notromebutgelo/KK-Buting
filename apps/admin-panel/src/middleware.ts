@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 const SUPERADMIN_ONLY_ROUTES = [
+  '/admin-controls',
   '/rewards',
   '/points-transactions',
   '/reports',

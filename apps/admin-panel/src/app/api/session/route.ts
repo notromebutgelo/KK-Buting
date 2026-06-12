@@ -21,6 +21,7 @@ function clearAdminCookies(response: NextResponse) {
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null)
   const token = String(payload?.token || '').trim()
+  const password = typeof payload?.password === 'string' ? payload.password : undefined
 
   if (!token) {
     return NextResponse.json({ error: 'Missing admin auth token.' }, { status: 400 })
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
       'Content-Type': 'application/json',
     },
     cache: 'no-store',
-    body: JSON.stringify({}),
+    body: JSON.stringify(password ? { password } : {}),
   })
 
   const backendPayload = await backendResponse.json().catch(() => null)

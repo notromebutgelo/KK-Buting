@@ -683,6 +683,29 @@ export function validateMerchantAccountRequest(req: Request) {
   return errors;
 }
 
+export function validateAdminAccountRequest(req: Request) {
+  const errors: string[] = [];
+  const body = ensureBodyRecord(req, errors);
+  if (!body) return errors;
+
+  validateString(errors, body, "displayName", "displayName", { required: true, minLength: 2, maxLength: 160 });
+  validateString(errors, body, "email", "email", { required: true, email: true, maxLength: 160 });
+  return errors;
+}
+
+export function validateAdminAccountStatusRequest(req: Request) {
+  const errors: string[] = [];
+  const body = ensureBodyRecord(req, errors);
+  if (!body) return errors;
+
+  validateString(errors, body, "status", "status", { required: true, maxLength: 20 });
+  const status = String(body.status || "").trim();
+  if (status && !["active", "disabled"].includes(status)) {
+    errors.push("status must be active or disabled.");
+  }
+  return errors;
+}
+
 export function validateMerchantStatusRequest(req: Request) {
   const errors: string[] = [];
   const body = ensureBodyRecord(req, errors);

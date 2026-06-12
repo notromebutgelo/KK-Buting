@@ -45,13 +45,22 @@ import {
   regenerateDigitalIdHandler,
   getReportsHandler,
   createMerchantAccountHandler,
+  listAdminAccountsHandler,
+  createAdminAccountHandler,
+  resetAdminPasswordHandler,
+  updateAdminAccountStatusHandler,
+  listAuditLogsHandler,
+  exportAuditLogsHandler,
   listPhysicalIdRequestsHandler,
   getPhysicalIdRequestHandler,
   updatePhysicalIdRequestHandler,
 } from "./admin.controller";
+import { auditAdminMutation } from "./audit.service";
 import { verifyToken } from "../../middleware/verifyToken";
 import { requireRole } from "../../middleware/requireRole";
 import {
+  validateAdminAccountRequest,
+  validateAdminAccountStatusRequest,
   validateAdjustYouthPointsRequest,
   validateArchiveYouthRequest,
   validateBulkUserIdsRequest,
@@ -76,9 +85,9 @@ import {
 
 const router = Router();
 
-const adminOrSuperadmin = [verifyToken, requireRole("admin", "superadmin")];
-const adminOnly = [verifyToken, requireRole("admin")];
-const superadminOnly = [verifyToken, requireRole("superadmin")];
+const adminOrSuperadmin = [verifyToken, requireRole("admin", "superadmin"), auditAdminMutation];
+const adminOnly = [verifyToken, requireRole("admin"), auditAdminMutation];
+const superadminOnly = [verifyToken, requireRole("superadmin"), auditAdminMutation];
 
 router.get("/dashboard", ...adminOrSuperadmin, getDashboard);
 router.get("/verification", ...adminOrSuperadmin, listVerificationProfiles);
@@ -159,6 +168,12 @@ router.patch("/merchants/:merchantId/status", ...superadminOnly, validateRequest
 router.get("/merchants/:merchantId/transactions", ...adminOrSuperadmin, listMerchantTransactionsHandler);
 router.get("/points-transactions", ...adminOrSuperadmin, getPointsTransactionsOverviewHandler);
 router.patch("/points-transactions/conversion-rate", ...superadminOnly, validateRequest(validatePointsConversionRequest), updatePointsConversionRateHandler);
+router.get("/admin-accounts", ...superadminOnly, listAdminAccountsHandler);
+router.post("/admin-accounts", ...superadminOnly, validateRequest(validateAdminAccountRequest), createAdminAccountHandler);
+router.post("/admin-accounts/:uid/reset-password", ...superadminOnly, resetAdminPasswordHandler);
+router.patch("/admin-accounts/:uid/status", ...superadminOnly, validateRequest(validateAdminAccountStatusRequest), updateAdminAccountStatusHandler);
+router.get("/audit-logs", ...superadminOnly, listAuditLogsHandler);
+router.get("/audit-logs/export", ...superadminOnly, exportAuditLogsHandler);
 router.get("/youth", ...adminOrSuperadmin, listYouth);
 router.get("/youth/:userId", ...adminOrSuperadmin, getYouthHandler);
 router.patch("/youth/:userId/status", ...adminOrSuperadmin, validateRequest(validateYouthStatusRequest), updateYouthStatusHandler);

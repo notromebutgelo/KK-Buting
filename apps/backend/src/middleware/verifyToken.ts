@@ -18,13 +18,27 @@ export async function verifyToken(req: AuthRequest, res: Response, next: NextFun
   try {
     const decoded = await auth.verifyIdToken(token);
     let role = decoded.role as string | undefined;
+    let storedUser: FirebaseFirestore.DocumentData | undefined;
 
     // Fall back to Firestore when the token has no role claim.
     // This covers existing users registered before setCustomUserClaims was added.
     if (!role) {
       const snap = await db.collection("users").doc(decoded.uid).get();
       if (snap.exists) {
-        role = snap.data()?.role as string | undefined;
+        storedUser = snap.data();
+        role = storedUser?.role as string | undefined;
+      }
+    }
+
+    if (role === "admin" || role === "superadmin") {
+      if (!storedUser) {
+        const snap = await db.collection("users").doc(decoded.uid).get();
+        storedUser = snap.exists ? snap.data() : undefined;
+      }
+
+      const accountStatus = String(storedUser?.adminStatus || storedUser?.accountStatus || "").trim();
+      if (accountStatus === "disabled" || storedUser?.disabled === true) {
+        return res.status(403).json({ error: "This admin account has been disabled." });
       }
     }
 

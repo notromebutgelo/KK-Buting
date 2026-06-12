@@ -111,7 +111,7 @@ export default function DigitalIDCard({
   }
 
   return (
-    <div className="relative aspect-[1.58/1] w-full [perspective:1200px]">
+    <div className="relative aspect-[1628/1040] w-full [perspective:1200px]">
       <button
         type="button"
         onClick={flipCard}
@@ -190,12 +190,11 @@ export const DigitalIdFace = forwardRef<HTMLDivElement, DigitalIdFaceProps>(func
     memberId,
     showQr,
     qrCodeUrl,
-    exportLayout = false,
   },
   ref
 ) {
   return (
-    <div ref={ref} className="relative aspect-[1.58/1] overflow-hidden rounded-[26px] [container-type:inline-size] ring-1 ring-[#d7e3f1] shadow-[0_20px_40px_rgba(1,67,132,0.18)]">
+    <div ref={ref} className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
       <img
         src={backgroundSrc}
         alt="Digital KK ID front background"
@@ -204,40 +203,35 @@ export const DigitalIdFace = forwardRef<HTMLDivElement, DigitalIdFaceProps>(func
       <DigitalIdFrontHeader />
       <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
         <div className="grid h-full grid-cols-[27%_1fr] gap-[6.5%]">
-          <div className="relative h-full">
-            {exportLayout ? (
-              <div className="absolute left-0 top-0 z-20 flex h-[5.2%] w-full items-center justify-center overflow-hidden px-[2%]">
-                <p className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-[1.14cqw] font-black leading-none tracking-[0.05em] text-[#0b2f5b]">
-                  {memberId || 'PENDING'}
-                </p>
-              </div>
-            ) : (
-              <div className="absolute left-0 top-0 z-20 flex h-[5.2%] w-full items-center justify-center overflow-hidden px-[2%]">
-                <p className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-[0.35rem] font-black leading-none tracking-[0.05em] text-[#0b2f5b]">
-                  {memberId || 'PENDING'}
-                </p>
-              </div>
-            )}
-            <div
-              className={
-                exportLayout
-                  ? 'absolute left-0 top-[6.6%] z-0 flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]'
-                  : 'absolute left-0 top-[7.5%] z-0 flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]'
-              }
-            >
+          <div className="flex flex-col items-center">
+            <div className="relative z-10 flex min-h-[2.25cqw] w-full items-center justify-center px-[2%]">
+              <p className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-[1.7cqw] font-black leading-[1.25] tracking-[0.05em] text-[#0b2f5b]">
+                {memberId || 'PENDING'}
+              </p>
+            </div>
+            <div className="relative mt-[3.8%] flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
               {photoUrl ? (
-                <img
-                  src={getExportSafeImageUrl(photoUrl)}
-                  alt={fullName}
-                  className="h-full w-full object-cover"
-                />
+                <>
+                  <img
+                    src={getExportSafeImageUrl(photoUrl)}
+                    alt=""
+                    aria-hidden="true"
+                    className="pointer-events-none absolute h-px w-px opacity-0"
+                  />
+                  <div
+                    role="img"
+                    aria-label={fullName}
+                    className="h-full w-full bg-cover bg-center bg-no-repeat"
+                    style={{ backgroundImage: `url("${getExportSafeImageUrl(photoUrl)}")` }}
+                  />
+                </>
               ) : (
-                <span className={exportLayout ? 'text-[2.85cqw] font-black text-[#014384]' : 'text-sm font-black text-[#014384]'}>
+                <span className="text-[3cqw] font-black text-[#014384]">
                   {getInitials(fullName)}
                 </span>
               )}
             </div>
-            <div className={exportLayout ? 'absolute left-0 top-[60.2%] flex h-[13%] w-full items-end justify-center overflow-hidden px-[4%]' : 'absolute left-0 top-[61.1%] flex h-[13%] w-full items-end justify-center overflow-hidden px-[4%]'}>
+            <div className="mt-[4.6%] flex h-[13%] w-full items-end justify-center overflow-hidden px-[4%]">
               {signatureUrl ? (
                 <img
                   src={getExportSafeImageUrl(signatureUrl)}
@@ -246,22 +240,22 @@ export const DigitalIdFace = forwardRef<HTMLDivElement, DigitalIdFaceProps>(func
                 />
               ) : null}
             </div>
-            <div className={exportLayout ? 'absolute left-0 top-[73.2%] w-full border-t border-[#808080] pt-[3.2%] text-center' : 'absolute left-0 top-[74.1%] w-full border-t border-[#808080] pt-[3.2%] text-center'}>
-              <p className={exportLayout ? 'text-[1.24cqw] font-medium tracking-[0.07em] text-[#1a1a1a]' : 'text-[0.38rem] font-medium tracking-[0.07em] text-[#1a1a1a]'}>
+            <div className="w-full border-t border-[#808080] pt-[3.2%] text-center">
+              <p className="text-[1.55cqw] font-medium tracking-[0.07em] text-[#1a1a1a]">
                 SIGNATURE
               </p>
             </div>
           </div>
 
-          <div className="flex h-full justify-between gap-[4%]">
-            <div className="min-w-0 flex-1 -translate-y-[3.3%] pt-0">
-              <Field label="Name" value={fullName} exportLayout={exportLayout} />
-              <Field label="Home Address" value={address} className="mt-[1.8%]" exportLayout={exportLayout} />
-              <Field label="Purok" value={purok} className="mt-[1.2%]" exportLayout={exportLayout} />
+          <div className={showQr ? 'flex h-full justify-between gap-[4%]' : '-translate-y-[3.3%] pt-0'}>
+            <div className={showQr ? 'min-w-0 flex-1 -translate-y-[3.3%] pt-0' : ''}>
+              <Field label="Name" value={fullName} />
+              <Field label="Home Address" value={address} className="mt-[1.8%]" />
+              <Field label="Purok" value={purok} className="mt-[1.2%]" />
               <div className="mt-[1.2%] grid grid-cols-2 gap-x-[6%] gap-y-[1.5%]">
-                <Field label="Date of Birth" value={birthday} exportLayout={exportLayout} />
-                <Field label="Gender" value={gender.toUpperCase()} exportLayout={exportLayout} />
-                <Field label="Contact No" value={contactNumber} exportLayout={exportLayout} />
+                <Field label="Date of Birth" value={birthday} />
+                <Field label="Gender" value={gender.toUpperCase()} />
+                <Field label="Contact No" value={contactNumber} />
               </div>
             </div>
 
@@ -302,7 +296,7 @@ export const DigitalIdExportFace = forwardRef<HTMLDivElement, DigitalIdExportFac
   ref
 ) {
   const width = Math.max(1, exportWidth)
-  const height = width / 1.58
+  const height = width * (1040 / 1628)
   const px = (value: number) => `${value}px`
   const font = (ratio: number) => px(width * ratio)
   const contentLeft = width * 0.082
@@ -321,7 +315,7 @@ export const DigitalIdExportFace = forwardRef<HTMLDivElement, DigitalIdExportFac
   const signatureLineTop = signatureTop + signatureHeight + width * 0.008
 
   return (
-    <div ref={ref} className="relative aspect-[1.58/1] overflow-hidden rounded-[26px] [container-type:inline-size] ring-1 ring-[#d7e3f1] shadow-[0_20px_40px_rgba(1,67,132,0.18)]">
+    <div ref={ref} className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
       <img
         src={backgroundSrc}
         alt="Digital KK ID front background"
@@ -538,7 +532,7 @@ export const DigitalIdBack = forwardRef<HTMLDivElement, DigitalIdBackProps>(func
   ref
 ) {
   return (
-    <div ref={ref} className="relative aspect-[1.58/1] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d6dee8] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_10px_24px_rgba(1,67,132,0.08)]">
+    <div ref={ref} className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
       <div className="absolute inset-[3.6%] rounded-[18px] border-[1.5px] border-[#4e5650]/65" />
       <div className="absolute inset-[6.2%] rounded-[14px] border border-[#838b85]/35" />
       <div className="relative flex h-full flex-col px-[9%] pb-[10.2%] pt-[9.8%] text-[#2b312e]">
@@ -598,19 +592,17 @@ function Field({
   label,
   value,
   className = '',
-  exportLayout = false,
 }: {
   label: string
   value: string
   className?: string
-  exportLayout?: boolean
 }) {
   return (
     <div className={className}>
-      <p className={exportLayout ? 'text-[1.24cqw] font-bold uppercase leading-[1.08] tracking-[0.06em] text-[#1d5aa1]' : 'text-[0.38rem] font-bold uppercase tracking-[0.06em] text-[#1d5aa1]'}>
+      <p className="text-[1.55cqw] font-bold uppercase leading-[1.18] tracking-[0.06em] text-[#1d5aa1]">
         {label}:
       </p>
-      <p className={exportLayout ? 'break-words text-[2.08cqw] font-black leading-[1.15] text-[#0b2f5b]' : 'break-words text-[0.64rem] font-black leading-[1.15] text-[#0b2f5b]'}>
+      <p className="break-words text-[2.62cqw] font-black leading-[1.15] text-[#0b2f5b]">
         {value || '-'}
       </p>
     </div>

@@ -8,6 +8,11 @@ import {
   markMerchantPasswordChanged,
   syncMerchantPasswordRequirement,
 } from "./merchantPasswordPolicy.service";
+import {
+  getAdminPasswordRequirement,
+  markAdminPasswordChanged,
+  syncAdminPasswordRequirement,
+} from "./adminPasswordPolicy.service";
 
 type AuthUserResponse = {
   uid: string;
@@ -45,6 +50,8 @@ async function buildAuthUserResponse(
   const mustChangePassword =
     role === "merchant" && uid
       ? mustChangePasswordOverride ?? await getMerchantPasswordRequirement(uid)
+      : role === "admin" && uid
+        ? mustChangePasswordOverride ?? await getAdminPasswordRequirement(uid)
       : false;
 
   return {
@@ -109,10 +116,13 @@ export async function loginUser(req: AuthRequest, res: Response) {
 
     const storedRole = String(user.role || req.user?.role || "");
     let mustChangePassword: boolean | undefined;
-    if (storedRole === "merchant") {
+    if (storedRole === "merchant" || storedRole === "admin") {
       const password = String(req.body?.password || "");
       if (password) {
-        mustChangePassword = await syncMerchantPasswordRequirement(uid, password);
+        mustChangePassword =
+          storedRole === "merchant"
+            ? await syncMerchantPasswordRequirement(uid, password)
+            : await syncAdminPasswordRequirement(uid, password);
       }
     }
 
@@ -225,12 +235,17 @@ export async function getMe(req: AuthRequest, res: Response) {
 
 export async function markMerchantPasswordChangedHandler(req: AuthRequest, res: Response) {
   try {
-    if (req.user?.role !== "merchant") {
-      return res.status(403).json({ error: "Only merchant accounts can update this setting." });
+    if (req.user?.role !== "merchant" && req.user?.role !== "admin") {
+      return res.status(403).json({ error: "Only merchant or admin accounts can update this setting." });
     }
 
-    await markMerchantPasswordChanged(req.user.uid);
-    return res.json({ message: "Merchant password change acknowledged." });
+    if (req.user.role === "admin") {
+      await markAdminPasswordChanged(req.user.uid);
+    } else {
+      await markMerchantPasswordChanged(req.user.uid);
+    }
+
+    return res.json({ message: "Password change acknowledged." });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

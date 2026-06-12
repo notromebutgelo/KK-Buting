@@ -3,6 +3,7 @@ type AdminSessionResponse = {
     email?: string
     role?: string
     UserName?: string
+    mustChangePassword?: boolean
   }
 }
 
@@ -11,11 +12,11 @@ async function parseSessionError(response: Response) {
   return String(payload?.error || 'Unable to update the admin session.')
 }
 
-export async function persistAdminSession(token: string) {
+export async function persistAdminSession(token: string, password?: string) {
   const response = await fetch('/api/session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ token, password }),
     credentials: 'same-origin',
   })
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithCustomToken } from 'firebase/auth';
+import { signInWithCustomToken, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { persistAdminSession } from '@/lib/session';
 import { resolveApiBaseUrl } from '@/lib/api-base-url';
@@ -19,21 +19,16 @@ export default function AdminLoginPage() {
     setError('');
     setIsLoading(true);
     try {
-      const adminLoginResponse = await fetch(`${resolveApiBaseUrl()}/auth/admin-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ username, password }),
-      });
-      const adminLoginPayload = await adminLoginResponse.json().catch(() => null);
-
-      if (!adminLoginResponse.ok || !adminLoginPayload?.token) {
-        throw new Error(String(adminLoginPayload?.error || 'Invalid username or password.'));
-      }
-
-      const userCredential = await signInWithCustomToken(auth, adminLoginPayload.token);
+      const loginName = username.trim();
+      const isEmailLogin = loginName.includes('@');
+      const userCredential = isEmailLogin
+        ? await signInWithEmailAndPassword(auth, loginName, password)
+        : await signInWithCustomToken(
+            auth,
+            await getBootstrapAdminToken(loginName, password),
+          );
       const token = await userCredential.user.getIdToken();
-      const session = await persistAdminSession(token);
+      const session = await persistAdminSession(token, password);
       const role = session.user?.role;
       if (role !== 'admin' && role !== 'superadmin') {
         await auth.signOut();
@@ -44,9 +39,16 @@ export default function AdminLoginPage() {
       window.localStorage.setItem('kk-admin-role', role);
       window.localStorage.setItem(
         'kk-admin-email',
-        session.user?.email || adminLoginPayload.user?.email || '',
+        session.user?.email || userCredential.user.email || '',
       );
-      router.push('/dashboard');
+
+      if (session.user?.mustChangePassword) {
+        window.localStorage.setItem('kk-admin-must-change-password', 'true');
+        router.push('/change-password');
+      } else {
+        window.localStorage.removeItem('kk-admin-must-change-password');
+        router.push('/dashboard');
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed';
       if (
@@ -108,7 +110,7 @@ export default function AdminLoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
+                placeholder="Username or admin email"
                 required
                 autoComplete="username"
                 className="surface-input rounded-xl px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
@@ -150,4 +152,20 @@ export default function AdminLoginPage() {
       </div>
     </div>
   );
+}
+
+async function getBootstrapAdminToken(username: string, password: string) {
+  const adminLoginResponse = await fetch(`${resolveApiBaseUrl()}/auth/admin-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify({ username, password }),
+  });
+  const adminLoginPayload = await adminLoginResponse.json().catch(() => null);
+
+  if (!adminLoginResponse.ok || !adminLoginPayload?.token) {
+    throw new Error(String(adminLoginPayload?.error || 'Invalid username or password.'));
+  }
+
+  return String(adminLoginPayload.token);
 }

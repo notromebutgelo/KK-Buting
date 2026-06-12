@@ -85,9 +85,10 @@ const firebaseStorageBucket = readString(
 const legacyClientUrl = readOrigin("CLIENT_URL", !isProduction ? "http://localhost:3000" : "");
 const adminPanelUrl = readOrigin("ADMIN_PANEL_URL", !isProduction ? "http://localhost:3001" : "");
 const youthPwaUrl = readOrigin("YOUTH_PWA_URL", legacyClientUrl || (!isProduction ? "http://localhost:3000" : ""));
+const merchantPwaUrl = readOrigin("MERCHANT_PWA_URL", !isProduction ? "http://localhost:3002" : "");
 const corsAllowedOrigins = Array.from(
   new Set([
-    ...[adminPanelUrl, youthPwaUrl, legacyClientUrl].filter(Boolean),
+    ...[adminPanelUrl, youthPwaUrl, merchantPwaUrl, legacyClientUrl].filter(Boolean),
     ...parseOriginList(readString("CORS_ALLOWED_ORIGINS")),
   ]),
 );
@@ -119,6 +120,7 @@ export const ENV = {
   CLIENT_URL: legacyClientUrl,
   ADMIN_PANEL_URL: adminPanelUrl,
   YOUTH_PWA_URL: youthPwaUrl,
+  MERCHANT_PWA_URL: merchantPwaUrl,
   CORS_ALLOWED_ORIGINS: corsAllowedOrigins,
   QR_SECRET: qrSecret,
   AUTH_RATE_LIMIT_WINDOW_MS: readNumber("AUTH_RATE_LIMIT_WINDOW_MS", 15 * 60 * 1000),
