@@ -30,8 +30,14 @@ interface QueueDocument {
   id: string
   documentType: string
   label: string
+  fileUrl?: string | null
+  uploadedAt?: string
   reviewStatus: string
+  reviewNote?: string | null
   present: boolean
+  required?: boolean
+  reviewedBy?: string | null
+  reviewedAt?: string | null
 }
 
 interface QueueProfile {
@@ -288,16 +294,27 @@ export default function VerificationPage() {
     if (!profiles.length) {
       setSelectedUserId('')
       setSelectedProfile(null)
+      setDetailLoading(false)
       return
     }
 
-    if (!selectedUserId || !profiles.some((profile) => profile.userId === selectedUserId)) {
-      setSelectedUserId(profiles[0].userId)
+    if (selectedUserId && !profiles.some((profile) => profile.userId === selectedUserId)) {
+      setSelectedUserId('')
+      setSelectedProfile(null)
+      setDetailLoading(false)
     }
   }, [profiles, selectedUserId])
 
+  const selectedQueueProfile = useMemo(
+    () => profiles.find((profile) => profile.userId === selectedUserId) || null,
+    [profiles, selectedUserId]
+  )
+
   useEffect(() => {
-    if (!selectedUserId) return
+    if (!selectedUserId) {
+      setDetailLoading(false)
+      return
+    }
 
     let active = true
     setDetailLoading(true)
@@ -310,7 +327,9 @@ export default function VerificationPage() {
       })
       .catch(() => {
         if (!active) return
-        setSelectedProfile(null)
+        setSelectedProfile(
+          selectedQueueProfile ? createDetailProfileFromQueueProfile(selectedQueueProfile) : null
+        )
       })
       .finally(() => {
         if (active) {
@@ -321,7 +340,7 @@ export default function VerificationPage() {
     return () => {
       active = false
     }
-  }, [refreshToken, selectedUserId])
+  }, [refreshToken, selectedQueueProfile, selectedUserId])
 
   const queueMetrics = useMemo(
     () => ({
@@ -337,11 +356,6 @@ export default function VerificationPage() {
         profiles.filter((profile) => isSameDay(profile.verificationDocumentsApprovedAt)).length,
     }),
     [profiles, summary]
-  )
-
-  const selectedQueueProfile = useMemo(
-    () => profiles.find((profile) => profile.userId === selectedUserId) || null,
-    [profiles, selectedUserId]
   )
 
   const approvedRequiredCount = useMemo(() => {
@@ -430,6 +444,44 @@ export default function VerificationPage() {
     URL.revokeObjectURL(url)
   }
 
+  const handleSelectQueueProfile = (
+    profile: QueueProfile,
+    options: {
+      action?: ReviewActionId
+      message?: string
+      clearMessage?: boolean
+    } = {}
+  ) => {
+    const isAlreadySelected = selectedUserId === profile.userId
+
+    setSelectedUserId(profile.userId)
+    setSelectedProfile((current) =>
+      isAlreadySelected && current?.userId === profile.userId
+        ? current
+        : createDetailProfileFromQueueProfile(profile)
+    )
+
+    if (options.action) {
+      setSelectedAction(options.action)
+    } else {
+      setSelectedAction('open_full_review')
+    }
+
+    if (options.message !== undefined) {
+      setMessage(options.message)
+    } else if (options.clearMessage !== false) {
+      setMessage('')
+    }
+  }
+
+  const clearSelection = () => {
+    setSelectedUserId('')
+    setSelectedProfile(null)
+    setDetailLoading(false)
+    setSelectedAction('open_full_review')
+    setMessage('')
+  }
+
   const handleConfirmAction = async () => {
     if (!selectedProfile) return
 
@@ -495,15 +547,16 @@ export default function VerificationPage() {
 
   const handleQuickApprove = async (profile: QueueProfile) => {
     if (!canApproveQueueProfile(profile)) {
-      setSelectedUserId(profile.userId)
-      setSelectedAction('open_full_review')
-      setMessage('Open the full review first. Every required document must be approved before this member can move to Digital ID generation.')
+      handleSelectQueueProfile(profile, {
+        action: 'open_full_review',
+        message:
+          'Open the full review first. Every required document must be approved before this member can move to Digital ID generation.',
+      })
       return
     }
 
     setIsActionLoading(true)
-    setSelectedUserId(profile.userId)
-    setMessage('')
+    handleSelectQueueProfile(profile, { message: '' })
 
     try {
       await api.patch(`/admin/verification/${profile.userId}/approve`)
@@ -517,9 +570,10 @@ export default function VerificationPage() {
   }
 
   const openQuickReject = (profile: QueueProfile) => {
-    setSelectedUserId(profile.userId)
-    setSelectedAction('reject_submission')
-    setMessage('Enter a rejection reason in the quick review panel, then confirm the action.')
+    handleSelectQueueProfile(profile, {
+      action: 'reject_submission',
+      message: 'Enter a rejection reason in the quick review panel, then confirm the action.',
+    })
   }
 
   const handlePreviewDocument = (fileUrl?: string | null) => {
@@ -738,11 +792,13 @@ export default function VerificationPage() {
                           key={profile.userId}
                           role="button"
                           tabIndex={0}
-                          onClick={() => router.push(`/verification/${profile.userId}`)}
+                          aria-pressed={isSelected}
+                          aria-label={`Preview ${profile.fullName || 'verification submission'}`}
+                          onClick={() => handleSelectQueueProfile(profile)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault()
-                              router.push(`/verification/${profile.userId}`)
+                              handleSelectQueueProfile(profile)
                             }
                           }}
                           className={`grid min-h-[88px] cursor-pointer items-center gap-4 px-4 py-4 transition-all ${
@@ -918,7 +974,7 @@ export default function VerificationPage() {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation()
-                                setSelectedUserId(profile.userId)
+                                handleSelectQueueProfile(profile)
                               }}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border text-[#0f4c97] shadow-[0_6px_18px_rgba(15,76,151,0.04)] transition hover:bg-[color:var(--surface-muted)]"
                               style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
@@ -1010,10 +1066,7 @@ export default function VerificationPage() {
 
             <button
               type="button"
-              onClick={() => {
-                setSelectedUserId('')
-                setSelectedProfile(null)
-              }}
+              onClick={clearSelection}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--accent-strong)] transition hover:bg-[color:var(--accent-soft)]"
             >
               <X className="h-4.5 w-4.5" strokeWidth={2.2} />
@@ -1033,19 +1086,32 @@ export default function VerificationPage() {
             </div>
           ) : null}
 
-          {detailLoading ? (
+          {detailLoading && !selectedProfile ? (
             <div className="flex justify-center py-20">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
             </div>
           ) : !selectedProfile ? (
             <div className="mt-6">
               <AdminEmptyState
-                title="No submission selected"
-                description="Pick a member from the queue to inspect the uploaded requirements and review actions."
+                title="Select a submission"
+                description="Select a submission from the verification queue to review its details."
               />
             </div>
           ) : (
             <div className="mt-5 space-y-5">
+              {detailLoading ? (
+                <div
+                  className="rounded-[14px] border px-4 py-2.5 text-xs font-semibold"
+                  style={{
+                    borderColor: 'color-mix(in srgb, var(--accent) 22%, white 78%)',
+                    background: 'var(--accent-soft)',
+                    color: 'var(--accent-strong)',
+                  }}
+                >
+                  Refreshing submission details...
+                </div>
+              ) : null}
+
               <div
                 className="rounded-[18px] border px-5 py-4"
                 style={{ borderColor: 'var(--stroke)', background: 'var(--card-solid)' }}
@@ -1074,6 +1140,10 @@ export default function VerificationPage() {
                       {selectedProfile.fullName}
                     </h3>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <QueueStatusBadge
+                        status={selectedProfile.queueStatus}
+                        digitalIdStatus={selectedProfile.digitalIdStatus}
+                      />
                       <span className="admin-status-pill rounded-full px-2.5 py-1 text-xs font-semibold" data-tone="info">
                         {selectedProfile.youthAgeGroup || 'Youth Member'}
                       </span>
@@ -1094,6 +1164,53 @@ export default function VerificationPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div
+                className="rounded-[16px] border px-4 py-4"
+                style={{
+                  borderColor: 'var(--stroke)',
+                  background: 'color-mix(in srgb, var(--surface-muted) 82%, transparent)',
+                }}
+              >
+                <h3 className="text-base font-black" style={{ color: 'var(--ink)' }}>
+                  Approval and Referral History
+                </h3>
+                <div className="mt-3 space-y-3">
+                  <VerificationHistoryRow
+                    label="Documents Approved"
+                    primary={
+                      selectedProfile.verificationDocumentsApprovedBy
+                        ? `By ${selectedProfile.verificationDocumentsApprovedBy}`
+                        : 'Not yet approved'
+                    }
+                    secondary={formatLongDateTime(selectedProfile.verificationDocumentsApprovedAt)}
+                    complete={Boolean(selectedProfile.verificationDocumentsApprovedBy)}
+                  />
+                  <VerificationHistoryRow
+                    label="Referred to Superadmin"
+                    primary={
+                      selectedProfile.verificationReferredToSuperadminBy
+                        ? `By ${selectedProfile.verificationReferredToSuperadminBy}`
+                        : 'Not yet referred'
+                    }
+                    secondary={formatLongDateTime(selectedProfile.verificationReferredToSuperadminAt)}
+                    complete={Boolean(selectedProfile.verificationReferredToSuperadminBy)}
+                  />
+                  {selectedProfile.digitalIdApprovalRequestedAt ||
+                  selectedProfile.digitalIdApprovalRequestedBy ? (
+                    <VerificationHistoryRow
+                      label="Digital ID Request"
+                      primary={
+                        selectedProfile.digitalIdApprovalRequestedBy
+                          ? `By ${selectedProfile.digitalIdApprovalRequestedBy}`
+                          : 'Request logged'
+                      }
+                      secondary={formatLongDateTime(selectedProfile.digitalIdApprovalRequestedAt)}
+                      complete
+                    />
+                  ) : null}
                 </div>
               </div>
 
@@ -1332,11 +1449,7 @@ export default function VerificationPage() {
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedUserId('')
-                    setSelectedProfile(null)
-                    setMessage('')
-                  }}
+                  onClick={clearSelection}
                   className="admin-action-button h-11 rounded-[14px] text-sm font-semibold"
                   data-variant="outline"
                 >
@@ -1485,6 +1598,46 @@ function DocumentStateIcon({ status }: { status: string }) {
   }
 
   return <FileWarning className="h-4 w-4 shrink-0 text-[#f59e0b]" strokeWidth={2.1} />
+}
+
+function VerificationHistoryRow({
+  label,
+  primary,
+  secondary,
+  complete,
+}: {
+  label: string
+  primary: string
+  secondary: string
+  complete: boolean
+}) {
+  return (
+    <div className="grid grid-cols-[24px_minmax(0,1fr)] gap-3 text-sm">
+      <span
+        className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full"
+        style={{
+          background: complete
+            ? 'color-mix(in srgb, var(--success-bg) 88%, transparent)'
+            : 'var(--card-solid)',
+          color: complete ? '#16a34a' : 'var(--muted)',
+          border: complete ? '0' : '1px solid var(--stroke)',
+        }}
+      >
+        {complete ? <CheckCircle2 className="h-4 w-4" strokeWidth={2.1} /> : null}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
+          {label}
+        </p>
+        <p className="mt-1 break-words font-semibold" style={{ color: 'var(--ink-soft)' }}>
+          {primary}
+        </p>
+        <p className="mt-0.5 break-words text-[13px]" style={{ color: 'var(--muted)' }}>
+          {secondary}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 function FlagMetricIcon() {
@@ -1642,6 +1795,58 @@ function canApproveQueueProfile(profile: QueueProfile) {
   return profile.requiredDocuments.every(
     (document) => document.present && document.reviewStatus === 'approved'
   )
+}
+
+function createDetailProfileFromQueueProfile(profile: QueueProfile): VerificationDetailProfile {
+  const requiredDocuments = profile.requiredDocuments.map(queueDocumentToReviewDocument)
+  const missingDocuments = profile.missingDocuments.map(queueDocumentToReviewDocument)
+
+  return {
+    userId: profile.userId,
+    fullName: profile.fullName,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    email: profile.email,
+    contactNumber: profile.contactNumber,
+    city: profile.city,
+    province: profile.province,
+    barangay: profile.barangay,
+    age: profile.age ?? undefined,
+    youthAgeGroup: profile.youthAgeGroup,
+    status: profile.status,
+    queueStatus: profile.queueStatus,
+    digitalIdStatus: profile.digitalIdStatus,
+    submittedAt: profile.submittedAt,
+    verificationDocumentsApprovedAt: profile.verificationDocumentsApprovedAt,
+    verificationDocumentsApprovedBy: profile.verificationDocumentsApprovedBy,
+    verificationReferredToSuperadminAt: profile.verificationReferredToSuperadminAt,
+    verificationReferredToSuperadminBy: profile.verificationReferredToSuperadminBy,
+    verificationAdminReviewMessage: profile.verificationAdminReviewMessage,
+    verificationAdminReviewDocumentIds: profile.verificationAdminReviewDocumentIds,
+    verificationAdminReviewRequestedAt: profile.verificationAdminReviewRequestedAt,
+    verificationAdminReviewRequestedBy: profile.verificationAdminReviewRequestedBy,
+    idPhotoUrl: profile.idPhotoUrl,
+    documents: requiredDocuments.filter((document) => document.present),
+    requiredDocuments,
+    supplementalDocuments: [],
+    missingDocuments,
+  }
+}
+
+function queueDocumentToReviewDocument(document: QueueDocument): ReviewDocument {
+  return {
+    id: document.id,
+    documentType: document.documentType,
+    label: document.label,
+    fileUrl: document.fileUrl,
+    uploadedAt: document.uploadedAt,
+    reviewStatus: document.reviewStatus,
+    reviewNote: document.reviewNote,
+    required: document.required ?? true,
+    present: document.present,
+    reviewedBy: document.reviewedBy,
+    reviewedAt: document.reviewedAt,
+  }
 }
 
 function getResubmissionTargetIds(profile: VerificationDetailProfile) {

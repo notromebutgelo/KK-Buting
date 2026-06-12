@@ -19,6 +19,9 @@ module.exports = (phase) => {
     poweredByHeader: false,
     // Keep dev and production outputs separate so `next build` doesn't corrupt a live `next dev` session.
     distDir: isDevServer ? '.next-dev' : '.next',
+    experimental: {
+      externalDir: true,
+    },
     images: { domains: ['firebasestorage.googleapis.com'] },
     async headers() {
       return [

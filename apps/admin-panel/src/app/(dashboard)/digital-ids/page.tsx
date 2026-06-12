@@ -1,7 +1,5 @@
 'use client'
-
-import type { Ref } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import jsPDF from 'jspdf'
 import JSZip from 'jszip'
 import {
@@ -19,12 +17,12 @@ import {
   XCircle,
 } from 'lucide-react'
 import api from '@/lib/api'
-import {
-  captureDigitalIdElement,
-  captureDigitalIdNode,
-  canvasToJpegBlob,
-} from '@/lib/digitalIdCapture'
+import { canvasToJpegBlob } from '@/lib/digitalIdCapture'
 import { cn } from '@/utils/cn'
+import {
+  renderDigitalIdCanvases as renderSharedDigitalIdCanvases,
+  type DigitalIdRenderData,
+} from '@kk-shared/digital-id/renderDigitalIdCanvases'
 
 interface DigitalIdMember {
   uid: string
@@ -153,8 +151,6 @@ export default function DigitalIdsPage() {
   const [selectedMember, setSelectedMember] = useState<DigitalIdDetail | null>(null)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [previewSide, setPreviewSide] = useState<'front' | 'back'>('front')
-  const frontPreviewRef = useRef<HTMLDivElement | null>(null)
-  const backPreviewRef = useRef<HTMLDivElement | null>(null)
   const [pagination, setPagination] = useState<DigitalIdResponse['pagination']>({
     page: 1,
     pageSize: PAGE_SIZE,
@@ -359,28 +355,6 @@ export default function DigitalIdsPage() {
     return response.data.member
   }
 
-  const getPreviewCaptureWidth = () => {
-    const width = frontPreviewRef.current?.getBoundingClientRect().width
-
-    return width && Number.isFinite(width) && width > 0 ? width : undefined
-  }
-
-  const captureSelectedPreviewCanvases = async (detail: DigitalIdDetail) => {
-    const frontPreview = frontPreviewRef.current
-    const backPreview = backPreviewRef.current
-
-    if (selectedMember?.uid === detail.uid && frontPreview && backPreview) {
-      const [front, back] = await Promise.all([
-        captureDigitalIdElement(frontPreview),
-        captureDigitalIdElement(backPreview),
-      ])
-
-      return { front, back }
-    }
-
-    return renderDigitalIdCanvases(detail, getPreviewCaptureWidth())
-  }
-
   const handleDownloadPdf = async (member: DigitalIdMember | DigitalIdDetail) => {
     setPdfAction('download')
     setMessage('')
@@ -389,7 +363,7 @@ export default function DigitalIdsPage() {
     try {
       const detail = await resolveDigitalIdDetail(member)
       const pdf = await withExportTimeout(
-        buildDigitalIdPdf(detail, captureSelectedPreviewCanvases(detail)),
+        buildDigitalIdPdf(detail),
         'PDF export timed out. Check the member photo or signature, then try again.'
       )
       pdf.save(`${(detail.memberId || detail.profile?.idNumber || detail.uid).replace(/[^\w-]+/g, '_')}.pdf`)
@@ -417,7 +391,7 @@ export default function DigitalIdsPage() {
     try {
       const detail = await resolveDigitalIdDetail(member)
       const images = await withExportTimeout(
-        buildDigitalIdJpegs(detail, captureSelectedPreviewCanvases(detail)),
+        buildDigitalIdJpegs(detail),
         'JPEG export timed out. Check the member photo or signature, then try again.'
       )
       const fileName = (detail.memberId || detail.profile?.idNumber || detail.uid)
@@ -468,7 +442,7 @@ export default function DigitalIdsPage() {
     try {
       const detail = await resolveDigitalIdDetail(member)
       const pdf = await withExportTimeout(
-        buildDigitalIdPdf(detail, captureSelectedPreviewCanvases(detail)),
+        buildDigitalIdPdf(detail),
         'Print export timed out. Check the member photo or signature, then try again.'
       )
       pdf.autoPrint()
@@ -501,14 +475,10 @@ export default function DigitalIdsPage() {
 
     try {
       const zip = new JSZip()
-      const fallbackCaptureWidth = getPreviewCaptureWidth()
 
       for (const member of activeIds) {
         const detailRes = await api.get<{ member: DigitalIdDetail }>(`/admin/digital-ids/${member.uid}`)
-        const pdf = await buildDigitalIdPdf(
-          detailRes.data.member,
-          renderDigitalIdCanvases(detailRes.data.member, fallbackCaptureWidth)
-        )
+        const pdf = await buildDigitalIdPdf(detailRes.data.member)
         const blob = pdf.output('blob')
         const fileName = `${(member.memberId || member.uid).replace(/[^\w-]+/g, '_')}.pdf`
         zip.file(fileName, blob)
@@ -811,7 +781,7 @@ export default function DigitalIdsPage() {
                       previewSide === 'front' ? 'ring-2 ring-[color:var(--accent-soft)] ring-offset-2 ring-offset-transparent' : ''
                     )}
                   >
-                    <DigitalIdPreviewCard member={selectedMember} previewSide="front" cardRef={frontPreviewRef} />
+                    <DigitalIdPreviewCard member={selectedMember} previewSide="front" />
                   </div>
                   <div
                     className={cn(
@@ -819,7 +789,7 @@ export default function DigitalIdsPage() {
                       previewSide === 'back' ? 'ring-2 ring-[color:var(--accent-soft)] ring-offset-2 ring-offset-transparent' : ''
                     )}
                   >
-                    <DigitalIdPreviewCard member={selectedMember} previewSide="back" cardRef={backPreviewRef} />
+                    <DigitalIdPreviewCard member={selectedMember} previewSide="back" />
                   </div>
                 </div>
 
@@ -1059,11 +1029,9 @@ function getDigitalIdTone(status: string) {
 function DigitalIdPreviewCard({
   member,
   previewSide,
-  cardRef,
 }: {
   member: DigitalIdDetail
   previewSide: 'front' | 'back'
-  cardRef?: Ref<HTMLDivElement>
 }) {
   const fullName = [member.profile?.firstName, member.profile?.middleName, member.profile?.lastName]
     .filter(Boolean)
@@ -1081,7 +1049,7 @@ function DigitalIdPreviewCard({
 
   if (previewSide === 'front') {
     return (
-      <div ref={cardRef} className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
+      <div className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#d9e3f1] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
         <img src="/images/KK ID - Front BG.png" alt="KK ID front background" className="absolute inset-0 h-full w-full object-cover" />
         <DigitalIdFrontHeader />
         <div className="relative flex h-full flex-col px-[8.2%] pb-[10.5%] pt-[18.4%] text-[#0b2f5b]">
@@ -1139,7 +1107,7 @@ function DigitalIdPreviewCard({
   }
 
   return (
-    <div ref={cardRef} className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
+    <div className="relative aspect-[1628/1040] overflow-hidden rounded-[24px] [container-type:inline-size] border border-[#ced8e4] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.98)_0%,rgba(243,241,235,0.96)_58%,rgba(230,227,219,0.98)_100%)] shadow-[0_18px_36px_rgba(1,67,132,0.12)]">
       <div className="absolute inset-[3.6%] rounded-[18px] border-[1.5px] border-[#4e5650]/65" />
       <div className="absolute inset-[6.2%] rounded-[14px] border border-[#838b85]/35" />
       <div className="relative flex h-full flex-col px-[9%] pb-[10.2%] pt-[9.8%] text-[#2b312e]">
@@ -1198,6 +1166,34 @@ function DigitalIdPreviewCard({
   )
 }
 
+function getDigitalIdRenderData(member: DigitalIdDetail): DigitalIdRenderData {
+  const fullName = [member.profile?.firstName, member.profile?.middleName, member.profile?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    .toUpperCase() || member.fullName?.toUpperCase() || 'KABATAAN MEMBER'
+
+  return {
+    front: {
+      backgroundSrc: '/images/KK ID - Front BG.png',
+      fullName,
+      address: buildAddress(member),
+      purok: buildPurok(member.profile?.purok || member.purok),
+      birthday: formatShortDate(member.profile?.birthday),
+      gender: member.profile?.gender || '-',
+      contactNumber: buildFrontCardValue(member.profile?.contactNumber || member.contactNumber),
+      memberId: member.memberId || member.profile?.idNumber || 'DRAFT',
+      photoUrl: member.photoUrl || member.profilePhotoUrl,
+      signatureUrl: getMemberSignatureUrl(member),
+    },
+    back: {
+      emergencyContactName: getEmergencyContactName(member),
+      emergencyContactPhone: getEmergencyContactPhone(member),
+      emergencyContactRelationship: getEmergencyContactRelationship(member),
+      validThru: getDigitalIdValidThru(member),
+    },
+  }
+}
+
 function DigitalIdFrontHeader() {
   return (
     <div className="absolute inset-x-0 top-0 h-[18.9%] bg-[#014384] text-white">
@@ -1219,6 +1215,15 @@ function DigitalIdFrontHeader() {
           SANGGUNIANG KABATAAN NG BARANGAY BUTING, PASIG CITY
         </p>
       </div>
+    </div>
+  )
+}
+
+function PreviewField({ label, value, className = '' }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={className}>
+      <p className="text-[1.55cqw] font-bold uppercase leading-[1.18] tracking-[0.06em] text-[#1d5aa1]">{label}:</p>
+      <p className="break-words text-[2.62cqw] font-black leading-[1.15] text-[#0b2f5b]">{value || '-'}</p>
     </div>
   )
 }
@@ -1329,15 +1334,6 @@ function SummaryIcon({ tone }: { tone: 'draft' | 'pending' | 'active' | 'deactiv
   }
 
   return <XCircle className="h-6 w-6" />
-}
-
-function PreviewField({ label, value, className = '' }: { label: string; value: string; className?: string }) {
-  return (
-    <div className={className}>
-      <p className="text-[1.55cqw] font-bold uppercase leading-[1.18] tracking-[0.06em] text-[#1d5aa1]">{label}:</p>
-      <p className="break-words text-[2.62cqw] font-black leading-[1.15] text-[#0b2f5b]">{value || '-'}</p>
-    </div>
-  )
 }
 
 function withExportTimeout<T>(promise: Promise<T>, message: string) {
@@ -1451,20 +1447,8 @@ function downloadBlob(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
 }
 
-async function renderDigitalIdCanvases(member: DigitalIdDetail, width?: number) {
-  const captureOptions = width ? { width } : undefined
-  const [front, back] = await Promise.all([
-    captureDigitalIdNode(
-      <DigitalIdPreviewCard member={member} previewSide="front" />,
-      captureOptions
-    ),
-    captureDigitalIdNode(
-      <DigitalIdPreviewCard member={member} previewSide="back" />,
-      captureOptions
-    ),
-  ])
-
-  return { front, back }
+async function renderDigitalIdCanvases(member: DigitalIdDetail) {
+  return renderSharedDigitalIdCanvases(getDigitalIdRenderData(member))
 }
 
 function getExportSafeImageUrl(value?: string | null) {

@@ -6,6 +6,7 @@ import jsPDF from 'jspdf'
 import { useEffect, useMemo, useState } from 'react'
 import DigitalIDCard, {
   DigitalIdBack,
+  DigitalIdExportFace,
   DigitalIdFace,
 } from '@/components/features/DigitalIDCard'
 import PhysicalIdRequestStatusBadge, {
@@ -51,6 +52,7 @@ interface DigitalIDData {
 }
 
 const REQUEST_CONTACT_NUMBER_MAX_LENGTH = 11
+const DIGITAL_ID_EXPORT_CAPTURE_WIDTH = 492
 
 export default function DigitalIDPage() {
   const { user } = useAuthStore()
@@ -1145,7 +1147,7 @@ async function renderDigitalIdCanvases({
   )
   const [front, back] = await Promise.all([
     captureDigitalIdNode(
-      <DigitalIdFace
+      <DigitalIdExportFace
         backgroundSrc="/images/KK ID - Front BG.png"
         fullName={fullName}
         address={address}
@@ -1157,7 +1159,9 @@ async function renderDigitalIdCanvases({
         signatureUrl={signatureUrl}
         memberId={memberId}
         showQr={false}
-      />
+        exportWidth={DIGITAL_ID_EXPORT_CAPTURE_WIDTH}
+      />,
+      { width: DIGITAL_ID_EXPORT_CAPTURE_WIDTH }
     ),
     captureDigitalIdNode(
       <DigitalIdBack
@@ -1165,7 +1169,8 @@ async function renderDigitalIdCanvases({
         emergencyContactPhone={emergencyContactPhone}
         emergencyContactRelationship={emergencyContactRelationship}
         validThru={validThru}
-      />
+      />,
+      { width: DIGITAL_ID_EXPORT_CAPTURE_WIDTH }
     ),
   ])
 
