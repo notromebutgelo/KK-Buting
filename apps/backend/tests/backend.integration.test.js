@@ -572,6 +572,67 @@ const tests = [
     },
   },
   {
+    name: "admin verification queue excludes profiling-only youth without uploaded documents",
+    async run() {
+      const db = new FakeFirestore({
+        users: {
+          "youth-profile-only": {
+            role: "youth",
+            UserName: "Maria Profile",
+            email: "maria@example.com",
+            createdAt: "2026-05-06T03:00:00.000Z",
+          },
+          "youth-with-docs": {
+            role: "youth",
+            UserName: "Leo Documents",
+            email: "leo@example.com",
+            createdAt: "2026-05-06T03:05:00.000Z",
+          },
+        },
+        kkProfiling: {
+          "youth-profile-only": {
+            firstName: "Maria",
+            lastName: "Profile",
+            youthAgeGroup: "Core Youth",
+            submittedAt: "2026-05-06T04:00:00.000Z",
+            status: "pending",
+            verified: false,
+          },
+          "youth-with-docs": {
+            firstName: "Leo",
+            lastName: "Documents",
+            youthAgeGroup: "Core Youth",
+            documentsSubmitted: true,
+            submittedAt: "2026-05-06T04:05:00.000Z",
+            status: "pending",
+            verified: false,
+            verificationQueueStatus: "pending",
+          },
+        },
+        documents: {
+          "doc-1": {
+            profileId: "youth-with-docs",
+            documentType: "proof_of_voter_registration",
+            reviewStatus: "pending",
+            uploadedAt: "2026-05-06T04:05:10.000Z",
+          },
+        },
+      });
+
+      const adminService = await loadAdminService(db);
+      const queue = await adminService.getVerificationProfiles({ pageSize: 10 });
+
+      assert.deepEqual(
+        queue.profiles.map((profile) => profile.userId),
+        ["youth-with-docs"]
+      );
+      assert.equal(queue.summary.total, 1);
+      assert.equal(queue.profiles[0].queueStatus, "pending");
+      assert.equal(queue.profiles[0].documentCounts.pending, 1);
+      assert.equal(Object.hasOwn(queue.profiles[0], "hasQueueActivity"), false);
+    },
+  },
+  {
     name: "admin verification reset to pending rewinds document review statuses and queue state",
     async run() {
       const db = new FakeFirestore({
@@ -1057,9 +1118,15 @@ const tests = [
       );
 
       const after = await adminService.getVerificationProfiles({ pageSize: 10 });
-      assert.equal(after.profiles[0].queueStatus, "verified");
-      assert.equal(after.profiles[0].digitalIdStatus, "active");
+      assert.equal(after.profiles.length, 0);
       assert.equal(after.summary.pendingSuperadmin, 0);
+
+      const generatedArchive = await adminService.getVerificationProfiles({
+        pageSize: 10,
+        status: "verified",
+      });
+      assert.equal(generatedArchive.profiles[0].queueStatus, "verified");
+      assert.equal(generatedArchive.profiles[0].digitalIdStatus, "active");
 
       const detail = await adminService.getVerificationProfile("youth-1");
       assert.equal(detail.queueStatus, "verified");

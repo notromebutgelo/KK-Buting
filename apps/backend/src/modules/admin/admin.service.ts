@@ -64,6 +64,14 @@ const REQUIRED_DOCUMENTS_BY_GROUP: Record<string, string[]> = {
 
 const PENDING_SUPERADMIN_ID_GENERATION = "pending_superadmin_id_generation";
 const ADMIN_REVERIFICATION_REQUESTED = "admin_reverification_requested";
+const VERIFICATION_QUEUE_ACTIVITY_STATUSES = new Set([
+  "pending",
+  "in_review",
+  "rejected",
+  "resubmission_requested",
+  PENDING_SUPERADMIN_ID_GENERATION,
+  ADMIN_REVERIFICATION_REQUESTED,
+]);
 const VERIFICATION_ADMIN_HANDOFFS = "verificationAdminHandoffs";
 const NOTIFICATION_DATE_FORMATTER = new Intl.DateTimeFormat("en-PH", {
   month: "short",
@@ -611,6 +619,41 @@ function isVerificationQueueCompleted(profile: AnyRecord) {
   return status === "not_submitted" || queueStatus === "not_submitted";
 }
 
+function isCompletedDigitalIdVerification(profile: AnyRecord) {
+  const status = normalizeString(profile.status);
+  const queueStatus = normalizeString(profile.queueStatus);
+  const digitalIdStatus = normalizeString(profile.digitalIdStatus);
+
+  return (
+    queueStatus === "verified" ||
+    (digitalIdStatus === "active" && status === "verified")
+  );
+}
+
+function hasVerificationQueueActivity(
+  profile: AnyRecord,
+  documents: AnyRecord[],
+  adminHandoff: AnyRecord
+) {
+  const queueStatus = normalizeString(profile?.verificationQueueStatus);
+  const hasAdminHandoff = Boolean(
+    adminHandoff?.requestedAt ||
+      adminHandoff?.message ||
+      (Array.isArray(adminHandoff?.documentIds) && adminHandoff.documentIds.length > 0)
+  );
+
+  return Boolean(
+    documents.length > 0 ||
+      profile?.documentsSubmitted ||
+      profile?.verificationDocumentsApprovedAt ||
+      profile?.verificationReferredToSuperadminAt ||
+      profile?.digitalIdApprovalRequestedAt ||
+      profile?.digitalIdGeneratedAt ||
+      hasAdminHandoff ||
+      VERIFICATION_QUEUE_ACTIVITY_STATUSES.has(queueStatus)
+  );
+}
+
 async function getUsersAndProfiles() {
   const [usersSnap, profilesSnap] = await Promise.all([
     db.collection("users").get(),
@@ -893,6 +936,7 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
       const adminHandoff = handoffMap.get(String(user.uid)) || {};
       const documentSummary = buildVerificationDocuments(profile, documents);
       const computedQueueStatus = computeQueueStatus(profile, documents);
+      const hasQueueActivity = hasVerificationQueueActivity(profile, documents, adminHandoff);
       const submittedAt = String(profile.submittedAt || profile.createdAt || user.createdAt || "");
       const latestActivityAt =
         [
@@ -946,12 +990,13 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
             (document) => document.reviewStatus === "resubmission_requested"
           ).length,
         },
+        hasQueueActivity,
       };
     })
     .filter((profile) => !isVerificationQueueCompleted(profile))
     .filter(
       (profile) =>
-        Boolean(profile.submittedAt) ||
+        profile.hasQueueActivity ||
         profile.requiredDocuments.some((document) => document.present) ||
         profile.documentCounts.approved > 0 ||
         profile.documentCounts.pending > 0 ||
@@ -976,6 +1021,8 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
           : profile.requiredDocuments.some((document) => document.documentType === documentType);
       const matchesStatus =
         !queueStatus || queueStatus === "all" ? true : normalizeString(profile.queueStatus) === queueStatus;
+      const matchesQueueScope =
+        queueStatus === "verified" || !isCompletedDigitalIdVerification(profile);
       const matchesDate =
         !dateSubmitted
           ? true
@@ -986,7 +1033,11 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
                 : false;
             })();
 
-      return matchesSearch && matchesAgeGroup && matchesDocumentType && matchesStatus && matchesDate;
+      return matchesQueueScope && matchesSearch && matchesAgeGroup && matchesDocumentType && matchesStatus && matchesDate;
+    })
+    .map((profile) => {
+      const { hasQueueActivity: _hasQueueActivity, ...publicProfile } = profile;
+      return publicProfile;
     })
     .sort((a, b) => {
       if (sortBy === "oldest") {

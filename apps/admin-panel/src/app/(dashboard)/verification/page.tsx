@@ -716,12 +716,14 @@ export default function VerificationPage() {
                   'all',
                   'pending',
                   'in_review',
+                  'pending_superadmin_id_generation',
                   'admin_reverification_requested',
                   'resubmission_requested',
                   'rejected',
+                  'verified',
                 ].map((option) => (
                   <option key={option} value={option}>
-                    {option === 'all' ? 'All' : getQueueStatusLabel(option)}
+                    {option === 'all' ? 'Active Queue' : getQueueStatusLabel(option)}
                   </option>
                 ))}
               </select>
