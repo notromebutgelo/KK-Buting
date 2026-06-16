@@ -45,7 +45,8 @@ export async function uploadDocumentHandler(req: AuthRequest, res: Response) {
     return res.status(201).json({ message: "Document uploaded", fileUrl });
   } catch (err: any) {
     console.error("uploadDocumentHandler error:", err);
-    return res.status(500).json({ error: err.message });
+    const statusCode = Number(err?.status || err?.statusCode || 500);
+    return res.status(statusCode).json({ error: err.message });
   }
 }
 

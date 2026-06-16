@@ -368,7 +368,7 @@ export default function EditProfilePage() {
                   value={emergencyContactName}
                   onChange={(e) => setEmergencyContactName(e.target.value)}
                   placeholder="Example: Maria Santos"
-                  hint="Required before your Digital ID can be generated or activated."
+                  hint="Required before uploading verification documents and before your Digital ID can be generated."
                 />
                 <Input
                   label="Relationship"

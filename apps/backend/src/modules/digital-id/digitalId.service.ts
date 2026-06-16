@@ -23,6 +23,12 @@ const DOCUMENT_LABELS: Record<string, string> = {
 const INLINE_DOCUMENT_LIMIT = 350_000;
 const PENDING_SUPERADMIN_ID_GENERATION = "pending_superadmin_id_generation";
 
+function makeServiceError(message: string, status: number): Error {
+  const error = new Error(message) as Error & { status?: number };
+  error.status = status;
+  return error;
+}
+
 function toIso(value: any) {
   if (!value) return undefined;
   if (typeof value?.toDate === "function") return value.toDate().toISOString();
@@ -101,6 +107,16 @@ function hasCompleteEmergencyContact(profile: Record<string, any>) {
       normalizeOptionalString(profile.digitalIdEmergencyContactRelationship) &&
       normalizeOptionalString(profile.digitalIdEmergencyContactPhone)
   );
+}
+
+function assertCanUploadVerificationDocuments(profile: Record<string, any> | null) {
+  if (!profile) {
+    throw makeServiceError("Complete your KK profiling before uploading verification documents.", 400);
+  }
+
+  if (!hasCompleteEmergencyContact(profile)) {
+    throw makeServiceError("Emergency contact is required before uploading verification documents.", 400);
+  }
 }
 
 function hasDigitalIdSignature(profile: Record<string, any>) {
@@ -359,12 +375,19 @@ export async function getMyVerificationStatus(uid: string) {
       required: true,
     };
   });
-  const correctionDocuments = requiredDocuments.filter((document) =>
+  const actionableCorrectionDocuments = requiredDocuments.filter((document) =>
     !document.present ||
     ["missing", "pending", "rejected", "resubmission_requested"].includes(
       String(document.reviewStatus || "")
     )
   );
+  const queueStatus = computeQueueStatus(profile, rawDocuments);
+  const correctionDocuments =
+    actionableCorrectionDocuments.length > 0
+      ? actionableCorrectionDocuments
+      : ["rejected", "resubmission_requested"].includes(queueStatus)
+        ? requiredDocuments
+        : [];
 
   const documents = rawDocuments.map((document) => ({
     id: document.id,
@@ -379,8 +402,6 @@ export async function getMyVerificationStatus(uid: string) {
     reviewedBy: document.reviewedBy || null,
     required: requiredTypes.includes(String(document.documentType || "")),
   }));
-
-  const queueStatus = computeQueueStatus(profile, rawDocuments);
 
   return {
     id: uid,
@@ -462,6 +483,7 @@ export async function uploadDocument(uid: string, docType: string, fileUrl: stri
     ...(doc.data() || {}),
   })) as Record<string, any>[];
   const user = userSnap.exists ? userSnap.data() || {} : {};
+  assertCanUploadVerificationDocuments(profileSnap.exists ? profile : null);
   const requiredTypes = getRequiredDocumentTypes(profile.youthAgeGroup);
   const hadAllRequiredDocuments = requiredTypes.every((type) =>
     existingDocuments.some((document) => String(document.documentType || "") === type)
@@ -537,6 +559,11 @@ export async function uploadDocumentFromBase64(
   docType: string,
   fileData: string
 ) {
+  const profileSnap = await db.collection("kkProfiling").doc(uid).get();
+  assertCanUploadVerificationDocuments(
+    profileSnap.exists ? profileSnap.data() || {} : null
+  );
+
   const { mimeType, base64Payload } = parseBase64FileData(fileData);
   const extension = mimeType.split("/")[1] || "jpg";
   const filePath = `verification-documents/${uid}/${docType}-${Date.now()}.${extension}`;

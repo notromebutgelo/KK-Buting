@@ -48,6 +48,14 @@ interface VerificationStatusProfile {
   correctionDocuments?: VerificationStatusDocument[]
 }
 
+interface ProfilingRecord {
+  youthAgeGroup?: string
+  digitalIdEmergencyContactName?: string | null
+  digitalIdEmergencyContactRelationship?: string | null
+  digitalIdEmergencyContactPhone?: string | null
+  digitalIdEmergencyContactComplete?: boolean
+}
+
 function isChildYouthGroup(ageGroup: string) {
   return ['Early Youth (15-17)', 'Child Youth', 'Child Youth (15-17)'].includes(String(ageGroup || '').trim())
 }
@@ -63,6 +71,7 @@ export default function VerificationUploadPage() {
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [error, setError] = useState('')
   const [ageGroup, setAgeGroup] = useState('')
+  const [emergencyContactComplete, setEmergencyContactComplete] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatusProfile | null>(null)
   const [showSourceActions, setShowSourceActions] = useState(false)
   const isChildYouth = isChildYouthGroup(ageGroup)
@@ -149,6 +158,7 @@ export default function VerificationUploadPage() {
         ])
         if (!mounted) return
         setAgeGroup(profile?.youthAgeGroup || '')
+        setEmergencyContactComplete(hasCompleteEmergencyContact(profile))
         setVerificationStatus(status)
       } catch {
         if (!mounted) return
@@ -259,6 +269,61 @@ export default function VerificationUploadPage() {
       <div className="flex min-h-screen items-center justify-center bg-[#f5f5f5]">
         <div className="rounded-[24px] bg-white px-6 py-5 text-center text-[#014384] shadow-[0_24px_60px_rgba(1,67,132,0.18)]">
           Loading verification requirements...
+        </div>
+      </div>
+    )
+  }
+
+  if (!emergencyContactComplete) {
+    return (
+      <div className="min-h-screen overflow-hidden bg-[#f5f5f5] text-[#014384]">
+        <div className="relative flex min-h-screen items-center px-4 py-10">
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,#7fb3ec_0%,#bdd7f3_22%,#eef5fd_48%,#fff8eb_78%,#f5f5f5_100%)]" />
+          <div className="absolute inset-0 bg-white/18 backdrop-blur-[10px]" />
+
+          <div className="relative z-10 mx-auto w-full max-w-[360px] rounded-[28px] bg-white px-5 py-6 text-center shadow-[0_24px_60px_rgba(1,67,132,0.18)]">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#edf6ff] text-[#014384]">
+              <svg
+                width="30"
+                height="30"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4h-1" />
+                <path d="M4 21v-2a4 4 0 0 1 4-4h1" />
+                <circle cx="12" cy="7" r="4" />
+                <path d="M17 11h4" />
+                <path d="M19 9v4" />
+              </svg>
+            </div>
+
+            <h1 className="mt-5 text-[22px] font-extrabold leading-tight text-[#014384]">
+              Add Emergency Contact First
+            </h1>
+            <p className="mt-3 text-[14px] leading-6 text-[#5c7aa3]">
+              Complete the emergency contact details for the back of your Digital ID before uploading verification documents.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3">
+              <Link
+                href="/profile/edit"
+                className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#014384_0%,#035DB7_52%,#0572DC_100%)] px-5 py-3.5 text-[15px] font-bold text-white shadow-[0_10px_22px_rgba(5,114,220,0.18)]"
+              >
+                Add Emergency Contact
+              </Link>
+              <Link
+                href="/home"
+                className="inline-flex w-full items-center justify-center rounded-full border border-[#d8e5f4] bg-white px-5 py-3 text-[14px] font-semibold text-[#014384]"
+              >
+                Return Home
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -651,12 +716,30 @@ function getActionableDocuments(profile: VerificationStatusProfile | null) {
       return flagged
     }
 
-    return (profile.requiredDocuments || []).filter(
+    const remaining = (profile.requiredDocuments || []).filter(
       (document) => normalizeReviewStatus(document.reviewStatus) !== 'approved'
     )
+
+    if (remaining.length > 0) {
+      return remaining
+    }
+
+    if (isProfileLevelReupload(profile)) {
+      return profile.requiredDocuments || []
+    }
+
+    return []
   }
 
   return sourceDocuments.filter((document) => !document.present)
+}
+
+function isProfileLevelReupload(profile: VerificationStatusProfile) {
+  return (
+    profile.status === 'rejected' ||
+    profile.verificationQueueStatus === 'rejected' ||
+    profile.verificationQueueStatus === 'resubmission_requested'
+  )
 }
 
 function needsUploadInCorrectionMode(document: VerificationStatusDocument) {
@@ -698,4 +781,15 @@ function getReviewStatusLabel(status?: string | null) {
   if (normalized === 'missing') return 'Missing'
   if (normalized === 'approved') return 'Approved'
   return normalized.split('_').join(' ')
+}
+
+function hasCompleteEmergencyContact(profile?: ProfilingRecord | null) {
+  if (!profile) return false
+  if (profile.digitalIdEmergencyContactComplete) return true
+
+  return Boolean(
+    String(profile.digitalIdEmergencyContactName || '').trim() &&
+      String(profile.digitalIdEmergencyContactRelationship || '').trim() &&
+      String(profile.digitalIdEmergencyContactPhone || '').trim()
+  )
 }

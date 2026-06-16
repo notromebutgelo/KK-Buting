@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updatePassword } from 'firebase/auth';
+import { Eye, EyeOff } from 'lucide-react';
 import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
 import { persistAdminSession } from '@/lib/session';
@@ -11,6 +12,8 @@ export default function AdminChangePasswordPage() {
   const router = useRouter();
   const [nextPassword, setNextPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNextPassword, setShowNextPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -89,31 +92,59 @@ export default function AdminChangePasswordPage() {
             </div>
           ) : null}
 
-          <label className="flex flex-col gap-1 text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>
-            New Password
-            <input
-              type="password"
-              value={nextPassword}
-              onChange={(event) => setNextPassword(event.target.value)}
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="surface-input rounded-xl px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
-            />
-          </label>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>
+              New Password
+            </label>
+            <span className="relative">
+              <input
+                type={showNextPassword ? 'text' : 'password'}
+                value={nextPassword}
+                onChange={(event) => setNextPassword(event.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="surface-input w-full rounded-xl px-3 py-2.5 pr-11 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNextPassword((value) => !value)}
+                className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-xl transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/45"
+                style={{ color: 'var(--muted)' }}
+                aria-label={showNextPassword ? 'Hide new password' : 'Show new password'}
+                title={showNextPassword ? 'Hide new password' : 'Show new password'}
+              >
+                {showNextPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </span>
+          </div>
 
-          <label className="flex flex-col gap-1 text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>
-            Confirm Password
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="surface-input rounded-xl px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
-            />
-          </label>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>
+              Confirm Password
+            </label>
+            <span className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="surface-input w-full rounded-xl px-3 py-2.5 pr-11 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[color:var(--accent)]/30"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((value) => !value)}
+                className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-xl transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/45"
+                style={{ color: 'var(--muted)' }}
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                title={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </span>
+          </div>
 
           <button
             type="submit"

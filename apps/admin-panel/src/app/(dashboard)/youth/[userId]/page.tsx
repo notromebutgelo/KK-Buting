@@ -184,11 +184,11 @@ export default function YouthDetailPage() {
               <div className="rounded-[var(--radius-md)] p-5" style={{ background: 'var(--surface-muted)' }}>
                 {activeTab === 'personal' && <FieldGrid fields={[['Full Name', member.fullName || member.UserName], ['Birthday', formatDate(profile.birthday)], ['Gender', profile.gender], ['Civil Status', profile.civilStatus], ['Contact Number', profile.contactNumber], ['Email', profile.email || member.email]]} />}
                 {activeTab === 'address' && <FieldGrid fields={[['Region', profile.region], ['Province', profile.province], ['City', profile.city], ['Barangay', profile.barangay], ['House / Block / Unit No.', profile.currentAddressHouseBlockUnitNumber], ['Street Address', profile.currentAddressStreetAddress], ['Purok / Zone', profile.purok], ['Years in Barangay', profile.yearsInBarangay]]} />}
-                {activeTab === 'demographics' && <FieldGrid fields={[['Civil Status', profile.civilStatus], ['Age / Age Group', `${profile.age || '-'} / ${profile.youthAgeGroup || '-'}`], ['Education', profile.educationalBackground], ['Classification', profile.youthClassification], ['Work Status', profile.workStatus], ['Profiling Status', member.profilingStatus]]} />}
-                {activeTab === 'civic' && <FieldGrid fields={[['Registered SK Voter', formatBool(profile.registeredSkVoter)], ['Voted Last SK Elections', formatBool(profile.votedLastSkElections)], ['Registered National Voter', formatBool(profile.registeredNationalVoter)], ['Attended KK Assembly', formatBool(profile.attendedKkAssembly)], ['KK Assembly Attendance', profile.kkAssemblyTimesAttended], ['Verification Status', profile.status]]} />}
+                {activeTab === 'demographics' && <FieldGrid fields={[['Civil Status', profile.civilStatus], ['Age / Age Group', `${profile.age || '-'} / ${profile.youthAgeGroup || '-'}`], ['Education', profile.educationalBackground], ['Classification', profile.youthClassification], ['Work Status', profile.workStatus], ['Profiling Status', formatStatusLabel(member.profilingStatus)]]} />}
+                {activeTab === 'civic' && <FieldGrid fields={[['Registered SK Voter', formatBool(profile.registeredSkVoter)], ['Voted Last SK Elections', formatBool(profile.votedLastSkElections)], ['Registered National Voter', formatBool(profile.registeredNationalVoter)], ['Attended KK Assembly', formatBool(profile.attendedKkAssembly)], ['KK Assembly Attendance', profile.kkAssemblyTimesAttended], ['Verification Status', formatStatusLabel(profile.status)]]} />}
                 {activeTab === 'documents' && <ListCardList items={member.documents || []} renderItem={(doc) => (
                   <div className="flex flex-col gap-3 rounded-[var(--radius-sm)] border p-4 md:flex-row md:items-center md:justify-between" style={{ borderColor: 'var(--stroke)', background: 'var(--card)' }}>
-                    <div><p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{String(doc.documentType || 'Document').split('_').join(' ')}</p><p className="text-xs" style={{ color: 'var(--muted)' }}>Uploaded {formatDate(doc.uploadedAt)}</p></div>
+                    <div><p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{formatStatusLabel(doc.documentType || 'Document')}</p><p className="text-xs" style={{ color: 'var(--muted)' }}>Uploaded {formatDate(doc.uploadedAt)}</p></div>
                     <div className="flex items-center gap-3"><StatusChip label={doc.status || 'pending'} tone={doc.status || 'pending'} />{doc.fileUrl && <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="rounded-lg border px-3 py-2 text-xs font-semibold transition-colors hover:bg-[color:var(--accent-soft)]" style={{ borderColor: 'var(--stroke)', color: 'var(--accent-strong)' }}>View File</a>}</div>
                   </div>
                 )} emptyText="No uploaded documents found." />}
@@ -337,7 +337,7 @@ function SelectField({ label, value, onChange }: { label: string; value: string;
 }
 
 function SelectStatus({ value, onChange, canReject }: { value: string; onChange: (value: string) => void; canReject: boolean }) {
-  return <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Verification Status</label><select value={value} onChange={(e) => onChange(e.target.value)} className="surface-input bg-transparent w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"><option value="pending">Pending</option><option value="verified">Verified</option>{canReject || value === 'rejected' ? <option value="rejected">Rejected</option> : null}</select></div>
+  return <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Verification Status</label><select value={value} onChange={(e) => onChange(e.target.value)} className="surface-input bg-transparent w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"><option value="pending">Pending Review</option><option value="verified">Verified</option>{canReject || value === 'rejected' ? <option value="rejected">Rejected</option> : null}</select></div>
 }
 
 function GateNotice({ text }: { text: string }) {
@@ -346,7 +346,7 @@ function GateNotice({ text }: { text: string }) {
 
 function StatusChip({ label, tone }: { label: string; tone: string }) {
   const cls = tone === 'verified' ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]' : tone === 'pending' ? 'bg-amber-50 text-amber-700' : tone === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
-  return <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize', cls)}>{label}</span>
+  return <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', cls)}>{formatStatusLabel(label)}</span>
 }
 
 function SummaryMini({ label, value }: { label: string; value: number }) {
@@ -366,3 +366,38 @@ function normalizeBool(value?: boolean | string) { if (value === true || value =
 function normalizeFieldValue(value: any) { return value === null || typeof value === 'undefined' ? '' : String(value) }
 function parseBool(value: string) { if (value === 'Yes') return true; if (value === 'No') return false; return null }
 function normalizeDate(value?: string) { if (!value) return ''; if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value; const d = new Date(value); if (Number.isNaN(d.getTime())) return ''; return d.toISOString().slice(0, 10) }
+
+function formatStatusLabel(value?: string | null) {
+  const normalized = String(value || '').trim()
+
+  if (!normalized) return '-'
+
+  const labels: Record<string, string> = {
+    all: 'All',
+    active: 'Active',
+    archived: 'Archived',
+    certificate_of_residency: 'Certificate of Residency',
+    claimed: 'Claimed',
+    completed: 'Completed',
+    complete: 'Completed',
+    id_photo: 'ID Photo',
+    incomplete: 'Incomplete',
+    not_submitted: 'Not Submitted',
+    pending: 'Pending Review',
+    proof_of_voter_registration: 'Proof of Voter Registration',
+    rejected: 'Rejected',
+    school_id: 'School ID',
+    valid_government_id: 'Valid Government ID',
+    verified: 'Verified',
+  }
+
+  if (!normalized.includes('_')) {
+    return normalized
+  }
+
+  return normalized
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}

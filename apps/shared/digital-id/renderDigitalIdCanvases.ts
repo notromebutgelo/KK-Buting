@@ -189,10 +189,10 @@ function drawFrontDetails(
 
   const idRowHeight = contentHeight * 0.052
   const photoTop = contentTop + contentHeight * 0.075
-  const photoHeight = contentHeight * 0.49
-  const signatureTop = contentTop + contentHeight * 0.611
+  const photoHeight = leftColumnWidth
+  const signatureTop = photoTop + photoHeight + width * 0.02
   const signatureHeight = contentHeight * 0.13
-  const signatureLineTop = contentTop + contentHeight * 0.741
+  const signatureLineTop = signatureTop + signatureHeight + width * 0.008
 
   drawCenteredLetterSpacedText(context, data.memberId || 'DRAFT', contentLeft + leftColumnWidth / 2, contentTop + idRowHeight * 0.15, {
     color: '#0b2f5b',
@@ -212,7 +212,7 @@ function drawFrontDetails(
     context.beginPath()
     context.rect(contentLeft + 2, photoTop + 2, leftColumnWidth - 4, photoHeight - 4)
     context.clip()
-    drawImageCover(context, photoImage, contentLeft + 2, photoTop + 2, leftColumnWidth - 4, photoHeight - 4)
+    drawImageContain(context, photoImage, contentLeft + 2, photoTop + 2, leftColumnWidth - 4, photoHeight - 4)
     context.restore()
   } else {
     drawCenteredLetterSpacedText(context, getInitials(data.fullName), contentLeft + leftColumnWidth / 2, photoTop + photoHeight / 2 - width * 0.02, {

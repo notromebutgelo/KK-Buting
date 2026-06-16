@@ -225,8 +225,8 @@ export default function YouthPage() {
         member.gender || '',
         member.barangay || '',
         member.purok || '',
-        member.profilingStatus || '',
-        member.verificationStatus || '',
+        formatStatusLabel(member.profilingStatus || ''),
+        formatStatusLabel(member.verificationStatus || ''),
         member.points?.totalPoints ?? 0,
         member.createdAt ? new Date(member.createdAt).toLocaleDateString('en-PH') : '',
       ])
@@ -319,8 +319,8 @@ export default function YouthPage() {
           member.gender || '',
           member.barangay || '',
           member.purok || '',
-          member.profilingStatus || '',
-          member.verificationStatus || '',
+          formatStatusLabel(member.profilingStatus || ''),
+          formatStatusLabel(member.verificationStatus || ''),
           String(member.points?.totalPoints ?? 0),
           member.createdAt ? new Date(member.createdAt).toLocaleDateString('en-PH') : '',
         ]),
@@ -427,22 +427,35 @@ export default function YouthPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[1200px] w-full">
+            <table className="w-full min-w-[1480px] table-fixed">
+              <colgroup>
+                <col className="w-[52px]" />
+                <col className="w-[285px]" />
+                <col className="w-[90px]" />
+                <col className="w-[75px]" />
+                <col className="w-[135px]" />
+                <col className="w-[220px]" />
+                <col className="w-[140px]" />
+                <col className="w-[160px]" />
+                <col className="w-[105px]" />
+                <col className="w-[145px]" />
+                <col className="w-[125px]" />
+              </colgroup>
               <thead className="bg-[color:var(--accent-soft)]">
                 <tr>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-4 py-3 text-left align-middle">
                     <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} />
                   </th>
                   <SortableHeader label="Full Name" active={sortKey === 'fullName'} direction={sortDir} onClick={() => toggleSort('fullName')} />
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>KK ID</th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Age</th>
+                  <TableHeader label="KK ID" />
+                  <TableHeader label="Age" />
                   <SortableHeader label="Age Group" active={sortKey === 'ageGroup'} direction={sortDir} onClick={() => toggleSort('ageGroup')} />
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Barangay</th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Profiling</th>
+                  <TableHeader label="Barangay" />
+                  <TableHeader label="Profiling" />
                   <SortableHeader label="Verification" active={sortKey === 'verificationStatus'} direction={sortDir} onClick={() => toggleSort('verificationStatus')} />
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>Points</th>
+                  <TableHeader label="Points" />
                   <SortableHeader label="Registered" active={sortKey === 'createdAt'} direction={sortDir} onClick={() => toggleSort('createdAt')} />
-                  <th className="px-5 py-3" />
+                  <th className="px-5 py-3 align-middle" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--stroke)]">
@@ -455,59 +468,59 @@ export default function YouthPage() {
                 ) : (
                   members.map((member) => (
                     <tr key={member.uid} className="hover:bg-[color:var(--accent-soft)]">
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 align-top">
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(member.uid)}
                           onChange={() => toggleSelectOne(member.uid)}
                         />
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 align-top">
                         <div>
-                          <p className="font-semibold" style={{ color: 'var(--ink)' }}>
+                          <p className="break-words font-semibold leading-6" style={{ color: 'var(--ink)' }}>
                             {member.fullName || member.UserName}
                           </p>
-                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                          <p className="break-words text-xs leading-5" style={{ color: 'var(--muted)' }}>
                             {member.email || 'No email'} | {member.contactNumber || 'No contact'}
                           </p>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
+                      <td className="px-5 py-4 align-top text-sm" style={{ color: 'var(--ink)' }}>
                         {member.idNumber || '-'}
                       </td>
-                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
+                      <td className="px-5 py-4 align-top text-sm" style={{ color: 'var(--ink)' }}>
                         {member.age ?? '-'}
                       </td>
-                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
+                      <td className="px-5 py-4 align-top text-sm" style={{ color: 'var(--ink)' }}>
                         {member.ageGroup || '-'}
                       </td>
-                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--ink)' }}>
+                      <td className="px-5 py-4 align-top text-sm" style={{ color: 'var(--ink)' }}>
                         <div>{member.barangay || '-'}</div>
                         <div className="text-xs" style={{ color: 'var(--muted)' }}>{buildAddressDetail(member) || 'No house / street'}</div>
                         <div className="text-xs" style={{ color: 'var(--muted)' }}>{member.purok || 'No purok'}</div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 align-top">
                         <StatusBadge
                           label={member.profilingStatus || 'incomplete'}
                           tone={member.profilingStatus === 'completed' ? 'complete' : 'incomplete'}
                         />
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 align-top">
                         <StatusBadge
                           label={member.verificationStatus || 'pending'}
                           tone={member.verificationStatus || 'pending'}
                         />
                       </td>
-                      <td className="px-5 py-4 text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
+                      <td className="px-5 py-4 align-top text-sm font-semibold" style={{ color: 'var(--accent-strong)' }}>
                         {(member.points?.totalPoints || 0).toLocaleString()}
                       </td>
-                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--muted)' }}>
+                      <td className="px-5 py-4 align-top text-sm whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                         {member.createdAt ? new Date(member.createdAt).toLocaleDateString('en-PH') : '-'}
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 align-top text-right">
                         <Link
                           href={`/youth/${member.uid}`}
-                          className="font-semibold text-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
+                          className="inline-flex justify-end text-sm font-semibold leading-5 text-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
                         >
                           View Profile
                         </Link>
@@ -594,7 +607,7 @@ function FilterSelect({
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option === 'all' ? 'All' : option.split('_').join(' ')}
+            {formatStatusLabel(option)}
           </option>
         ))}
       </select>
@@ -626,6 +639,17 @@ function DateInput({
   )
 }
 
+function TableHeader({ label }: { label: string }) {
+  return (
+    <th
+      className="whitespace-nowrap px-5 py-3 text-left align-middle text-xs font-bold uppercase tracking-[0.14em]"
+      style={{ color: 'var(--muted)' }}
+    >
+      {label}
+    </th>
+  )
+}
+
 function SortableHeader({
   label,
   active,
@@ -639,14 +663,14 @@ function SortableHeader({
 }) {
   return (
     <th
-      className="cursor-pointer px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] hover:text-[color:var(--accent-strong)]"
+      className="cursor-pointer whitespace-nowrap px-5 py-3 text-left align-middle text-xs font-bold uppercase tracking-[0.14em] hover:text-[color:var(--accent-strong)]"
       style={{ color: 'var(--muted)' }}
       onClick={onClick}
     >
-      {label}
+      <span>{label}</span>
       <span
         className={cn(
-          'ml-2 inline-block text-[11px]',
+          'ml-1.5 inline-block text-[11px]',
           active ? 'text-[color:var(--accent-strong)]' : 'text-transparent'
         )}
       >
@@ -677,8 +701,8 @@ function StatusBadge({
             : 'bg-[color:var(--surface-muted)] text-[color:var(--muted)]'
 
   return (
-    <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize', className)}>
-      {label}
+    <span className={cn('inline-flex min-w-[104px] justify-center rounded-full px-2.5 py-1 text-xs font-semibold', className)}>
+      {formatStatusLabel(label)}
     </span>
   )
 }
@@ -724,8 +748,8 @@ function buildFilterSummary({
   const segments = [
     selectedCount > 0 ? `Selected rows only (${selectedCount})` : 'All rows from current filtered view',
     search ? `Search: ${search}` : '',
-    verificationStatus !== 'all' ? `Verification: ${verificationStatus}` : '',
-    profilingStatus !== 'all' ? `Profiling: ${profilingStatus}` : '',
+    verificationStatus !== 'all' ? `Verification: ${formatStatusLabel(verificationStatus)}` : '',
+    profilingStatus !== 'all' ? `Profiling: ${formatStatusLabel(profilingStatus)}` : '',
     ageGroup !== 'all' ? `Age group: ${ageGroup}` : '',
     gender !== 'all' ? `Gender: ${gender}` : '',
     purok !== 'all' ? `Purok: ${purok}` : '',
@@ -735,4 +759,34 @@ function buildFilterSummary({
   ].filter(Boolean)
 
   return segments.join(' | ')
+}
+
+function formatStatusLabel(value?: string | null) {
+  const normalized = String(value || '').trim()
+
+  if (!normalized) return '-'
+
+  const labels: Record<string, string> = {
+    all: 'All',
+    active: 'Active',
+    archived: 'Archived',
+    completed: 'Completed',
+    complete: 'Completed',
+    incomplete: 'Incomplete',
+    not_submitted: 'Not Submitted',
+    pending: 'Pending Review',
+    in_review: 'Pending Review',
+    verified: 'Verified',
+    rejected: 'Rejected',
+  }
+
+  if (!normalized.includes('_')) {
+    return normalized
+  }
+
+  return normalized
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
 }

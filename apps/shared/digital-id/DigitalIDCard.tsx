@@ -209,22 +209,14 @@ export const DigitalIdFace = forwardRef<HTMLDivElement, DigitalIdFaceProps>(func
                 {memberId || 'PENDING'}
               </p>
             </div>
-            <div className="relative mt-[3.8%] flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
+            <div className="relative mt-[3.8%] flex aspect-square w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
               {photoUrl ? (
-                <>
-                  <img
-                    src={getExportSafeImageUrl(photoUrl)}
-                    alt=""
-                    aria-hidden="true"
-                    className="pointer-events-none absolute h-px w-px opacity-0"
-                  />
-                  <div
-                    role="img"
-                    aria-label={fullName}
-                    className="h-full w-full bg-cover bg-center bg-no-repeat"
-                    style={{ backgroundImage: `url("${getExportSafeImageUrl(photoUrl)}")` }}
-                  />
-                </>
+                <img
+                  src={getExportSafeImageUrl(photoUrl)}
+                  alt={fullName}
+                  draggable={false}
+                  className="h-full w-full object-contain"
+                />
               ) : (
                 <span className="text-[3cqw] font-black text-[#014384]">
                   {getInitials(fullName)}
@@ -309,7 +301,7 @@ export const DigitalIdExportFace = forwardRef<HTMLDivElement, DigitalIdExportFac
   const rightColumnWidth = width - rightColumnLeft - contentLeft
   const idRowHeight = width * 0.026
   const photoTop = contentTop + idRowHeight + width * 0.01
-  const photoHeight = contentHeight * 0.49
+  const photoHeight = leftColumnWidth
   const signatureTop = photoTop + photoHeight + width * 0.02
   const signatureHeight = contentHeight * 0.13
   const signatureLineTop = signatureTop + signatureHeight + width * 0.008
@@ -381,7 +373,7 @@ export const DigitalIdExportFace = forwardRef<HTMLDivElement, DigitalIdExportFac
             style={{
               display: 'block',
               height: '100%',
-              objectFit: 'cover',
+              objectFit: 'contain',
               width: '100%',
             }}
           />

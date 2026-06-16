@@ -403,7 +403,7 @@ export default function ProfilePage() {
                 Add your emergency contact
               </h2>
               <p className="mt-2 text-[13px] leading-[1.6] text-[#6f5a1d]">
-                Your Digital ID cannot be generated or activated until the emergency contact on the back of the card is complete.
+                Complete this before uploading verification documents. These details also appear on the back of your Digital ID.
               </p>
               <Link
                 href="/profile/edit"

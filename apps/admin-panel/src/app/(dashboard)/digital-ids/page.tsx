@@ -1060,22 +1060,14 @@ function DigitalIdPreviewCard({
                   {member.memberId || member.profile?.idNumber || 'DRAFT'}
                 </p>
               </div>
-              <div className="relative mt-[3.8%] flex h-[49%] w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
+              <div className="relative mt-[3.8%] flex aspect-square w-full items-center justify-center overflow-hidden border border-[#2c5a8f] bg-[#eef4fb]">
                 {photoUrl ? (
-                  <>
-                    <img
-                      src={photoUrl}
-                      alt=""
-                      aria-hidden="true"
-                      className="pointer-events-none absolute h-px w-px opacity-0"
-                    />
-                    <div
-                      role="img"
-                      aria-label={fullName}
-                      className="h-full w-full bg-cover bg-center bg-no-repeat"
-                      style={{ backgroundImage: `url("${photoUrl}")` }}
-                    />
-                  </>
+                  <img
+                    src={photoUrl}
+                    alt={fullName}
+                    draggable={false}
+                    className="h-full w-full object-contain"
+                  />
                 ) : (
                   <span className="text-[3cqw] font-black text-[#014384]">{getInitials(fullName)}</span>
                 )}
