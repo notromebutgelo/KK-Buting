@@ -73,6 +73,19 @@ async function loadAdminService(db, notificationEvents = null) {
   });
 }
 
+async function loadDigitalIdService(db, notificationEvents = null) {
+  return loadDistModuleWithMocks("dist/src/modules/digital-id/digitalId.service", {
+    "dist/src/config/firebase": createFirebaseConfigMock(db),
+    "module:firebase-admin/firestore": FIRESTORE_MODULE_MOCK,
+    "dist/src/modules/notifications/notifications.service": {
+      createNotificationsForRoles: async (roles, notification) => {
+        notificationEvents?.push({ kind: "roles", roles, notification });
+        return undefined;
+      },
+    },
+  });
+}
+
 async function loadPhysicalIdRequestsService(db) {
   return loadDistModuleWithMocks(
     "dist/src/modules/physical-id-requests/physicalIdRequests.service",
@@ -764,6 +777,208 @@ const tests = [
       assert.equal(notifications.length, 2);
       assert.equal(notifications[1].kind, "direct");
       assert.equal(notifications[1].notification.recipientUid, "youth-1");
+    },
+  },
+  {
+    name: "verification queue includes rejected profiles even when an old Digital ID is still active",
+    async run() {
+      const db = new FakeFirestore({
+        users: {
+          "youth-1": {
+            role: "youth",
+            UserName: "Jerome Angelo Alison",
+            email: "qjadcalison@tip.edu.ph",
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            firstName: "Jerome Angelo",
+            middleName: "Dela Cruz",
+            lastName: "Alison",
+            email: "qjadcalison@tip.edu.ph",
+            youthAgeGroup: "Core Youth",
+            documentsSubmitted: true,
+            submittedAt: "2026-05-09T16:04:15.105Z",
+            status: "rejected",
+            verified: false,
+            verificationQueueStatus: "rejected",
+            verificationRejectReason: "reject",
+            digitalIdStatus: "active",
+            digitalIdGeneratedAt: "2026-05-09T16:12:00.000Z",
+            digitalIdApprovedAt: "2026-05-09T16:16:42.306Z",
+          },
+        },
+        documents: {
+          "doc-1": {
+            profileId: "youth-1",
+            documentType: "proof_of_voter_registration",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:11.050Z",
+          },
+          "doc-2": {
+            profileId: "youth-1",
+            documentType: "valid_government_id",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:12.644Z",
+          },
+          "doc-3": {
+            profileId: "youth-1",
+            documentType: "id_photo",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:14.898Z",
+          },
+        },
+      });
+
+      const adminService = await loadAdminService(db);
+      const queue = await adminService.getVerificationProfiles({
+        search: "qjadcalison@tip.edu.ph",
+        pageSize: 10,
+      });
+
+      assert.equal(queue.pagination.total, 1);
+      assert.equal(queue.profiles[0].userId, "youth-1");
+      assert.equal(queue.profiles[0].queueStatus, "rejected");
+      assert.equal(queue.profiles[0].digitalIdStatus, "active");
+    },
+  },
+  {
+    name: "re-uploading rejected verification documents clears a stale active Digital ID",
+    async run() {
+      const notifications = [];
+      const db = new FakeFirestore({
+        users: {
+          "youth-1": {
+            role: "youth",
+            UserName: "Jerome Angelo Alison",
+            email: "qjadcalison@tip.edu.ph",
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            firstName: "Jerome Angelo",
+            lastName: "Alison",
+            email: "qjadcalison@tip.edu.ph",
+            youthAgeGroup: "Core Youth",
+            status: "rejected",
+            verified: false,
+            verificationQueueStatus: "rejected",
+            digitalIdStatus: "active",
+            digitalIdGeneratedAt: "2026-05-09T16:12:00.000Z",
+            digitalIdApprovedAt: "2026-05-09T16:16:42.306Z",
+            digitalIdEmergencyContactName: "Wanda Rodrigaso",
+            digitalIdEmergencyContactRelationship: "Mother",
+            digitalIdEmergencyContactPhone: "09125485424",
+          },
+        },
+        documents: {
+          "doc-1": {
+            profileId: "youth-1",
+            documentType: "proof_of_voter_registration",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:11.050Z",
+          },
+          "doc-2": {
+            profileId: "youth-1",
+            documentType: "valid_government_id",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:12.644Z",
+          },
+          "doc-3": {
+            profileId: "youth-1",
+            documentType: "id_photo",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:14.898Z",
+          },
+        },
+      });
+
+      const digitalIdService = await loadDigitalIdService(db, notifications);
+      await digitalIdService.uploadDocument(
+        "youth-1",
+        "id_photo",
+        "https://cdn.example.com/replacement-id-photo.png"
+      );
+
+      const profile = db.getDocData("kkProfiling", "youth-1");
+      assert.equal(profile.status, "pending");
+      assert.equal(profile.verified, false);
+      assert.equal(profile.verificationQueueStatus, "pending");
+      assert.equal(profile.digitalIdStatus, "draft");
+      assert.equal(profile.digitalIdApprovalRequestedAt, null);
+      assert.equal(profile.verificationReferredToSuperadminAt, null);
+      assert.equal(notifications.length, 1);
+      assert.deepEqual(notifications[0].roles, ["admin", "superadmin"]);
+    },
+  },
+  {
+    name: "rejecting a verification clears active Digital ID issuance state",
+    async run() {
+      const db = new FakeFirestore({
+        users: {
+          "youth-1": {
+            role: "youth",
+            UserName: "Jerome Angelo Alison",
+            email: "qjadcalison@tip.edu.ph",
+          },
+        },
+        kkProfiling: {
+          "youth-1": {
+            firstName: "Jerome Angelo",
+            lastName: "Alison",
+            email: "qjadcalison@tip.edu.ph",
+            youthAgeGroup: "Core Youth",
+            documentsSubmitted: true,
+            status: "verified",
+            verified: true,
+            verificationQueueStatus: "verified",
+            verificationDocumentsApprovedAt: "2026-05-09T16:10:28.375Z",
+            verificationDocumentsApprovedBy: "admin@kk.local",
+            verificationReferredToSuperadminAt: "2026-05-09T16:10:40.450Z",
+            verificationReferredToSuperadminBy: "admin@kk.local",
+            digitalIdApprovalRequestedAt: "2026-05-09T16:10:40.450Z",
+            digitalIdApprovalRequestedBy: "admin@kk.local",
+            digitalIdStatus: "active",
+            digitalIdApprovedAt: "2026-05-09T16:16:42.306Z",
+          },
+        },
+        documents: {
+          "doc-1": {
+            profileId: "youth-1",
+            documentType: "proof_of_voter_registration",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:11.050Z",
+          },
+          "doc-2": {
+            profileId: "youth-1",
+            documentType: "valid_government_id",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:12.644Z",
+          },
+          "doc-3": {
+            profileId: "youth-1",
+            documentType: "id_photo",
+            reviewStatus: "approved",
+            uploadedAt: "2026-05-09T16:04:14.898Z",
+          },
+        },
+      });
+
+      const adminService = await loadAdminService(db, []);
+      await adminService.rejectVerification(
+        "youth-1",
+        "admin@kk.local",
+        "Unable to validate submitted information.",
+        "Please submit updated documents."
+      );
+
+      const profile = db.getDocData("kkProfiling", "youth-1");
+      assert.equal(profile.status, "rejected");
+      assert.equal(profile.verified, false);
+      assert.equal(profile.digitalIdStatus, "draft");
+      assert.equal(profile.digitalIdApprovalRequestedAt, null);
+      assert.equal(profile.verificationReferredToSuperadminAt, null);
+      assert.equal(profile.verificationDocumentsApprovedAt, null);
     },
   },
   {

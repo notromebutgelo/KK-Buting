@@ -10,9 +10,18 @@ interface PointsData {
   transactions: Array<{
     id: string
     type: 'earn' | 'redeem'
+    direction?: 'add' | 'deduct'
     points: number
     description: string
     createdAt: string
+    merchantId?: string | null
+    merchantName?: string | null
+    merchantLogoUrl?: string | null
+    rewardId?: string | null
+    rewardTitle?: string | null
+    amountSpent?: number | null
+    status?: string
+    reason?: string | null
   }>
 }
 

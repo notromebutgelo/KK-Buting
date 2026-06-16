@@ -24,24 +24,68 @@ export async function getPoints(uid: string): Promise<number> {
 }
 
 export async function getPointsSummary(uid: string) {
-  const [pointsSnap, transactionsSnap] = await Promise.all([
+  const [pointsSnap, transactionsSnap, merchantsSnap, rewardsSnap] = await Promise.all([
     db.collection("points").doc(uid).get(),
     db.collection("transactions").where("userId", "==", uid).get(),
+    db.collection("merchants").get(),
+    db.collection("rewards").get(),
   ]);
 
   const pointsData = pointsSnap.data() || {};
+  const merchantsMap = new Map(
+    merchantsSnap.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() } as Record<string, unknown>])
+  );
+  const rewardsMap = new Map(
+    rewardsSnap.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() } as Record<string, unknown>])
+  );
   const transactions = transactionsSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, unknown>)
-    .map((transaction) => ({
-      id: String(transaction.id),
-      type: String(transaction.type || "earn") as "earn" | "redeem",
-      points: Math.abs(Number(transaction.points || 0)),
-      description:
-        String(transaction.type || "earn") === "redeem"
-          ? "Reward redemption"
-          : "Points earned from merchant scan",
-      createdAt: toIso(transaction.createdAt) || new Date().toISOString(),
-    }))
+    .map((transaction) => {
+      const type = String(transaction.type || "earn") as "earn" | "redeem";
+      const merchantId = String(transaction.merchantId || "");
+      const rewardId = String(transaction.rewardId || "");
+      const merchant = merchantId ? merchantsMap.get(merchantId) : null;
+      const reward = rewardId ? rewardsMap.get(rewardId) : null;
+      const points = Math.abs(Number(transaction.points || 0));
+      const merchantName =
+        String(
+          merchant?.businessName ||
+            merchant?.name ||
+            merchant?.shopName ||
+            transaction.merchantName ||
+            ""
+        ).trim() || null;
+      const rewardTitle =
+        String(reward?.title || transaction.rewardTitle || "").trim() || null;
+
+      return {
+        id: String(transaction.id),
+        type,
+        direction: type === "redeem" || Number(transaction.points || 0) < 0 ? "deduct" : "add",
+        points,
+        merchantId: merchantId || null,
+        merchantName,
+        merchantLogoUrl:
+          String(merchant?.logoUrl || merchant?.imageUrl || merchant?.bannerUrl || "").trim() || null,
+        rewardId: rewardId || null,
+        rewardTitle,
+        amountSpent:
+          transaction.amountSpent === undefined || transaction.amountSpent === null
+            ? null
+            : Number(transaction.amountSpent || 0),
+        status: String(transaction.status || "success"),
+        reason: String(transaction.reason || "").trim() || null,
+        description:
+          type === "redeem"
+            ? rewardTitle
+              ? `Redeemed ${rewardTitle}`
+              : "Reward redemption"
+            : merchantName
+              ? `Points earned from ${merchantName}`
+              : "Points earned from merchant scan",
+        createdAt: toIso(transaction.createdAt) || new Date().toISOString(),
+      };
+    })
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
   const earnedPoints =

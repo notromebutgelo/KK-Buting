@@ -735,6 +735,71 @@ const tests = [
     },
   },
   {
+    name: "points.service summary includes merchant and reward activity context",
+    async run() {
+      const db = new FakeFirestore({
+        points: {
+          "youth-1": {
+            balance: 85,
+            earnedPoints: 120,
+            redeemedPoints: 35,
+          },
+        },
+        merchants: {
+          "merchant-1": {
+            name: "Dirtbusters Laundry Shop",
+            logoUrl: "https://cdn.example.com/dirtbusters.png",
+          },
+        },
+        rewards: {
+          "reward-1": {
+            title: "Laundry Voucher",
+          },
+        },
+        transactions: {
+          "tx-earn": {
+            userId: "youth-1",
+            merchantId: "merchant-1",
+            amountSpent: 250,
+            points: 25,
+            type: "earn",
+            status: "success",
+            createdAt: "2026-06-10T04:00:00.000Z",
+          },
+          "tx-redeem": {
+            userId: "youth-1",
+            rewardId: "reward-1",
+            points: 35,
+            type: "redeem",
+            status: "claimed",
+            createdAt: "2026-06-11T04:00:00.000Z",
+          },
+        },
+      });
+
+      const service = loadDistModuleWithMocks("dist/src/modules/points/points.service", {
+        "dist/src/config/firebase": { db },
+        "module:firebase-admin/firestore": {
+          FieldValue,
+          Timestamp: FakeTimestamp,
+        },
+      });
+
+      const summary = await service.getPointsSummary("youth-1");
+
+      assert.equal(summary.totalPoints, 85);
+      assert.equal(summary.earnedPoints, 120);
+      assert.equal(summary.redeemedPoints, 35);
+      assert.equal(summary.transactions[0].id, "tx-redeem");
+      assert.equal(summary.transactions[0].rewardTitle, "Laundry Voucher");
+      assert.equal(summary.transactions[0].direction, "deduct");
+      assert.equal(summary.transactions[1].merchantName, "Dirtbusters Laundry Shop");
+      assert.equal(summary.transactions[1].merchantLogoUrl, "https://cdn.example.com/dirtbusters.png");
+      assert.equal(summary.transactions[1].amountSpent, 250);
+      assert.equal(summary.transactions[1].direction, "add");
+    },
+  },
+  {
     name: "admin.service updates complete merchant business information and owner contact details",
     async run() {
       const db = new FakeFirestore({

@@ -607,14 +607,8 @@ function classifyYouthLifecycle(
 function isVerificationQueueCompleted(profile: AnyRecord) {
   const status = normalizeString(profile.status);
   const queueStatus = normalizeString(profile.queueStatus);
-  const digitalIdStatus = normalizeString(profile.digitalIdStatus);
 
-  return (
-    status === "verified" ||
-    queueStatus === "verified" ||
-    queueStatus === PENDING_SUPERADMIN_ID_GENERATION ||
-    digitalIdStatus === "active"
-  );
+  return status === "not_submitted" || queueStatus === "not_submitted";
 }
 
 async function getUsersAndProfiles() {
@@ -1263,6 +1257,13 @@ export async function rejectVerification(
       verificationLastAction: "rejected",
       verificationRejectReason: reason,
       verificationRejectNote: note || null,
+      digitalIdStatus: "draft",
+      digitalIdApprovalRequestedAt: null,
+      digitalIdApprovalRequestedBy: null,
+      verificationReferredToSuperadminAt: null,
+      verificationReferredToSuperadminBy: null,
+      verificationDocumentsApprovedAt: null,
+      verificationDocumentsApprovedBy: null,
     },
     { merge: true }
   );
@@ -2407,6 +2408,16 @@ export async function updateYouthVerificationStatus(
 
   if (status === "verified") {
     payload.verifiedAt = FieldValue.serverTimestamp();
+  }
+
+  if (status === "rejected") {
+    payload.digitalIdStatus = "draft";
+    payload.digitalIdApprovalRequestedAt = null;
+    payload.digitalIdApprovalRequestedBy = null;
+    payload.verificationReferredToSuperadminAt = null;
+    payload.verificationReferredToSuperadminBy = null;
+    payload.verificationDocumentsApprovedAt = null;
+    payload.verificationDocumentsApprovedBy = null;
   }
 
   if (status === "pending") {

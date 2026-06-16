@@ -45,6 +45,10 @@ function getMainBackgroundClass(pathname: string) {
     return 'bg-gray-50'
   }
 
+  if (pathname.startsWith('/points')) {
+    return 'bg-[#f4f7fc]'
+  }
+
   if (pathname.startsWith('/scanner')) {
     return 'bg-[#f6f8fc]'
   }

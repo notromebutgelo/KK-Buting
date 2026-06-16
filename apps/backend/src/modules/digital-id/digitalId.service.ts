@@ -512,6 +512,7 @@ export async function uploadDocument(uid: string, docType: string, fileUrl: stri
       verificationResubmissionMessage: null,
       verificationRejectReason: null,
       verificationRejectNote: null,
+      digitalIdStatus: "draft",
       digitalIdApprovalRequestedAt: null,
       digitalIdApprovalRequestedBy: null,
       verificationReferredToSuperadminAt: null,

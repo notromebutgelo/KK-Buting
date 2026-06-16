@@ -254,9 +254,13 @@ export default function HomePage() {
                   <p className="text-[13px] leading-[1.45] text-[#5f6d83]">
                     Earn more points to unlock exciting rewards!
                   </p>
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f7f9fd] text-[#7d8fa8]">
+                  <Link
+                    href="/points/activity"
+                    aria-label="Open points activity"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f7f9fd] text-[#7d8fa8] transition-colors hover:bg-[#edf4ff] hover:text-[#0f4c97] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5ca9ed]/35"
+                  >
                     <ChevronRight className="h-4.5 w-4.5" strokeWidth={2.2} />
-                  </span>
+                  </Link>
                 </div>
               </div>
             </div>
