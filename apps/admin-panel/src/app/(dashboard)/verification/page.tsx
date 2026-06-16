@@ -177,7 +177,15 @@ type ReviewActionOption = {
   tone: 'success' | 'warning' | 'danger' | 'info'
 }
 
+type VerificationSortBy = 'newest' | 'latest' | 'oldest' | 'name_az'
+
 const PAGE_SIZE = 8
+const SORT_OPTIONS: Array<{ value: VerificationSortBy; label: string }> = [
+  { value: 'newest', label: 'Newest Submitted' },
+  { value: 'latest', label: 'Latest Activity' },
+  { value: 'oldest', label: 'Oldest Submitted' },
+  { value: 'name_az', label: 'Name A-Z' },
+]
 
 export default function VerificationPage() {
   const router = useRouter()
@@ -186,6 +194,7 @@ export default function VerificationPage() {
   const [status, setStatus] = useState('all')
   const [ageGroup, setAgeGroup] = useState('all')
   const [dateSubmitted, setDateSubmitted] = useState('')
+  const [sortBy, setSortBy] = useState<VerificationSortBy>('newest')
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -229,15 +238,16 @@ export default function VerificationPage() {
       status,
       ageGroup,
       dateSubmitted,
+      sortBy,
       page: currentPage,
       pageSize: PAGE_SIZE,
     }),
-    [ageGroup, currentPage, dateSubmitted, search, status]
+    [ageGroup, currentPage, dateSubmitted, search, sortBy, status]
   )
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, status, ageGroup, dateSubmitted])
+  }, [search, status, ageGroup, dateSubmitted, sortBy])
 
   useEffect(() => {
     let active = true
@@ -663,7 +673,7 @@ export default function VerificationPage() {
             />
           </section>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_0.68fr_0.68fr_0.9fr_0.48fr]">
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.35fr)_minmax(140px,0.68fr)_minmax(160px,0.72fr)_minmax(170px,0.78fr)_minmax(180px,0.88fr)_minmax(120px,0.48fr)]">
             <FilterField label="Search">
               <div className="relative">
                 <Search
@@ -707,13 +717,25 @@ export default function VerificationPage() {
                   'pending',
                   'in_review',
                   'admin_reverification_requested',
-                  'pending_superadmin_id_generation',
                   'resubmission_requested',
-                  'verified',
                   'rejected',
                 ].map((option) => (
                   <option key={option} value={option}>
                     {option === 'all' ? 'All' : getQueueStatusLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Sort By">
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as VerificationSortBy)}
+                className="surface-input h-11 w-full rounded-[14px] bg-transparent px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent)]/20"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -998,7 +1020,7 @@ export default function VerificationPage() {
               {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} submissions
             </p>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
@@ -1009,14 +1031,27 @@ export default function VerificationPage() {
                 <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
                 Previous
               </button>
-              {Array.from({ length: Math.min(pagination.totalPages, 3) }, (_, index) => {
-                const pageNumber = index + 1
-                const active = pageNumber === pagination.page
+              {getPaginationItems(pagination.page, pagination.totalPages).map((item) => {
+                if (typeof item === 'string') {
+                  return (
+                    <span
+                      key={item}
+                      className="inline-flex h-10 min-w-[28px] items-center justify-center text-sm font-bold"
+                      style={{ color: 'var(--muted)' }}
+                    >
+                      ...
+                    </span>
+                  )
+                }
+
+                const active = item === pagination.page
+
                 return (
                   <button
-                    key={pageNumber}
+                    key={item}
                     type="button"
-                    onClick={() => setCurrentPage(pageNumber)}
+                    onClick={() => setCurrentPage(item)}
+                    aria-current={active ? 'page' : undefined}
                     className="inline-flex h-10 min-w-[40px] items-center justify-center rounded-[12px] px-3 text-sm font-bold transition"
                     style={
                       active
@@ -1028,7 +1063,7 @@ export default function VerificationPage() {
                           }
                     }
                   >
-                    {pageNumber}
+                    {item}
                   </button>
                 )
               })}
@@ -1730,6 +1765,25 @@ function getInitials(fullName: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() || '')
     .join('')
+}
+
+function getPaginationItems(currentPage: number, totalPages: number) {
+  const safeTotal = Math.max(1, totalPages)
+  const safeCurrent = Math.min(Math.max(1, currentPage), safeTotal)
+
+  if (safeTotal <= 7) {
+    return Array.from({ length: safeTotal }, (_, index) => index + 1)
+  }
+
+  if (safeCurrent <= 4) {
+    return [1, 2, 3, 4, 5, 'end-ellipsis', safeTotal]
+  }
+
+  if (safeCurrent >= safeTotal - 3) {
+    return [1, 'start-ellipsis', safeTotal - 4, safeTotal - 3, safeTotal - 2, safeTotal - 1, safeTotal]
+  }
+
+  return [1, 'start-ellipsis', safeCurrent - 1, safeCurrent, safeCurrent + 1, 'end-ellipsis', safeTotal]
 }
 
 function formatShortDate(value?: string | null) {

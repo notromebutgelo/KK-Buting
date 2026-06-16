@@ -2,6 +2,7 @@ export interface DashboardStats {
   totalUsers: number
   verified: number
   pending: number
+  needsUpload: number
   rejected: number
   archivedUsers: number
   profileSubmitted: number

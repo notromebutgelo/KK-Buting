@@ -410,19 +410,28 @@ export default function AdminControlsPage() {
                   <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: 'var(--muted)' }}>Loading audit logs...</td></tr>
                 ) : audit.logs.length === 0 ? (
                   <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: 'var(--muted)' }}>No audit records match these filters.</td></tr>
-                ) : audit.logs.map((log) => (
-                  <tr key={log.id} className="border-t align-top" style={{ borderColor: 'var(--stroke)' }}>
-                    <td className="px-3 py-3 text-xs" style={{ color: 'var(--muted)' }}>{formatDate(log.createdAt)}</td>
-                    <td className="px-3 py-3">
-                      <p className="font-semibold" style={{ color: 'var(--ink)' }}>{log.actorEmail || 'System'}</p>
-                      <p className="text-xs" style={{ color: 'var(--muted)' }}>{log.actorRole || '-'}</p>
-                    </td>
-                    <td className="px-3 py-3 font-semibold" style={{ color: 'var(--ink-soft)' }}>{log.module}</td>
-                    <td className="px-3 py-3">{prettify(log.action)}</td>
-                    <td className="px-3 py-3 text-xs" style={{ color: 'var(--muted)' }}>{log.targetLabel || log.targetId || '-'}</td>
-                    <td className="px-3 py-3"><StatusPill status={log.status} /></td>
-                  </tr>
-                ))}
+                ) : audit.logs.map((log) => {
+                  const target = formatTarget(log);
+
+                  return (
+                    <tr key={log.id} className="border-t align-top" style={{ borderColor: 'var(--stroke)' }}>
+                      <td className="px-3 py-3 text-xs" style={{ color: 'var(--muted)' }}>{formatDate(log.createdAt)}</td>
+                      <td className="px-3 py-3">
+                        <p className="font-semibold" style={{ color: 'var(--ink)' }}>{log.actorEmail || 'System'}</p>
+                        <p className="text-xs" style={{ color: 'var(--muted)' }}>{log.actorRole || '-'}</p>
+                      </td>
+                      <td className="px-3 py-3 font-semibold" style={{ color: 'var(--ink-soft)' }}>{log.module}</td>
+                      <td className="px-3 py-3">{prettify(log.action)}</td>
+                      <td className="px-3 py-3" title={target.title}>
+                        <p className="text-xs font-semibold" style={{ color: 'var(--ink-soft)' }}>{target.primary}</p>
+                        {target.secondary ? (
+                          <p className="mt-1 text-[11px]" style={{ color: 'var(--muted)' }}>{target.secondary}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-3"><StatusPill status={log.status} /></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -515,6 +524,42 @@ function formatDate(value?: string | null) {
 
 function prettify(value: string) {
   return value.split(/[-_]/).join(' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function shortenId(value?: string | null) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.length > 10 ? `...${text.slice(-6)}` : text;
+}
+
+function formatTarget(log: AuditLog) {
+  const label = String(log.targetLabel || '').trim();
+  const id = String(log.targetId || '').trim();
+  const type = prettify(String(log.targetType || log.module || 'target'));
+
+  if (!label && !id) {
+    return {
+      primary: '-',
+      secondary: '',
+      title: '',
+    };
+  }
+
+  if (label) {
+    return {
+      primary: `${type}: ${label}`,
+      secondary: id ? `ID ${shortenId(id)}` : '',
+      title: id ? `${type}: ${label} (${id})` : `${type}: ${label}`,
+    };
+  }
+
+  const compactId = shortenId(id);
+
+  return {
+    primary: `${type}: ${compactId}`,
+    secondary: '',
+    title: id,
+  };
 }
 
 function getApiError(error: unknown, fallback: string) {

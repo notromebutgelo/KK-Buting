@@ -75,7 +75,8 @@ export function VerificationLifecycleChart({ stats }: { stats: DashboardStats })
   const data = useMemo(
     () => [
       { label: 'Verified', value: stats.verified, color: 'var(--success-accent)' },
-      { label: 'Pending', value: stats.pending, color: 'var(--warning-accent)' },
+      { label: 'Pending Review', value: stats.pending, color: 'var(--warning-accent)' },
+      { label: 'Needs Upload', value: stats.needsUpload, color: '#f59e0b' },
       { label: 'Rejected', value: stats.rejected, color: 'var(--danger-accent)' },
       { label: 'Incomplete', value: stats.incompleteProfiles, color: 'rgba(1, 67, 132, 0.34)' },
     ],
@@ -96,7 +97,7 @@ export function VerificationLifecycleChart({ stats }: { stats: DashboardStats })
         <YAxis
           type="category"
           dataKey="label"
-          width={84}
+          width={112}
           axisLine={false}
           tickLine={false}
           tick={axisTick()}

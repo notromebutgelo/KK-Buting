@@ -55,9 +55,9 @@ export default function AdminDashboardView({ stats }: { stats: DashboardStats })
         aside={
           <div className="grid grid-cols-2 gap-3">
             <DashboardMiniStat
-              label="Pending queue"
+              label="Pending review"
               value={stats.verificationQueue.toLocaleString()}
-              meta="Documents waiting on review"
+              meta="Complete submissions awaiting action"
               tone={queueUrgent ? 'warning' : 'soft'}
             />
             <DashboardMiniStat
@@ -74,14 +74,14 @@ export default function AdminDashboardView({ stats }: { stats: DashboardStats })
         <DashboardKpiCard
           title="Registered Youth"
           value={stats.totalUsers.toLocaleString()}
-          meta="All member accounts currently tracked in the system."
+          meta="Youth accounts only, excluding admin and merchant users."
           icon={<Users size={18} />}
           featured
         />
         <DashboardKpiCard
           title="Pending Review"
           value={stats.pending.toLocaleString()}
-          meta="Profiles waiting for an approval, rejection, or resubmission request."
+          meta="Complete verification submissions waiting for admin action."
           icon={<Clock size={18} />}
           tone="warning"
           badge={queueUrgent ? 'live queue' : undefined}
@@ -104,9 +104,9 @@ export default function AdminDashboardView({ stats }: { stats: DashboardStats })
 
       <section className="grid gap-6 xl:grid-cols-[1.22fr_0.78fr]">
         <DashboardChartCard
-          title="Verification lifecycle"
-          description="A quick view of how members are distributed across the review pipeline today."
-          insight={`${stats.pending.toLocaleString()} profiles are awaiting action, while ${stats.rejected.toLocaleString()} need resubmission support.`}
+          title="Youth verification lifecycle"
+          description="Youth accounts only. Each youth appears in one lifecycle status."
+          insight={`${stats.pending.toLocaleString()} submissions are awaiting action, while ${stats.needsUpload.toLocaleString()} youth still need to upload or replace documents.`}
         >
           <VerificationLifecycleChart stats={stats} />
         </DashboardChartCard>
@@ -130,11 +130,18 @@ export default function AdminDashboardView({ stats }: { stats: DashboardStats })
             <DashboardStatusList
               items={[
                 {
-                  label: 'Verification queue',
+                  label: 'Pending review',
                   value: stats.verificationQueue.toLocaleString(),
-                  meta: 'Pending document reviews and profile decisions.',
+                  meta: 'Complete submissions waiting for admin action.',
                   tone: 'warning',
                   progress: 100,
+                },
+                {
+                  label: 'Needs upload',
+                  value: stats.needsUpload.toLocaleString(),
+                  meta: 'Youth who must upload missing or replacement documents.',
+                  tone: 'warning',
+                  progress: stats.totalUsers ? (stats.needsUpload / stats.totalUsers) * 100 : 0,
                 },
                 {
                   label: 'Rejected profiles',

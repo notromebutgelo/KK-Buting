@@ -642,7 +642,8 @@ export default function DigitalIDPage() {
               />
             </div>
 
-            <p className="mt-10 text-[17px] leading-[1.6] text-[#1e4f91]">
+            <p className="mt-10  
+            text-[17px] leading-[1.6] text-[#1e4f91]">
               {awaitingSuperadminMessage}
             </p>
 

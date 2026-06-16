@@ -133,11 +133,19 @@ export default function SuperadminDashboardView({ stats }: { stats: DashboardSta
 
   const attentionItems = [
     {
-      title: 'Pending Verifications',
-      description: 'Approvals waiting for review',
+      title: 'Pending Review',
+      description: 'Complete submissions waiting for admin action',
       count: stats.verificationQueue,
       href: '/verification',
       icon: Clock3,
+      tone: 'yellow' as const,
+    },
+    {
+      title: 'Needs Upload',
+      description: 'Youth missing required or replacement documents',
+      count: stats.needsUpload,
+      href: '/verification',
+      icon: FileText,
       tone: 'yellow' as const,
     },
     {
@@ -179,9 +187,9 @@ export default function SuperadminDashboardView({ stats }: { stats: DashboardSta
 
       <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <ExecutiveMetricCard
-          label="Total Members"
+          label="Registered Youth"
           value={stats.totalUsers.toLocaleString()}
-          description="All registered members"
+          description="Youth accounts only"
           icon={<Users size={22} />}
           tone="blue"
         />
@@ -200,9 +208,9 @@ export default function SuperadminDashboardView({ stats }: { stats: DashboardSta
           tone="yellow"
         />
         <ExecutiveMetricCard
-          label="Verification Queue"
+          label="Pending Review"
           value={stats.verificationQueue.toLocaleString()}
-          description="Pending approvals"
+          description="Ready for admin action"
           icon={<ShieldCheck size={22} />}
           tone="red"
         />
@@ -210,9 +218,9 @@ export default function SuperadminDashboardView({ stats }: { stats: DashboardSta
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.72fr)_minmax(320px,0.92fr)]">
         <DashboardChartCard
-          title="Member Lifecycle Overview"
-          description="Quick overview of member status across the system."
-          insight={`${stats.verified.toLocaleString()} verified members are already flowing through the system, while ${stats.incompleteProfiles.toLocaleString()} are still stuck before completion.`}
+          title="Youth Verification Lifecycle"
+          description="Youth accounts only. Each youth is counted in one lifecycle status."
+          insight={`${stats.verified.toLocaleString()} youth are verified, ${stats.pending.toLocaleString()} are ready for review, and ${stats.needsUpload.toLocaleString()} still need uploads.`}
         >
           <VerificationLifecycleChart stats={stats} />
         </DashboardChartCard>

@@ -19,6 +19,7 @@ interface DocumentStep {
   docType: VerificationDocType
   title: string
   helper: string
+  note?: string
   reviewStatus?: string
   reviewNote?: string | null
   reviewedAt?: string | null
@@ -72,7 +73,7 @@ export default function VerificationUploadPage() {
         {
           docType: 'certificate_of_residency',
           title: 'Certificate of Residency',
-          helper: 'Upload your residency certificate as your first required document.',
+          helper: 'Upload your certificate or proof of residency as your first required document.',
         },
         {
           docType: 'school_id',
@@ -81,8 +82,8 @@ export default function VerificationUploadPage() {
         },
         {
           docType: 'id_photo',
-          title: 'ID Photo',
-          helper: 'Upload a clear selfie-style ID photo for your digital record.',
+          title: '1x1 or 2x2 Photo',
+          helper: 'Upload a clear 1x1 or 2x2 photo for your digital record.',
         },
       ]
     }
@@ -92,6 +93,7 @@ export default function VerificationUploadPage() {
         docType: 'proof_of_voter_registration',
         title: 'Proof of Voter Registration',
         helper: 'Upload your proof of voter registration for verification.',
+        note: 'If you are 15-17 years old, upload your certificate or proof of residency instead.',
       },
       {
         docType: 'valid_government_id',
@@ -100,8 +102,8 @@ export default function VerificationUploadPage() {
       },
       {
         docType: 'id_photo',
-        title: 'ID Photo',
-        helper: 'Upload a clear selfie-style ID photo for your digital record.',
+        title: '1x1 or 2x2 Photo',
+        helper: 'Upload a clear 1x1 or 2x2 photo for your digital record.',
       },
     ]
   }, [isChildYouth])
@@ -334,7 +336,15 @@ export default function VerificationUploadPage() {
                 </p>
                 {isIdPhotoStep ? (
                   <div className="mt-4 rounded-[18px] bg-[#fff8eb] px-4 py-3 text-left text-[12px] leading-[1.55] text-[#7c5a0a]">
-                    This photo will be used on your Digital KK ID after your account is verified, so use a clear front-facing picture with good lighting.
+                    This 1x1 or 2x2 photo will be used on your Digital KK ID after your account is verified, so use a clear front-facing picture with good lighting.
+                  </div>
+                ) : null}
+                {currentDocument.note ? (
+                  <div className="mt-4 rounded-[18px] border border-[#f3ddb1] bg-[#fff8eb] px-4 py-3 text-left text-[12px] leading-[1.55] text-[#7c5a0a]">
+                    <span className="block font-bold uppercase tracking-[0.12em] text-[#9a6a00]">
+                      Note
+                    </span>
+                    <span className="mt-1 block">{currentDocument.note}</span>
                   </div>
                 ) : null}
                 {currentDocument.reviewNote ? (
@@ -379,7 +389,7 @@ export default function VerificationUploadPage() {
                       className="h-auto w-[88px] object-contain"
                     />
                     <span className="mt-3 text-[18px] font-medium text-[#1e4f91]">
-                      {isIdPhotoStep ? 'ID Photo Ready' : 'Document Ready'}
+                      {isIdPhotoStep ? '1x1 or 2x2 Photo' : 'Document Ready'}
                     </span>
                     <span className="mt-2 text-[12px] font-medium text-[#5f7b9d]">
                       Tap here to choose upload source

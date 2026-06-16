@@ -85,8 +85,163 @@ function serializeAuditLog(id: string, data: AnyRecord) {
   };
 }
 
+type SerializedAuditLog = ReturnType<typeof serializeAuditLog>;
+type DocumentCache = Map<string, Promise<AnyRecord | null>>;
+
 function normalize(value: unknown) {
   return String(value || "").trim().toLowerCase();
+}
+
+function pickText(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function buildPersonName(data: AnyRecord | null | undefined) {
+  if (!data) return "";
+  return [
+    pickText(data.firstName),
+    pickText(data.middleName),
+    pickText(data.lastName),
+    pickText(data.suffix),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
+function combineNameAndEmail(name: string, email: string) {
+  if (name && email && normalize(name) !== normalize(email)) {
+    return `${name} (${email})`;
+  }
+  return name || email;
+}
+
+function labelFromUser(data: AnyRecord | null | undefined) {
+  if (!data) return "";
+  return combineNameAndEmail(
+    pickText(data.UserName, data.displayName, data.fullName, buildPersonName(data)),
+    pickText(data.email)
+  );
+}
+
+function labelFromProfile(profile: AnyRecord | null | undefined, user?: AnyRecord | null) {
+  const name = pickText(profile?.fullName, buildPersonName(profile), user?.UserName, user?.displayName);
+  const email = pickText(profile?.email, user?.email);
+  return combineNameAndEmail(name, email);
+}
+
+function labelFromMerchant(data: AnyRecord | null | undefined) {
+  if (!data) return "";
+  return combineNameAndEmail(
+    pickText(data.name, data.businessName, data.storeName, data.displayName),
+    pickText(data.ownerEmail, data.email)
+  );
+}
+
+function labelFromReward(data: AnyRecord | null | undefined) {
+  if (!data) return "";
+  return pickText(data.title, data.name, data.rewardTitle);
+}
+
+function labelFromTransaction(data: AnyRecord | null | undefined) {
+  if (!data) return "";
+  const reward = pickText(data.rewardTitle, data.rewardName);
+  const member = pickText(data.userName, data.memberName, data.userEmail);
+  if (reward && member) return `${reward} for ${member}`;
+  return reward || member;
+}
+
+function labelFromPhysicalIdRequest(data: AnyRecord | null | undefined) {
+  if (!data) return "";
+  return combineNameAndEmail(
+    pickText(data.fullName, data.memberName),
+    pickText(data.digitalIdReference, data.userId)
+  );
+}
+
+function inferTargetLabelFromMetadata(module: string, metadata: AnyRecord | null | undefined) {
+  const body = metadata?.body && typeof metadata.body === "object" ? metadata.body : {};
+
+  if (module === "admin-accounts") {
+    return combineNameAndEmail(pickText(body.displayName, body.UserName), pickText(body.email));
+  }
+
+  if (module === "merchants") {
+    return labelFromMerchant(body);
+  }
+
+  if (module === "rewards") {
+    return labelFromReward(body);
+  }
+
+  if (module === "physical-id-requests") {
+    return labelFromPhysicalIdRequest(body);
+  }
+
+  return "";
+}
+
+async function getCachedDocument(collection: string, id: string, cache: DocumentCache) {
+  const key = `${collection}/${id}`;
+  if (!cache.has(key)) {
+    cache.set(
+      key,
+      db.collection(collection)
+        .doc(id)
+        .get()
+        .then((snap) => (snap.exists ? ({ id: snap.id, ...snap.data() } as AnyRecord) : null))
+    );
+  }
+  return cache.get(key)!;
+}
+
+async function resolveProfileLabel(userId: string, cache: DocumentCache) {
+  const [profile, user] = await Promise.all([
+    getCachedDocument("kkProfiling", userId, cache),
+    getCachedDocument("users", userId, cache),
+  ]);
+  return labelFromProfile(profile, user);
+}
+
+async function resolveAuditTargetLabel(log: SerializedAuditLog, cache: DocumentCache): Promise<SerializedAuditLog> {
+  if (log.targetLabel) return log;
+
+  const metadataLabel = inferTargetLabelFromMetadata(log.module, log.metadata);
+  if (metadataLabel) {
+    return { ...log, targetLabel: metadataLabel };
+  }
+
+  if (!log.targetId) return log;
+
+  const module = normalize(log.module);
+  const targetType = normalize(log.targetType);
+  const targetId = String(log.targetId);
+  let targetLabel = "";
+
+  if (module === "admin-accounts" || targetType === "admin-accounts") {
+    targetLabel = labelFromUser(await getCachedDocument("users", targetId, cache));
+  } else if (["verification", "youth", "digital-ids"].includes(module)) {
+    targetLabel = await resolveProfileLabel(targetId, cache);
+  } else if (module === "merchants" || targetType === "merchants") {
+    targetLabel = labelFromMerchant(await getCachedDocument("merchants", targetId, cache));
+  } else if (module === "rewards" || targetType === "rewards") {
+    targetLabel = labelFromReward(await getCachedDocument("rewards", targetId, cache));
+  } else if (module === "physical-id-requests" || targetType === "physical-id-requests") {
+    targetLabel = labelFromPhysicalIdRequest(await getCachedDocument("physicalIdRequests", targetId, cache));
+  } else if (module === "points-transactions" || targetType === "points-transactions") {
+    targetLabel = labelFromTransaction(await getCachedDocument("transactions", targetId, cache));
+  }
+
+  return targetLabel ? { ...log, targetLabel } : log;
+}
+
+async function enrichAuditTargetLabels(logs: SerializedAuditLog[]) {
+  const cache: DocumentCache = new Map();
+  return Promise.all(logs.map((log) => resolveAuditTargetLabel(log, cache).catch(() => log)));
 }
 
 function parseDate(value?: string, endOfDay = false) {
@@ -95,7 +250,7 @@ function parseDate(value?: string, endOfDay = false) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function matchesFilters(log: ReturnType<typeof serializeAuditLog>, filters: AuditLogFilters) {
+function matchesFilters(log: SerializedAuditLog, filters: AuditLogFilters) {
   const actor = normalize(filters.actor);
   const module = normalize(filters.module);
   const action = normalize(filters.action);
@@ -149,9 +304,10 @@ export async function listAuditLogs(filters: AuditLogFilters = {}) {
   const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize || 25)));
   const fetchLimit = Math.max(page * pageSize, Number(filters.exportLimit || 0), 500);
   const snap = await db.collection("auditLogs").orderBy("createdAt", "desc").limit(fetchLimit).get();
-  const filtered = snap.docs
-    .map((doc) => serializeAuditLog(doc.id, doc.data() || {}))
-    .filter((log) => matchesFilters(log, filters));
+  const logs = await enrichAuditTargetLabels(
+    snap.docs.map((doc) => serializeAuditLog(doc.id, doc.data() || {}))
+  );
+  const filtered = logs.filter((log) => matchesFilters(log, filters));
   const total = filtered.length;
   const start = (page - 1) * pageSize;
 
@@ -263,6 +419,13 @@ export function auditAdminMutation(req: AuthRequest, res: Response, next: NextFu
     const action = inferAction(req.method, relativePath);
     const target = inferTarget(req);
     const status = res.statusCode >= 200 && res.statusCode < 400 ? "success" : "failed";
+    const metadata = {
+      statusCode: res.statusCode,
+      durationMs: Date.now() - startedAt,
+      params: sanitize(req.params || {}),
+      query: sanitize(req.query || {}),
+      body: sanitize(req.body || {}),
+    };
 
     void createAuditLog({
       actorUid: req.user?.uid,
@@ -271,15 +434,10 @@ export function auditAdminMutation(req: AuthRequest, res: Response, next: NextFu
       action,
       module,
       ...target,
+      targetLabel: inferTargetLabelFromMetadata(module, metadata),
       status,
       summary: `${req.method.toUpperCase()} /api/admin/${relativePath} ${status}`,
-      metadata: {
-        statusCode: res.statusCode,
-        durationMs: Date.now() - startedAt,
-        params: sanitize(req.params || {}),
-        query: sanitize(req.query || {}),
-        body: sanitize(req.body || {}),
-      },
+      metadata,
     }).catch(() => undefined);
   });
 

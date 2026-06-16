@@ -34,6 +34,7 @@ interface VerificationQueueFilters {
   documentType?: string;
   dateSubmitted?: string;
   status?: string;
+  sortBy?: string;
   page?: number;
   pageSize?: number;
 }
@@ -105,6 +106,13 @@ function normalizeString(value: any) {
 
 function normalizeOptionalString(value: any) {
   return String(value || "").trim();
+}
+
+function toTime(value: any) {
+  const iso = toIso(value);
+  if (!iso) return 0;
+  const time = new Date(iso).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function formatNotificationDateTime(value: Date | string) {
@@ -558,6 +566,57 @@ function buildVerificationDocuments(profile: AnyRecord, rawDocuments: AnyRecord[
   };
 }
 
+function classifyYouthLifecycle(
+  profile: AnyRecord | null | undefined,
+  documentSummary: ReturnType<typeof buildVerificationDocuments> | null,
+  queueStatus: string
+) {
+  if (!profile || !profile.submittedAt) {
+    return "incomplete";
+  }
+
+  const finalStatus = normalizeString(profile.status);
+  if (
+    finalStatus === "verified" ||
+    queueStatus === "verified" ||
+    queueStatus === PENDING_SUPERADMIN_ID_GENERATION ||
+    resolveDigitalIdStatus(profile) === "active"
+  ) {
+    return "verified";
+  }
+
+  if (finalStatus === "rejected" || queueStatus === "rejected") {
+    return "rejected";
+  }
+
+  const needsUpload = Boolean(
+    documentSummary?.requiredDocuments.some((document) =>
+      ["missing", "rejected", "resubmission_requested"].includes(
+        normalizeString(normalizeDocumentStatus(document))
+      )
+    )
+  );
+
+  if (needsUpload) {
+    return "needs_upload";
+  }
+
+  return "pending_review";
+}
+
+function isVerificationQueueCompleted(profile: AnyRecord) {
+  const status = normalizeString(profile.status);
+  const queueStatus = normalizeString(profile.queueStatus);
+  const digitalIdStatus = normalizeString(profile.digitalIdStatus);
+
+  return (
+    status === "verified" ||
+    queueStatus === "verified" ||
+    queueStatus === PENDING_SUPERADMIN_ID_GENERATION ||
+    digitalIdStatus === "active"
+  );
+}
+
 async function getUsersAndProfiles() {
   const [usersSnap, profilesSnap] = await Promise.all([
     db.collection("users").get(),
@@ -588,23 +647,50 @@ export async function getDashboardStats() {
     getUsersAndProfiles(),
     db.collection("rewards").get(),
     db.collection("merchants").get(),
-    db.collection("transactions").orderBy("createdAt", "desc").limit(50).get(),
-    db.collection("documents").orderBy("uploadedAt", "desc").limit(50).get(),
+    db.collection("transactions").get(),
+    db.collection("documents").get(),
   ]);
 
-  const members: AnyRecord[] = users.map((user) => ({
-    ...user,
-    profile: profileMap.get(user.uid),
-    status: profileMap.get(user.uid)?.status,
-  }));
+  const youthUsers = users.filter((user) => normalizeString(user.role) === "youth");
+  const documentRecords: AnyRecord[] = documentsSnap.docs.map((doc) =>
+    serializeRecord({ id: doc.id, ...doc.data() }) as AnyRecord
+  );
+  const documentMap = new Map<string, AnyRecord[]>();
+  for (const document of documentRecords) {
+    const profileId = String(document.profileId || "");
+    if (!documentMap.has(profileId)) {
+      documentMap.set(profileId, []);
+    }
+    documentMap.get(profileId)!.push(document);
+  }
 
-  const recentMembers = [...members]
+  const youthMembers: AnyRecord[] = youthUsers.map((user) => {
+    const profile = profileMap.get(user.uid) || null;
+    const documents = documentMap.get(String(user.uid)) || [];
+    const documentSummary = profile ? buildVerificationDocuments(profile, documents) : null;
+    const queueStatus = profile ? computeQueueStatus(profile, documents) : "incomplete";
+
+    return {
+      ...user,
+      profile,
+      documents,
+      documentSummary,
+      queueStatus,
+      lifecycleStatus: classifyYouthLifecycle(profile, documentSummary, queueStatus),
+      status: profile?.status,
+    };
+  });
+  const youthProfiles = youthMembers
+    .map((member) => member.profile)
+    .filter(Boolean) as AnyRecord[];
+
+  const recentMembers = [...youthMembers]
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
     .slice(0, 8);
 
   const approvedMerchants = merchantsSnap.docs.filter((doc) => doc.data().status === "approved").length;
   const pendingMerchants = merchantsSnap.docs.filter((doc) => doc.data().status === "pending").length;
-  const archivedUsers = members.filter((member) => {
+  const archivedUsers = youthMembers.filter((member) => {
     const profile = member.profile || {};
     const numericAge = Number(profile.age);
     if (!Number.isNaN(numericAge) && numericAge > 30) return true;
@@ -623,10 +709,18 @@ export async function getDashboardStats() {
     return false;
   }).length;
 
-  const completedProfiles = profiles.filter((profile) => Boolean(profile.submittedAt)).length;
-  const incompleteProfiles = Math.max(users.length - completedProfiles, 0);
-  const profilingCompletionRate = users.length
-    ? Math.round((completedProfiles / users.length) * 100)
+  const lifecycleCounts = youthMembers.reduce(
+    (counts, member) => {
+      const key = String(member.lifecycleStatus || "incomplete");
+      counts[key] = (counts[key] || 0) + 1;
+      return counts;
+    },
+    {} as Record<string, number>
+  );
+  const completedProfiles = youthMembers.filter((member) => member.lifecycleStatus !== "incomplete").length;
+  const incompleteProfiles = lifecycleCounts.incomplete || 0;
+  const profilingCompletionRate = youthUsers.length
+    ? Math.round((completedProfiles / youthUsers.length) * 100)
     : 0;
 
   const now = new Date();
@@ -655,11 +749,11 @@ export async function getDashboardStats() {
     "Adult Youth",
   ].map((label) => ({
     name: label,
-    value: profiles.filter((profile) => normalizeYouthAgeGroup(profile.youthAgeGroup) === label).length,
+    value: youthProfiles.filter((profile) => normalizeYouthAgeGroup(profile.youthAgeGroup) === label).length,
   }));
 
   const genderMap = new Map<string, number>();
-  for (const profile of profiles) {
+  for (const profile of youthProfiles) {
     const key = String(profile.gender || "Unspecified");
     genderMap.set(key, (genderMap.get(key) || 0) + 1);
   }
@@ -668,9 +762,9 @@ export async function getDashboardStats() {
   const merchantMap = new Map<string, AnyRecord>(
     merchantsSnap.docs.map((doc) => [doc.id, serializeRecord({ id: doc.id, ...doc.data() })])
   );
-  const userMap = new Map<string, AnyRecord>(users.map((user) => [String(user.uid), user]));
+  const userMap = new Map<string, AnyRecord>(youthUsers.map((user) => [String(user.uid), user]));
 
-  const registrationActivities = users.map((user) => ({
+  const registrationActivities = youthUsers.map((user) => ({
     id: `registration-${user.uid}`,
     type: "registration",
     title: "New registration",
@@ -678,7 +772,7 @@ export async function getDashboardStats() {
     timestamp: user.createdAt,
   }));
 
-  const verificationActivities = profiles
+  const verificationActivities = youthProfiles
     .filter((profile) => profile.verificationActionAt)
     .map((profile) => ({
       id: `verification-${profile.userId}`,
@@ -694,9 +788,9 @@ export async function getDashboardStats() {
       status: profile.status,
     }));
 
-  const documentActivities = documentsSnap.docs.map((doc) => {
-    const record: AnyRecord = serializeRecord({ id: doc.id, ...doc.data() });
+  const documentActivities = documentRecords.map((record) => {
     const user = userMap.get(String(record.profileId || ""));
+    if (!user) return null;
     return {
       id: `document-${record.id}`,
       type: "document",
@@ -706,7 +800,7 @@ export async function getDashboardStats() {
       ).split("_").join(" ")}`,
       timestamp: record.uploadedAt,
     };
-  });
+  }).filter(Boolean) as AnyRecord[];
 
   const transactionActivities = transactionDocs.map((transaction) => {
     const merchant = merchantMap.get(String(transaction.merchantId || ""));
@@ -734,15 +828,16 @@ export async function getDashboardStats() {
     .slice(0, 10);
 
   return {
-    totalUsers: users.length,
-    profileSubmitted: profiles.filter((profile) => profile.submittedAt).length,
-    pending: profiles.filter((profile) => profile.status === "pending").length,
-    verified: profiles.filter((profile) => profile.status === "verified").length,
-    rejected: profiles.filter((profile) => profile.status === "rejected").length,
+    totalUsers: youthUsers.length,
+    profileSubmitted: completedProfiles,
+    pending: lifecycleCounts.pending_review || 0,
+    needsUpload: lifecycleCounts.needs_upload || 0,
+    verified: lifecycleCounts.verified || 0,
+    rejected: lifecycleCounts.rejected || 0,
     archivedUsers,
     profilingCompletionRate,
     incompleteProfiles,
-    verificationQueue: profiles.filter((profile) => profile.status === "pending").length,
+    verificationQueue: lifecycleCounts.pending_review || 0,
     pointsActivity: {
       today: pointsAwardedToday,
       thisWeek: pointsAwardedThisWeek,
@@ -792,6 +887,7 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
   const documentType = String(filters.documentType || "").trim();
   const queueStatus = normalizeString(filters.status);
   const dateSubmitted = filters.dateSubmitted ? new Date(filters.dateSubmitted) : null;
+  const sortBy = normalizeString(filters.sortBy) || "newest";
   const pageSize = Math.min(Math.max(Number(filters.pageSize) || 12, 1), 100);
   const page = Math.max(Number(filters.page) || 1, 1);
 
@@ -803,7 +899,21 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
       const adminHandoff = handoffMap.get(String(user.uid)) || {};
       const documentSummary = buildVerificationDocuments(profile, documents);
       const computedQueueStatus = computeQueueStatus(profile, documents);
-      const submittedAt = String(profile.submittedAt || "");
+      const submittedAt = String(profile.submittedAt || profile.createdAt || user.createdAt || "");
+      const latestActivityAt =
+        [
+          profile.verificationActionAt,
+          profile.verificationDocumentsApprovedAt,
+          profile.verificationReferredToSuperadminAt,
+          profile.digitalIdGeneratedAt,
+          profile.updatedAt,
+          adminHandoff.requestedAt,
+          submittedAt,
+          user.updatedAt,
+          user.createdAt,
+        ]
+          .map((value) => toTime(value))
+          .sort((a, b) => b - a)[0] || 0;
       return {
         userId: user.uid,
         fullName: [profile.firstName, profile.middleName, profile.lastName].filter(Boolean).join(" "),
@@ -820,6 +930,7 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
         queueStatus: computedQueueStatus,
         digitalIdStatus: resolveDigitalIdStatus(profile),
         submittedAt,
+        latestActivityAt,
         verificationDocumentsApprovedAt: profile.verificationDocumentsApprovedAt || null,
         verificationDocumentsApprovedBy: profile.verificationDocumentsApprovedBy || null,
         verificationReferredToSuperadminAt: profile.verificationReferredToSuperadminAt || null,
@@ -843,14 +954,15 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
         },
       };
     })
+    .filter((profile) => !isVerificationQueueCompleted(profile))
     .filter(
       (profile) =>
+        Boolean(profile.submittedAt) ||
         profile.requiredDocuments.some((document) => document.present) ||
         profile.documentCounts.approved > 0 ||
         profile.documentCounts.pending > 0 ||
         profile.documentCounts.rejected > 0 ||
         profile.documentCounts.resubmissionRequested > 0 ||
-        profile.status === "verified" ||
         profile.status === "rejected"
     )
     .filter((profile) => {
@@ -882,7 +994,21 @@ export async function getVerificationProfiles(filters: VerificationQueueFilters 
 
       return matchesSearch && matchesAgeGroup && matchesDocumentType && matchesStatus && matchesDate;
     })
-    .sort((a, b) => String(a.submittedAt || "").localeCompare(String(b.submittedAt || "")));
+    .sort((a, b) => {
+      if (sortBy === "oldest") {
+        return toTime(a.submittedAt) - toTime(b.submittedAt);
+      }
+
+      if (sortBy === "latest") {
+        return Number(b.latestActivityAt || 0) - Number(a.latestActivityAt || 0);
+      }
+
+      if (sortBy === "name_az") {
+        return String(a.fullName || a.email || "").localeCompare(String(b.fullName || b.email || ""));
+      }
+
+      return toTime(b.submittedAt) - toTime(a.submittedAt);
+    });
 
   const total = profiles.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
